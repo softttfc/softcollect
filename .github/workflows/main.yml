@@ -1,0 +1,156 @@
+name: Sync GitHub Repos to Subfolders and unzip to master
+ 
+on: 
+  schedule: 
+    - cron: '0 0 * * *' 
+  workflow_dispatch: 
+ 
+env: 
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true 
+ 
+concurrency: 
+  group: sync_job_lock 
+  cancel-in-progress: true 
+ 
+jobs: 
+  sync_and_unzip: 
+    runs-on: ubuntu-latest 
+ 
+    steps: 
+      - name: Checkout default branch 
+        uses: actions/checkout@v4 
+ 
+      - name: Set up Git config 
+        run: | 
+          git config user.name "github-actions[bot]" 
+          git config user.email "github-actions[bot]@users.noreply.github.com" 
+ 
+      - name: Reset repo 
+        run: | 
+          set -e 
+          DEFAULT_BRANCH=$(git remote show origin | sed -n '/HEAD branch/s/.*: //p') 
+          git fetch origin $DEFAULT_BRANCH 
+          git checkout $DEFAULT_BRANCH || git checkout -b $DEFAULT_BRANCH 
+          git reset --hard origin/$DEFAULT_BRANCH 
+          git clean -fdx 
+ 
+      # ==================== 修改点 1：Fetch subprojects（安全版） ====================
+      - name: Fetch subprojects（安全版：先克隆成功再替换）
+        run: | 
+          echo "==== 开始同步仓库 ====" 
+          declare -A repos=( 
+               [iptv-api]="https://github.com/Guovin/iptv-api.git" 
+            [TVBox_live]="https://github.com/Supprise0901/TVBox_live.git" 
+             [clash]="https://github.com/clash-download/Clash.git"  
+             [fanqiang]="https://github.com/free-nodes/fanqiang.git"  
+           #  [TVAPP]="https://github.com/youhunwl/TVAPP.git" 
+             [tvbox-source-aggregator]="https://github.com/riowang88/tvbox-source-aggregator.git"           
+            # 可以继续添加其他仓库
+          ) 
+ 
+          for name in "${!repos[@]}"; do 
+            echo "→ 同步 $name" 
+            
+            # [修改] 先尝试克隆到临时目录，不删除原有文件夹
+            rm -rf "temp-$name"                    # 清理旧的临时目录
+            git clone --depth 1 "${repos[$name]}" "temp-$name" || { 
+              echo "❌ 克隆失败 $name，跳过（保留原有文件夹）" 
+              rm -rf "temp-$name"                 # [新增] 清理克隆失败的残留
+              continue 
+            } 
+ 
+            # [修改] 克隆成功后，再删除旧目录并替换
+            rm -rf "$name" 
+            mkdir -p "$name" 
+            rsync -a --exclude='.git' "temp-$name"/ "$name"/ 
+            rm -rf "temp-$name" 
+          done 
+ 
+      - name: Sync DustinWin _posts 
+        run: | 
+          rm -rf temp-dustinwin 
+          git clone --depth 1 https://github.com/DustinWin/dustinwin.github.io.git temp-dustinwin || exit 0 
+          mkdir -p _posts 
+          rsync -a --exclude='.git' temp-dustinwin/_posts/ _posts/ 
+          rm -rf temp-dustinwin 
+ 
+      - name: Fix timestamps（安全版） 
+        run: | 
+          dirs="dr tvbox T4 wzxxcz Tomorrow aa999ok sky4726 ediart lemonguo121 leexuben yjl zheng1976 FGBLH yihad168 cpu_iy cpu_iy2 reF1nd bd catvod jaychouqq _posts" 
+ 
+          for d in $dirs; do 
+            [ -d "$d" ] || continue 
+            find "$d" -type f -print0 
+          done | xargs -0 touch 
+ 
+      # ==================== 修改点 2：Download NewTVBox（安全版） ====================
+      - name: Download NewTVBox（安全版：先下载验证成功再替换）
+        run: | 
+          # [修改] 先下载到临时文件，不删除现有目录
+          curl -L -o github.zip "https://github.com/PizazzGY/NewTVBox/archive/refs/heads/main.zip" || { 
+            echo "❌ 下载 NewTVBox 失败，保留原有 gitee-source（如果有）" 
+            rm -f github.zip 
+            exit 0 
+          } 
+ 
+          # [修改] 验证 ZIP 有效性
+          if unzip -t github.zip >/dev/null 2>&1; then 
+            # [修改] 验证通过后，再删除旧目录并替换
+            rm -rf gitee-source 
+            mkdir -p gitee-source 
+            unzip -q github.zip 
+            rsync -a --exclude='.git' NewTVBox-main/ gitee-source/ 
+            rm -rf NewTVBox-main github.zip 
+          else 
+            echo "⚠️ 下载的 ZIP 文件损坏，保留原有 gitee-source" 
+            rm -f github.zip 
+          fi 
+ 
+      - name: Commit main 
+        run: | 
+          git add . 
+          git commit -m "Sync all projects" || echo "No changes" 
+          DEFAULT_BRANCH=$(git remote show origin | sed -n '/HEAD branch/s/.*: //p') 
+          git push origin $DEFAULT_BRANCH 
+ 
+      - name: Sync to master 
+        run: | 
+          DEFAULT_BRANCH=$(git remote show origin | sed -n '/HEAD branch/s/.*: //p') 
+          git fetch origin 
+ 
+          if git show-ref --quiet refs/remotes/origin/master; then 
+            git checkout master 
+          else 
+            git checkout -b master 
+          fi 
+ 
+          git reset --hard origin/$DEFAULT_BRANCH 
+          git push origin master --force 
+ 
+      - name: Unzip ZIP 
+        run: | 
+          if [ -d "gitee-source" ]; then 
+            cd gitee-source 
+            for file in *.zip; do 
+              [ -e "$file" ] || continue 
+              unzip -o "$file" 
+            done 
+            cd .. 
+          fi 
+ 
+      - name: Commit unzip 
+        run: | 
+          git add . 
+          git commit -m "Unzip ZIP files" || echo "No changes" 
+          git push origin master --force 
+ 
+  cleanup_runs: 
+    runs-on: ubuntu-latest 
+    needs: sync_and_unzip 
+    steps: 
+      - name: Delete old runs 
+        uses: Mattraks/delete-workflow-runs@v2 
+        with: 
+          token: ${{ secrets.GITHUB_TOKEN }} 
+          retain_days: 3 
+          keep_minimum_runs: 10

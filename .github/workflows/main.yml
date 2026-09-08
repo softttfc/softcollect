@@ -46,6 +46,8 @@ jobs:
             [tvbox-source-aggregator]="https://github.com/riowang88/tvbox-source-aggregator.git" 
             [MusicFree]="https://github.com/maotoumao/MusicFree.git" 
             [MusicFreePlugins]="https://github.com/maotoumao/MusicFreePlugins.git" 
+            [lx-music-mobile洛雪]="https://github.com/lyswhut/lx-music-mobile.git" 
+             [lx-music-desktop洛雪]="https://github.com/lyswhut/lx-music-desktop.git"
             
             
             # 可以继续添加其他仓库

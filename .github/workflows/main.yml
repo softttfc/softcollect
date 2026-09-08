@@ -43,7 +43,11 @@ jobs:
             [TVBox_live]="https://github.com/Supprise0901/TVBox_live.git" 
              [clash]="https://github.com/clash-download/Clash.git"  
             [fanqiang]="https://github.com/free-nodes/fanqiang.git"  
-            [tvbox-source-aggregator]="https://github.com/riowang88/tvbox-source-aggregator.git"           
+            [tvbox-source-aggregator]="https://github.com/riowang88/tvbox-source-aggregator.git" 
+            [MusicFree]="https://github.com/maotoumao/MusicFree.git" 
+            [MusicFreePlugins]="https://github.com/maotoumao/MusicFreePlugins.git" 
+            
+            
             # 可以继续添加其他仓库
               #  [TVAPP]="https://github.com/youhunwl/TVAPP.git" 
           ) 

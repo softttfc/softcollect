@@ -48,6 +48,8 @@ jobs:
             [MusicFreePlugins]="https://github.com/maotoumao/MusicFreePlugins.git" 
             [lx-music-mobile洛雪]="https://github.com/lyswhut/lx-music-mobile.git" 
              [lx-music-desktop洛雪]="https://github.com/lyswhut/lx-music-desktop.git"
+            [lx-netease-music-mobile洛雪]="https://github.com/souvenp/lx-netease-music-mobile.git"
+             
             
             
             # 可以继续添加其他仓库

@@ -538,6 +538,7 @@ services:
       PUBLIC_PORT: "${PORT:-80}" # Legacy compatibility value synchronized from PORT
       NGINX_HTTP_PORT: "8080" # Advanced compatibility setting; normally do not change
       CDN_URL: ""
+      # Used only for subscription sources and EPG data, not media speed tests
       HTTP_PROXY: ""
 ```
 

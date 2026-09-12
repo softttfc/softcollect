@@ -247,6 +247,33 @@ public_url = https://iptv.example.com
         self.assertEqual(manager.public_url, "https://iptv.example.com")
         self.assertIsNone(manager.environment_override_name("public_url"))
 
+    def test_empty_http_proxy_environment_keeps_configured_proxy(self):
+        manager, _, _ = self._manager(
+            """\
+[Settings]
+http_proxy = http://proxy.example.com:7890
+""",
+            environ={"HTTP_PROXY": ""},
+        )
+
+        self.assertEqual(manager.http_proxy, "http://proxy.example.com:7890")
+        self.assertIsNone(manager.environment_override_name("http_proxy"))
+
+    def test_nonempty_http_proxy_environment_overrides_configured_proxy(self):
+        manager, _, _ = self._manager(
+            """\
+[Settings]
+http_proxy = http://config-proxy.example.com:7890
+""",
+            environ={"HTTP_PROXY": "http://env-proxy.example.com:7890"},
+        )
+
+        self.assertEqual(manager.http_proxy, "http://env-proxy.example.com:7890")
+        self.assertEqual(
+            manager.environment_override_name("http_proxy"),
+            "HTTP_PROXY",
+        )
+
     def test_nonempty_public_url_environment_overrides_configured_address(self):
         manager, _, _ = self._manager(
             """\

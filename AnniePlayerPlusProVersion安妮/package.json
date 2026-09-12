@@ -1,0 +1,78 @@
+{
+  "name": "annie-player-plus-pro",
+  "productName": "安妮播放器Plus Pro",
+  "version": "0.0.3",
+  "description": "AnniePlayerPlusProVersion beta0.0.3 —— DSD原生输出 / 防削波 / 响度归一 / 媒体库 / CUE / 迷你模式 / 命令面板",
+  "main": "main/main.js",
+  "license": "GPL-3.0-only",
+  "author": "无敌章鱼哥",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --publish never"
+  },
+  "dependencies": {
+    "music-metadata": "^11.14.0",
+    "NeteaseCloudMusicApi": "^4.32.0"
+  },
+  "devDependencies": {
+    "electron": "^42.4.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.mineradio.local.pro",
+    "productName": "安妮播放器Plus Pro",
+    "copyright": "Copyright © 无敌章鱼哥",
+    "compression": "maximum",
+    "files": [
+      "main/**/*",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "engine/publish",
+        "to": "engine",
+        "filter": [
+          "**/*",
+          "!**/*.pdb"
+        ]
+      },
+      {
+        "from": "engine/tools",
+        "to": "engine/tools",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "executableName": "AnniePlayerPlusPro",
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "legalTrademarks": "本应用由无敌章鱼哥开发"
+    },
+    "directories": {
+      "output": "setupEXE"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "安妮播放器Plus Pro",
+      "include": "build/installer.nsh",
+      "runAfterFinish": true,
+      "menuCategory": false,
+      "artifactName": "AnniePlayerPlusProVersion-beta${version}-Setup.${ext}"
+    }
+  }
+}

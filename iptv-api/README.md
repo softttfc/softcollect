@@ -83,18 +83,10 @@
 
 ## 赞助商
 
-<p align="center">
-  <a href="https://www.ipwo.net/?ref=githubGuovin">
-    <img src="./docs/images/ipwo.png" alt="Sponsored by IPWO - 住宅代理网络">
-  </a>
-</p>
-<p align="center">
-  <sub>
-    <a href="https://www.ipwo.net/?ref=githubGuovin"><strong>IPWO</strong></a> 提供稳定的住宅代理网络，适用于公开数据采集、接口调试、自动化测试与多地区访问验证等合规场景。
-    支持 HTTP / HTTPS / SOCKS5，优惠码：<strong><code>0105</code></strong>。
-    请在合法授权并遵守目标站点条款的前提下使用。
-  </sub>
-</p>
+| 赞助商 | 服务介绍                                                                                                                                                                                                                                                                                                                                                              |
+|:---:|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| <a href="https://helodata.com?ref=iptvapi1"><img src="./docs/images/helodata.png" alt="Helodata" width="150"></a> | <p align="center"><a href="https://helodata.com?ref=iptvapi1"><img src="./docs/images/helodata-banner.png" alt="Helodata 全球代理网络" width="720"></a></p><a href="https://helodata.com?ref=iptvapi1"><strong>Helodata</strong></a> 提供全球代理基础设施，覆盖 195+国家和地区，拥有8000万+ 合规授权住宅 IP，并支持住宅、ISP、移动及数据中心代理等，为 AI、爬虫与自动化应用提供稳定可靠的数据访问。使用优惠码 <strong><code>iptvapi</code></strong> 可享专属折扣。                     |
+| <a href="https://www.ipwo.net/?ref=githubGuovin"><img src="./docs/images/ipwo.webp" alt="IPWO" width="150"></a> | <p align="center"><a href="https://www.ipwo.net/?ref=githubGuovin"><img src="./docs/images/ipwo-banner.png" alt="IPWO 住宅代理网络" width="720"></a></p><a href="https://www.ipwo.net/?ref=githubGuovin"><strong>IPWO</strong></a> 提供稳定的住宅代理网络，适用于公开数据采集、接口调试、自动化测试与多地区访问验证等合规场景。支持 HTTP / HTTPS / SOCKS5，优惠码：<strong><code>0105</code></strong>。请在合法授权并遵守目标站点条款的前提下使用。 |
 
 <p align="center">
   <a href="mailto:360996299@qq.com?subject=%E6%88%90%E4%B8%BA%E8%B5%9E%E5%8A%A9%E5%95%86">成为赞助商</a>
@@ -160,7 +152,7 @@
 | public_scheme            | 高级兼容设置：旧版公网协议，仅在 `public_url` 留空时生效；可选值: http、https                                                            | http                                     |
 | public_domain            | 高级兼容设置：旧版公网 Host，仅在 `public_url` 留空时生效，默认使用本机 IP                                                                 | 127.0.0.1                                |
 | cdn_url                  | CDN 代理加速地址，用于订阅源、频道图标等资源的加速访问；支持配置多个（用英文逗号分隔），订阅源与 EPG 按顺序逐个回退拉取，任一镜像成功即停，频道图标使用第一个地址                                                                                        |                                          |
-| http_proxy               | HTTP 代理地址，用于获取订阅源等网络请求                                                                                               |                                          |
+| http_proxy               | HTTP 代理地址，仅用于获取订阅源和 EPG 数据；测速、媒体探测和截图保持直连                                                              |                                          |
 | open_local               | 开启本地源功能，将使用模板文件与本地源文件（local.txt）中的数据                                                                                 | True                                     |
 | open_subscribe           | 开启订阅源功能                                                                                                              | True                                     |
 | open_auto_disable_source | 开启自动停用失效地址，失效项会在 `config/subscribe.txt` 和 `config/epg.txt` 中加 #；Actions 不会提交该变更 | False                                    |

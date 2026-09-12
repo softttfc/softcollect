@@ -1,0 +1,9 @@
+node_modules/
+setupEXE/
+setupEXE-tmp*/
+engine/bin/
+engine/obj/
+engine/publish/
+*.pdb
+engine/tools/ffmpeg.exe
+engine/tools/ffprobe.exe

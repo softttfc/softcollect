@@ -493,6 +493,7 @@ services:
       PUBLIC_PORT: "${PORT:-80}" # 兼容旧配置，由 PORT 自动同步
       NGINX_HTTP_PORT: "8080" # 高级兼容项，通常不要修改
       CDN_URL: ""
+      # 仅用于获取订阅源和 EPG 数据，不用于媒体测速
       HTTP_PROXY: ""
 ```
 

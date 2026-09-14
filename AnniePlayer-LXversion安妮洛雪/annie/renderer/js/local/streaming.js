@@ -76,17 +76,38 @@ function localMatches(kw) {
   return out;
 }
 
-function localDupOf(song) {
-  const norm = (s) => String(s || '').toLowerCase().replace(/[\s（）()\[\]【】·\-_.]/g, '');
-  const n = norm(song.name), a = norm(song.artist);
-  if (!n) return null;
+/* V3.1 性能：本地查重预建索引。旧实现每首搜索结果都遍历整个曲库且每曲两次正则
+ *（30 结果 × 5000 曲 = 15 万次正则/次渲染）。现在按规范化标题建 Map 索引，
+ * 命中后再按艺人匹配；库规模/标签版本变化时自动重建。 */
+const _dupNorm = (s) => String(s || '').toLowerCase().replace(/[\s（）()\[\]【】·\-_.]/g, '');
+let _dupIdx = { key: '', map: null };
+function dupIndex() {
+  const key = state.library.tracks.length + '|' + (state._tagVer || 0);
+  if (_dupIdx.key === key && _dupIdx.map) return _dupIdx.map;
+  const map = new Map();
   for (const t of state.library.tracks) {
     const mc = state.library.metaCache[t.path] || {};
-    const tn = norm(mc.title || t.name.replace(/\.[^.]+$/, ''));
-    const ta = norm(mc.artist);
-    if (tn === n && (!a || !ta || ta === a || ta.includes(a) || a.includes(ta))) {
-      const lossless = /\.(flac|wav|ape|aiff?|alac|tta|wv|dsf|dff)$/i.test(t.path);
-      return { fav: state.favorites.has(t.path), lossless, path: t.path };
+    const tn = _dupNorm(mc.title || t.name.replace(/\.[^.]+$/, ''));
+    if (!tn) continue;
+    let arr = map.get(tn);
+    if (!arr) map.set(tn, arr = []);
+    arr.push({
+      ta: _dupNorm(mc.artist),
+      path: t.path,
+      lossless: /\.(flac|wav|ape|aiff?|alac|tta|wv|dsf|dff)$/i.test(t.path),
+    });
+  }
+  _dupIdx = { key, map };
+  return map;
+}
+function localDupOf(song) {
+  const n = _dupNorm(song.name), a = _dupNorm(song.artist);
+  if (!n) return null;
+  const cands = dupIndex().get(n);
+  if (!cands) return null;
+  for (const c of cands) {
+    if (!a || !c.ta || c.ta === a || c.ta.includes(a) || a.includes(c.ta)) {
+      return { fav: state.favorites.has(c.path), lossless: c.lossless, path: c.path };
     }
   }
   return null;
@@ -374,6 +395,12 @@ async function playStreamAt(i) {
     // 注入歌词：与播放地址并行获取，playTrack 完成后立即渲染
     if (ly && ly.lrc && window.annieStage && window.annieStage.setLyricText) {
       window.annieStage.setLyricText(ly.lrc);
+    }
+    // AM 主题流媒体歌词：按 stream:// 路径缓存 + 广播事件（AM 歌词走本地文件接口，stream:// 会落空）
+    if (ly && ly.lrc && state.currentPath) {
+      window.__annieStreamLrcByPath = window.__annieStreamLrcByPath || {};
+      window.__annieStreamLrcByPath[state.currentPath] = ly.lrc;
+      try { document.dispatchEvent(new CustomEvent('annie-stream-lyric', { detail: { path: state.currentPath } })); } catch { }
     }
     // V1.1.4：播放确认后预取下一首（URL 缓存 + 引擎 probe 预热）——切歌时秒起播
     prefetchNextSong();

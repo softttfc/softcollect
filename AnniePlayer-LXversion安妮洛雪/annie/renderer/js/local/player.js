@@ -55,6 +55,7 @@ async function loadLibrary() {
   rebuildLibIndex();
   state.favorites = new Set(state.library.favorites || []);
   state.tagCache = state.library.metaCache || {};
+  state._tagVer = (state._tagVer || 0) + 1; // V3.1：视图缓存失效
   // 文件夹被移除后，过滤条件可能失效
   if (state.folderFilter && state.folderFilter !== 'favorites'
     && !state.library.folders.some(f => isPathUnder(state.folderFilter, f) || isPathUnder(f, state.folderFilter))) {
@@ -540,6 +541,7 @@ async function ensureTagsForSort(viewTracks) {
       const chunk = missing.slice(i, i + CHUNK);
       const fresh = await window.mine.metaBatch(chunk);
       Object.assign(state.tagCache, fresh);
+      state._tagVer = (state._tagVer || 0) + 1; // V3.1：标签到达 → 视图缓存失效，按新标签重排
       /* EXP 7.28 修复：解析失败的文件（DSD/损坏/无标签容器）做会话级负缓存标记。
        * 否则它们永远处于 missing，metaBatch → renderTracks → ensureTagsForSort 形成
        * 无限重渲染循环，行节点被反复替换导致点击事件无法派发（粒子舞台点歌无响应）。 */
@@ -554,10 +556,14 @@ async function ensureTagsForSort(viewTracks) {
 async function toggleFavorite(trackPath) {
   const favs = await window.mine.toggleFavorite(trackPath);
   state.favorites = new Set(favs);
+  state._favVer = (state._favVer || 0) + 1; // V3.1：收藏过滤视图缓存失效
   renderFolderTree(); // 更新"我的喜爱"计数
   renderCurrentView();
   updateFavCurBtn(); // Plus：同步底栏收藏按钮
 }
+
+/* V3.1：视图排序缓存（见 renderTracks） */
+let viewCache = { key: '', tracks: null };
 
 function currentViewTracks() {
   let list = state.library.tracks;
@@ -662,8 +668,22 @@ async function renderTracks() {
   const filtered = currentViewTracks();
   // 标签排序模式：按维度值分组，插入分类标签头
   const mode = (window.annieSettings && annieSettings.ui.sortMode) || 'name';
-  const tracks = await sortTracksOffloaded(filtered, mode); // EXP 7.28：>1000 首 Worker 排序
-  if (gen !== renderGen) return; // 期间又有新渲染请求，丢弃过期结果
+  /* V3.1 性能：视图排序结果缓存。切歌/收藏/切主题触发的 renderTracks 此前每次都
+   * 全库 filter + 拼音 localeCompare 全排（>1000 首还会走一次 Worker 往返）。
+   * 键 = 过滤条件 + 搜索词 + 排序模式 + 库规模 + 标签版本 + 收藏版本；
+   * 智能列表是动态视图（依赖播放统计），不参与缓存。 */
+  const ff = state.folderFilter || '';
+  const kw = ($('#search').value || '').trim();
+  const useCache = !ff.startsWith('smart:');
+  const ck = ff + '|' + kw + '|' + mode + '|' + state.library.tracks.length + '|' + (state._tagVer || 0) + '|' + (state._favVer || 0);
+  let tracks;
+  if (useCache && viewCache.key === ck) tracks = viewCache.tracks;
+  else {
+    tracks = await sortTracksOffloaded(filtered, mode); // EXP 7.28：>1000 首 Worker 排序
+    if (gen !== renderGen) return; // 期间又有新渲染请求，丢弃过期结果
+    if (useCache) viewCache = { key: ck, tracks };
+  }
+  if (gen !== renderGen) return;
   // 播放中不覆写队列：点击行时会钉住队列快照，覆写会导致索引/播放错位
   if (!state.currentPath) state.queue = tracks;
   const grouped = TAG_SORTS.has(mode);
@@ -1041,12 +1061,9 @@ window.annieStreamPlay = async function (track) {
     } else $('#thumb-cover').src = track.cover;
   }
   if (track.duration) { $('#t-total').textContent = fmtTime(track.duration); }
-  // 可视化分析（ffmpeg 拉流解码）——V1.1.9：延后 1.2s（同 playAt，避免双 ffmpeg 抢资源）
-  // SVLX：仅在粒子舞台可见时执行
-  if (window.annieViz) {
-    const _u = track.url;
-    setTimeout(() => { if (!window.__legacyThemeHidden && state.currentStream?.url === _u) window.annieViz.analyze(_u, track.headers); }, 1200);
-  }
+  // 流媒体不做可视化分析：analyze 会让 ffmpeg 全速下载整首网络流，
+  // 与引擎的实时拉流抢带宽导致音频卡顿（AM/FB2K 门控后粒子舞台下仍会触发）。
+  // 舞台对无分析数据的曲目走实时回退渲染。
   return true; // SVLX：返回值供 AM 主题弹出错误提示
 };
 
@@ -1206,7 +1223,8 @@ function startProgressInterp() {
     const dt = (performance.now() - state._posAt) / 1000;
     if (dt < 0 || dt > 5) return; // 锚点过期（引擎事件停滞），等下个事件刷新
     const disp = state.position + dt;
-    updateProgress(disp);
+    // AM/FB2K 主题下舞台进度条隐藏，跳过 DOM 写入（其自身进度条由 position 事件驱动）
+    if (!window.__legacyThemeHidden) updateProgress(disp);
     if (window.annieViz) window.annieViz.setProgress(disp, state.duration);
     _interpRaf = requestAnimationFrame(tick);
   };

@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('mine', {
   toggleFavorite: (p) => ipcRenderer.invoke('lib:toggleFavorite', p),
   metaBatch: (paths) => ipcRenderer.invoke('lib:metaBatch', paths),
   metaFullBatch: (paths) => ipcRenderer.invoke('lib:metaFullBatch', paths), // V3.1：批量完整 meta（含封面）
+  matchSearch: (params) => ipcRenderer.invoke('match:search', params), // V3.3.1：在线歌词/封面匹配
+  matchApply: (params) => ipcRenderer.invoke('match:apply', params),
 
   // SVLX 1.3.0：自建播放列表（AM 主题）
   playlists: () => ipcRenderer.invoke('lib:playlists'),
@@ -116,6 +118,7 @@ contextBridge.exposeInMainWorld('mine', {
   // Pro beat0.0.1：迷你模式 / 桌面歌词 / 拖放 / 托盘
   miniEnter: (miniBounds) => ipcRenderer.invoke('mini:enter', miniBounds),
   miniExit: () => ipcRenderer.invoke('mini:exit'),
+  miniSetSize: (w, h) => ipcRenderer.invoke('mini:setSize', w, h),
   dlyricsToggle: () => ipcRenderer.invoke('dlyrics:toggle'),
   dlyricsLine: (payload) => ipcRenderer.send('dlyrics:line', payload),
   dlyricsCtl: (payload) => ipcRenderer.send('dlyrics:ctl', payload),

@@ -9,6 +9,7 @@ const { Worker } = require('worker_threads'); // EXP 7.28：曲库扫描 Worker
 const { EngineClient } = require('./engineClient');
 const library = require('./library');
 const streaming = require('./streaming');
+const onlineMatch = require('./onlineMatch');
 const analyzer = require('./analyzer');
 
 const engine = new EngineClient();
@@ -518,7 +519,7 @@ function registerIpc() {
   });
 
   /* ---------------- Pro beat0.0.1：迷你模式（主窗口形态切换，位置记忆） ---------------- */
-  let miniSaved = null, miniWasMax = false;
+  let miniSaved = null, miniWasMax = false, miniActive = false;
   ipcMain.handle('mini:enter', (_e, miniBounds) => {
     if (!mainWindow) return { ok: false };
     // 最大化窗口 setSize/setBounds 无效：先记录并退出最大化（修复：最大化进迷你变"全屏"）
@@ -527,10 +528,20 @@ function registerIpc() {
     if (miniWasMax) mainWindow.unmaximize();
     mainWindow.setMinimumSize(360, 120);
     mainWindow.setAlwaysOnTop(true);
+    miniActive = true;
     // 记忆位置尺寸合法性钳制（防止历史异常值把迷你窗撑回大屏）
     if (miniBounds && miniBounds.width >= 360 && miniBounds.width <= 900 && miniBounds.height >= 120 && miniBounds.height <= 400)
       mainWindow.setBounds(miniBounds);
     else mainWindow.setSize(420, 150);
+    return { ok: true };
+  });
+  // AM 迷你界面：歌词/队列面板展开时动态调整窗口高度（仅迷你模式内有效）
+  ipcMain.handle('mini:setSize', (_e, w, h) => {
+    if (!mainWindow || !miniActive) return { ok: false };
+    w = Math.round(Math.min(Math.max(w || 360, 320), 520));
+    h = Math.round(Math.min(Math.max(h || 156, 120), 760));
+    const b = mainWindow.getBounds();
+    mainWindow.setBounds({ x: b.x, y: b.y, width: w, height: h });
     return { ok: true };
   });
   ipcMain.handle('mini:exit', () => {
@@ -538,6 +549,7 @@ function registerIpc() {
     const b = mainWindow.getBounds();
     mainWindow.setAlwaysOnTop(false);
     mainWindow.setMinimumSize(1120, 680);
+    miniActive = false;
     if (miniWasMax) mainWindow.maximize(); // 进入前是最大化 → 还原最大化
     else if (miniSaved) mainWindow.setBounds(miniSaved);
     miniSaved = null; miniWasMax = false;
@@ -721,6 +733,10 @@ function registerIpc() {
     const cut = p.includes('#cue') ? p.indexOf('#cue') : (p.includes('#iso') ? p.indexOf('#iso') : -1);
     return library.readLyrics(cut >= 0 ? p.slice(0, cut) : p);
   });
+
+  // V3.3.1：在线歌词/封面匹配（一期·单曲手动匹配）
+  ipcMain.handle('match:search', (_e, params) => onlineMatch.searchCandidates(params || {}));
+  ipcMain.handle('match:apply', (_e, params) => onlineMatch.applyMatch(params || {}));
   ipcMain.handle('track:readFile', (_e, p) => {
     // Pro：CUE 虚拟分轨剥离 #cueN 后缀，读真实整轨文件
     const cut = p.includes('#cue') ? p.indexOf('#cue') : (p.includes('#iso') ? p.indexOf('#iso') : -1);
@@ -824,6 +840,34 @@ if (!gotLock) {
     if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.focus(); }
   });
 
+  // V3.3.1：GitHub Releases 差量自动更新（electron-updater，仅打包版运行）
+  // 用户侧体验：后台静默下载差量包（几 MB），下完弹窗询问是否重启安装；选"稍后"则下次启动生效。
+  function setupAutoUpdate() {
+    if (!app.isPackaged) return;
+    let autoUpdater;
+    try { ({ autoUpdater } = require('electron-updater')); } catch (e) { console.warn('[update] electron-updater 不可用:', e.message); return; }
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.on('update-available', (info) => console.log('[update] 发现新版本:', info && info.version));
+    autoUpdater.on('update-downloaded', async (info) => {
+      try {
+        const r = await dialog.showMessageBox(mainWindow, {
+          type: 'info',
+          title: '更新已就绪',
+          message: '新版本 V' + (info && info.version) + ' 已下载完成',
+          detail: '现在重启应用完成更新？（选"稍后"则下次启动时自动生效）',
+          buttons: ['立即重启更新', '稍后'],
+          defaultId: 0, cancelId: 1,
+        });
+        if (r.response === 0) autoUpdater.quitAndInstall();
+      } catch { }
+    });
+    autoUpdater.on('error', (e) => console.warn('[update] 更新检查失败(不打扰用户):', e && e.message));
+    // 启动 15s 后首查（让开启动带宽），之后每 6 小时复查
+    setTimeout(() => autoUpdater.checkForUpdates().catch(() => { }), 15000);
+    setInterval(() => autoUpdater.checkForUpdates().catch(() => { }), 6 * 3600 * 1000);
+  }
+
   app.whenReady().then(() => {
     registerIpc();
     streaming.init(app); // 恢复流媒体登录态（userData/stream-cookies.json）
@@ -833,6 +877,7 @@ if (!gotLock) {
     engine.call('devices.list', {}, 90000).catch(() => { });
     createWindow();
     createTray(); // Pro beat0.0.1：系统托盘
+    setupAutoUpdate(); // V3.3.1：GitHub 差量自动更新（仅打包版）
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();

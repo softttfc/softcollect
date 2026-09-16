@@ -213,6 +213,8 @@
         ['添加音乐文件夹…', '', function () { $('#btn-add-folder').click(); }],
         ['重新扫描媒体库', 'F5', function () { $('#btn-rescan').click(); }],
         ['-', null, null],
+        ['设置中心…', 'Ctrl+,', function () { window.annieSettings.togglePanel(); }],
+        ['-', null, null],
         ['退出', '', function () { window.mine.winClose(); }]
       ]],
       ['编辑', [
@@ -222,7 +224,7 @@
       ]],
       ['视图', [
         ['切换到粒子舞台主题', '', function () { window.annieTheme.switch('legacy'); }],
-        ['主题与外观设置…', '', function () { window.annieSettings.togglePanel(); }],
+        ['设置中心…', 'Ctrl+,', function () { window.annieSettings.togglePanel(); }],
         ['-', null, null],
         ['列表视图', '', function () { setViewMode('list'); }],
         ['分栏视图', '', function () { setViewMode('split'); }],
@@ -1045,15 +1047,80 @@
   }
 
   /* ---------- 歌词 ---------- */
+  /* 逐字歌词提取（与 stage-adapter 同款解析；无词标签返回 null，普通 LRC 行为不变）
+   * 支持 <mm:ss.xxx>文字（绝对）与 <相对ms,时长ms>文字（lxlyric）两种标签 */
+  function karaParseMark(raw, lineStart) {
+    var s = String(raw || '').trim();
+    var mm = /^(\d{1,2}):(\d{1,2}(?:\.\d{1,3})?)$/.exec(s);
+    if (mm) return { t: (parseInt(mm[1], 10) || 0) * 60 + parseFloat(mm[2] || '0'), d: 0 };
+    var rel = /^(\d+),(\d+)$/.exec(s);
+    if (rel) return { t: (Number(lineStart) || 0) + (parseInt(rel[1], 10) || 0) / 1000, d: (parseInt(rel[2], 10) || 0) / 1000 };
+    return null;
+  }
+  function karaExtractWords(rawText, lineStart) {
+    var s = String(rawText || '');
+    if (s.indexOf('<') < 0) return null;
+    var re = /<([^<>]+)>/g, m, marks = [];
+    while ((m = re.exec(s))) marks.push({ raw: m[1], index: m.index, end: re.lastIndex });
+    if (!marks.length) return null;
+    var words = [], fullText = '';
+    for (var i = 0; i < marks.length; i++) {
+      var seg = s.slice(marks[i].end, i + 1 < marks.length ? marks[i + 1].index : s.length);
+      if (!seg) continue;
+      var tk = karaParseMark(marks[i].raw, lineStart);
+      if (tk == null) { fullText += seg; continue; }
+      var c0 = fullText.length;
+      fullText += seg;
+      words.push({ text: seg, t: tk.t, d: tk.d, c0: c0, c1: fullText.length });
+    }
+    if (!words.length) return null;
+    for (var k = 0; k < words.length; k++) {
+      if (words[k].d > 0) continue;
+      var nxt = words[k + 1];
+      words[k].d = nxt ? Math.max(0.06, nxt.t - words[k].t) : 0.6;
+    }
+    return { text: fullText, words: words };
+  }
+  /* 用行元素实际字体测每个词的字宽占比（缓存到节点，字体/文本变化时重算） */
+  /* 逐词 span 卡拉OK：每词独立双层，词间自然折行；每 tick 只刷当前行 */
+  function karaPaintLine(node, now) {
+    var arr = node._karaWords;
+    for (var i = 0; i < arr.length; i++) {
+      var w = arr[i].w;
+      var ws = w.t, we = w.t + Math.max(0.08, w.d || 0.24);
+      var p;
+      if (now >= we) p = 1;
+      else if (now <= ws) p = 0;
+      else p = (now - ws) / (we - ws);
+      arr[i].hi.style.width = (p * 100).toFixed(1) + '%';
+    }
+  }
+  function karaResetLine(node) {
+    var arr = node._karaWords;
+    for (var i = 0; i < arr.length; i++) arr[i].hi.style.width = '0%';
+  }
   function parseLrc(text) {
     var map = new Map();
     text.split(/\r?\n/).forEach(function (line) {
+      // lxlyric 行格式：[起始ms,时长ms]文本（行内 <相对ms,时长ms> 词标签走同一提取）
+      var lx = /^\s*\[(\d+),(\d+)\](.*)$/.exec(line);
+      if (lx) {
+        var lt = (parseInt(lx[1], 10) || 0) / 1000;
+        var lraw = (lx[3] || '').trim();
+        var lex = karaExtractWords(lraw, lt);
+        if (!map.has(lt)) map.set(lt, { t: lt, txt: lex ? lex.text : lraw, tly: '', words: lex ? lex.words : null });
+        return;
+      }
       var re = /\[(\d+):(\d+(?:\.\d+)?)\]/g, mm, last = 0, times = [];
       while ((mm = re.exec(line))) { times.push(+mm[1] * 60 + (+mm[2])); last = re.lastIndex; }
       if (!times.length) return;
-      var txt = line.slice(last).trim();
+      var raw = line.slice(last).trim();
+      // 逐字：提取 <词时间> 标签，txt 清洗为纯文本
+      var ex = karaExtractWords(raw, times[times.length - 1]);
+      var txt = ex ? ex.text : raw;
+      var words = ex ? ex.words : null;
       times.forEach(function (t) {
-        if (!map.has(t)) map.set(t, { t: t, txt: txt, tly: '' });
+        if (!map.has(t)) map.set(t, { t: t, txt: txt, tly: '', words: words ? words.slice() : null });
         else { map.get(t).tly = txt; } // 同时间戳第二行视为译文
       });
     });
@@ -1068,6 +1135,10 @@
       renderLyrics();
     }).catch(function () { renderLyrics(); });
   }
+  /* 逐字歌词总开关（设置中心·歌词页，LS annieplayer.karaoke，默认开） */
+  function karaOn() { try { return localStorage.getItem('annieplayer.karaoke') !== '0'; } catch (e) { return true; } }
+  // 开关变更后重建歌词行（撤下/恢复逐词扫过）
+  document.addEventListener('annie-karaoke-changed', function () { renderLyrics(); });
   function renderLyrics() {
     if (!R.lyrLines) return;
     R.lyrLines.innerHTML = '';
@@ -1077,7 +1148,22 @@
       S.lyrLines.forEach(function (l, i) {
         var d = el('div', 'f2-lyr');
         d.dataset.i = i;
-        d.appendChild(document.createTextNode(l.txt || ' '));
+        if (l.words && l.words.length && l.txt && karaOn()) {
+          // 逐词 span（词间自然折行；词内双层按进度裁切扫过）
+          d.classList.add('kara');
+          var wspans = [];
+          l.words.forEach(function (w) {
+            var ws = el('span', 'kara-w');
+            var base = el('span', 'kara-wb'); base.textContent = w.text;
+            var hi = el('span', 'kara-wh'); hi.textContent = w.text;
+            ws.appendChild(base); ws.appendChild(hi);
+            d.appendChild(ws);
+            wspans.push({ w: w, hi: hi });
+          });
+          d._karaWords = wspans;
+        } else {
+          d.appendChild(document.createTextNode(l.txt || ' '));
+        }
         if (l.tly) d.appendChild(el('span', 'tly', l.tly));
         R.lyrLines.appendChild(d);
       });
@@ -1091,9 +1177,13 @@
     if (!S.lyrLines || !R.lyrLines) return;
     var cur = -1;
     for (var i = 0; i < S.lyrLines.length; i++) if (S.lyrLines[i].t <= S.pos + 0.15) cur = i; else break;
-    if (cur === S.lyrCur) return;
-    S.lyrCur = cur;
+    // 逐词扫过：当前行每 tick 更新各词裁切宽度（不吃下方 line-change 早退）
     var q = R.lyrLines.querySelectorAll('.f2-lyr');
+    if (cur >= 0 && q[cur] && q[cur]._karaWords) karaPaintLine(q[cur], S.pos);
+    if (cur === S.lyrCur) return;
+    // 行切换：重置上一行逐词宽度，避免残留
+    if (S.lyrCur >= 0 && q[S.lyrCur] && q[S.lyrCur]._karaWords) karaResetLine(q[S.lyrCur]);
+    S.lyrCur = cur;
     for (var j = 0; j < q.length; j++) q[j].classList.toggle('cur', j === cur);
     if (cur >= 0 && q[cur]) {
       var box = R.lyrLines;

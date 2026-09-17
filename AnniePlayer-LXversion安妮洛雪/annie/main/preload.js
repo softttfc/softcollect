@@ -62,6 +62,11 @@ contextBridge.exposeInMainWorld('mine', {
   streamGetPic: (params) => ipcRenderer.invoke('stream:getPic', params),
   streamCoverProxy: (url) => ipcRenderer.invoke('stream:coverProxy', url),
   streamHotSearch: (params) => ipcRenderer.invoke('stream:hotSearch', params),
+  // 发现音乐：排行榜 / 歌单广场（V3.5.4）
+  streamLeaderboards: (params) => ipcRenderer.invoke('stream:leaderboards', params),
+  streamLeaderboardList: (params) => ipcRenderer.invoke('stream:leaderboardList', params),
+  streamSongLists: (params) => ipcRenderer.invoke('stream:songLists', params),
+  streamSongListDetail: (params) => ipcRenderer.invoke('stream:songListDetail', params),
 
   // 设置中心：版本 / 手动检查更新 / 外链 / 更新状态订阅
   appVersion: () => ipcRenderer.invoke('app:getVersion'),
@@ -72,6 +77,7 @@ contextBridge.exposeInMainWorld('mine', {
     ipcRenderer.on('app:updateStatus', listener);
     return () => ipcRenderer.removeListener('app:updateStatus', listener);
   },
+  getReleaseNotes: (ver) => ipcRenderer.invoke('app:getReleaseNotes', ver), // 新版本更新日志（V3.5.3）
 
   // 洛雪式音源管理
   streamSourcesList: () => ipcRenderer.invoke('stream:sources:list'),

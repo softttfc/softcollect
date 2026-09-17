@@ -767,6 +767,11 @@ function registerIpc() {
 ipcMain.handle('stream:getPic', (_e, params) => streaming.getPic(params));
 ipcMain.handle('stream:coverProxy', (_e, url) => streaming.coverProxy(url));
 ipcMain.handle('stream:hotSearch', (_e, params) => streaming.hotSearch(params));
+// 发现音乐：排行榜 / 歌单广场（V3.5.4）
+ipcMain.handle('stream:leaderboards', (_e, params) => streaming.leaderboards(params));
+ipcMain.handle('stream:leaderboardList', (_e, params) => streaming.leaderboardList(params));
+ipcMain.handle('stream:songLists', (_e, params) => streaming.songLists(params));
+ipcMain.handle('stream:songListDetail', (_e, params) => streaming.songListDetail(params));
 
   // —— 洛雪式音源管理（导入/删除/启停）——
   ipcMain.handle('stream:sources:list', () => streaming.sources.list());
@@ -839,16 +844,30 @@ function setupAutoUpdate() {
   autoUpdater.on('update-downloaded', async (info) => {
     ulog.info('[updater] downloaded: ' + (info && info.version));
     sendUpd('ready', info && info.version);
+    // V3.5.3：更新公告——弹窗附带本次更新内容（release notes）
+    let notes = '';
+    try { notes = (await fetchReleaseNotes(info && info.version)) || ''; } catch { }
     try {
       const r = await dialog.showMessageBox(mainWindow, {
         type: 'info',
         title: '更新已就绪',
         message: '新版本 V' + (info && info.version) + ' 已下载完成',
-        detail: '现在重启应用完成更新？（选"稍后"则下次启动时自动生效）',
+        detail: '现在重启应用完成更新？（选"稍后"则下次启动时自动生效）'
+          + (notes ? '\n\n更新内容：\n' + notes.slice(0, 800) : ''),
         buttons: ['立即重启更新', '稍后'],
         defaultId: 0, cancelId: 1,
       });
-      if (r.response === 0) autoUpdater.quitAndInstall();
+      if (r.response === 0) {
+        // 修复：托盘模式下进程可能退不干净导致 NSIS 提示"无法关闭"——
+        // 先置退出标记并停引擎，再走 quitAndInstall（V3.5.3）
+        // V3.5.5 双保险：优雅退出若被托盘/Worker 拖住，5s 后 app.exit 强退，
+        // 保证 NSIS「无法关闭」重试一次即过（根因：NSIS 用 WM_CLOSE 关程序，
+        // 而我们窗口关闭后进程留托盘，被判定无法关闭）
+        try { global.__svlxQuitting = true; } catch { }
+        try { engine.stop(); } catch { }
+        autoUpdater.quitAndInstall();
+        setTimeout(() => { try { app.exit(0); } catch { } }, 5000);
+      }
     } catch { }
   });
   autoUpdater.on('error', (e) => { console.warn('[update] 更新检查失败(不打扰用户):', e && e.message); sendUpd('error', String(e && e.message || e)); });
@@ -873,6 +892,20 @@ ipcMain.handle('app:checkUpdate', async () => {
   if (!__manualCheckUpdate) return { ok: false, error: 'updater 未初始化' };
   return __manualCheckUpdate();
 });
+// 更新日志（设置中心·更新页 + 更新就绪弹窗共用）：net.fetch 走系统代理；失败返回 null 静默
+async function fetchReleaseNotes(ver) {
+  try {
+    const { net } = require('electron');
+    const v = String(ver || '').replace(/[^\d.]/g, '');
+    if (!v) return null;
+    const r = await net.fetch('https://api.github.com/repos/Zhou1019-1/AnniePlayer-LXversion/releases/tags/v' + v,
+      { headers: { 'User-Agent': 'annie-player' } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return (j && j.body) ? String(j.body) : null;
+  } catch { return null; }
+}
+ipcMain.handle('app:getReleaseNotes', (_e, ver) => fetchReleaseNotes(ver));
 
 // ---------- 生命周期 ----------
 // SVLX 模式下跳过锁 + whenReady（已由 src/main.js 接管）
@@ -891,6 +924,9 @@ if (global.__svlxBoot) {
   app.on('window-all-closed', () => {
     if (global.__svlxQuitting) { engine.stop(); app.quit(); }
   });
+  // V3.5.5：任何退出路径（含用户选"稍后"后 autoInstallOnAppQuit 触发的安装）
+  // 都在退出前停引擎，避免 AnnieEngine.exe 残留占用安装目录文件导致覆盖失败
+  app.on('before-quit', () => { try { engine.stop(); } catch { } });
 } else {
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {

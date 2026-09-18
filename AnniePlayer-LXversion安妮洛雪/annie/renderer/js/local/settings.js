@@ -126,6 +126,7 @@
     ['general', '常规'],
     ['audio', '音频输出'],
     ['playback', '播放'],
+    ['fx', '效果器'],
     ['lyrics', '歌词'],
     ['visual', '视觉舞台'],
     ['library', '媒体库'],
@@ -363,6 +364,7 @@
     panel.appendChild(win);
 
     var pgGeneral = pageEls.general, pgAudio = pageEls.audio, pgPlayback = pageEls.playback,
+      pgFx = pageEls.fx,
       pgLyrics = pageEls.lyrics, pgVisual = pageEls.visual, pgLibrary = pageEls.library,
       pgTools = pageEls.tools,
       pgDownload = pageEls.download, pgUpdate = pageEls.update, pgExt = pageEls.ext;
@@ -373,6 +375,22 @@
     checkRow(s4, '粒子总开关', 'particlesEnabled', applyInterface, '粒子总开关 舞台粒子 particles');
     checkRow(s4, '封面氛围背景', 'albumBg', applyInterface, '封面氛围背景 模糊 background blur');
     sliderRow(s4, '背景模糊', 'albumBgBlur', 40, 200, 10, fmtPx, applyInterface, '背景模糊 blur');
+
+    // —— V3.5.8：全局快捷键（状态存主进程 store，IPC 开关） ——
+    var sHk = section(pgGeneral, '全局快捷键');
+    var hkRow = markItem(el('label', 'set-check'), '全局快捷键 媒体键 后台播放 global hotkey media keys');
+    var hkInput = document.createElement('input');
+    hkInput.type = 'checkbox';
+    hkRow.appendChild(hkInput);
+    hkRow.appendChild(el('span', '', '启用全局快捷键（软件在后台/最小化时也能控制播放）'));
+    sHk.appendChild(hkRow);
+    sHk.appendChild(el('div', 'set-hint', '播放/暂停 Ctrl+Alt+Space · 上一首/下一首 Ctrl+Alt+←/→ · 音量 Ctrl+Alt+↑/↓；支持键盘媒体键。任务栏图标悬停也有播放控制按钮。'));
+    if (window.mine.hotkeysGet) {
+      window.mine.hotkeysGet().then(function (on) { hkInput.checked = !!on; }).catch(function () { });
+      hkInput.onchange = function () {
+        window.mine.hotkeysSetEnabled(hkInput.checked).catch(function () { });
+      };
+    } else hkInput.disabled = true;
 
     // —— 外观：界面主题（一键切换，无需重启） ——
     var s5 = section(pgGeneral, '外观 · 界面主题');
@@ -718,6 +736,16 @@
     var tlyRow = lsCheckRow(sLg, '显示翻译行', 'annieplayer.lyrtly', true, function (on) {
       document.body.classList.toggle('no-tly', !on);
     }, '翻译行 译文 罗马音 tly translation');
+    // —— 桌面歌词开关（窗口开关，状态跟随 annie-dlyrics-changed） ——
+    var dlRow = markItem(el('div', 'set-row'), '桌面歌词 desktop lyrics 悬浮 置顶 逐字');
+    var dlLab = el('div'); dlLab.appendChild(el('div', '', '桌面歌词'));
+    dlLab.appendChild(el('div', 'set-hint', '屏幕上方悬浮歌词条，本地逐字歌词有卡拉OK填充；快捷键 Alt+L'));
+    var dlChk = document.createElement('input'); dlChk.type = 'checkbox';
+    dlChk.checked = !!(window.annieDlyricsOn && window.annieDlyricsOn());
+    dlChk.onchange = function () { if (window.annieDlyricsToggle) window.annieDlyricsToggle(); };
+    document.addEventListener('annie-dlyrics-changed', function (e) { dlChk.checked = !!(e.detail && e.detail.on); });
+    dlRow.appendChild(dlLab); dlRow.appendChild(dlChk);
+    sLg.appendChild(dlRow);
     lsSliderRow(sLg, 'AM 歌词字号', 'annieplayer.am.lyrscale', 0.7, 1.6, 0.05, 1, fmt2, function () {
       if (window.amLyrStyle) window.amLyrStyle();
     }, 'am 歌词字号 字体大小 apple music font size');
@@ -764,6 +792,162 @@
     sliderRow(s2, '节拍震屏', 'cinemaShake', 0, 1, 0.05, fmt2, applyVisual, '节拍震屏 shake');
     sliderRow(s2, '封面粒子密度', 'coverResolution', 0.75, 1.55, 0.05, fmt2, applyVisual, '封面粒子密度 cover resolution');
     s2.appendChild(el('div', 'set-hint', '封面粒子密度在切歌后生效'));
+
+    /* ================= VST实验区：效果器（VST3 链） ================= */
+    (function buildFxPage() {
+      var fx = window.annieFx;
+      var sFx = section(pgFx, 'VST3 效果器链');
+      var fxBox = markItem(el('div', 'set-lib-list'), '效果器 vst vst3 插件 混响 压缩 effect plugin fx');
+      sFx.appendChild(fxBox);
+      var fxStat = el('div', 'set-hint', 'VST3 效果器在引擎音频链中处理（均衡器之前），崩溃自动旁通；未播放时参数仅可查看');
+      sFx.appendChild(fxStat);
+      if (!fx) { fxBox.appendChild(el('div', 'set-hint', '效果器模块未加载')); return; }
+
+      // —— 参数面板（点「参数」展开） ——
+      var paramPanel = el('div', 'fx-params');
+      paramPanel.style.display = 'none';
+      sFx.appendChild(paramPanel);
+      var paramSlotId = null;
+
+      function renderParams(id, path) {
+        paramSlotId = id;
+        paramPanel.innerHTML = '';
+        paramPanel.style.display = '';
+        paramPanel.appendChild(el('div', 'set-hint', '正在读取参数…'));
+        fx.params(id).then(function (r) {
+          if (paramSlotId !== id) return; // 已切换
+          paramPanel.innerHTML = '';
+          paramPanel.appendChild(el('div', 'fx-params-title', '🎛 ' + (r.name || '') + '（' + r.params.length + ' 个参数）'));
+          if (!r.params.length) { paramPanel.appendChild(el('div', 'set-hint', '该插件没有可编辑参数')); return; }
+          r.params.forEach(function (p) {
+            if (p.readOnly) return;
+            var row = el('div', 'set-row');
+            var head = el('div', 'set-row-head');
+            head.appendChild(el('span', 'set-label', p.title));
+            var val = el('span', 'set-val', p.display || String(Math.round(p.value * 100) / 100));
+            head.appendChild(val);
+            row.appendChild(head);
+            var slider = document.createElement('input');
+            slider.type = 'range'; slider.min = 0; slider.max = 1;
+            slider.step = (p.discrete && p.steps > 0) ? (1 / p.steps) : 0.001;
+            slider.value = p.value;
+            slider.oninput = function () {
+              val.textContent = slider.value;
+              fx.setParam(id, path, p.id, parseFloat(slider.value)).then(function (rr) {
+                if (rr && rr.display) val.textContent = rr.display;
+              }).catch(function () { });
+            };
+            row.appendChild(slider);
+            paramPanel.appendChild(row);
+          });
+        }).catch(function (e) {
+          paramPanel.innerHTML = '';
+          paramPanel.appendChild(el('div', 'set-hint', '读取参数失败：' + (e && e.message ? e.message : e)));
+        });
+      }
+
+      function renderFxSlots() {
+        paramSlotId = null; paramPanel.style.display = 'none'; paramPanel.innerHTML = '';
+        fxBox.innerHTML = '';
+        fx.ensureReady().then(function (slots) {
+          fxBox.innerHTML = '';
+          var cfgs = fx.cfg.slots;
+          if (!slots.length && !cfgs.length) {
+            fxBox.appendChild(el('div', 'set-hint', '尚未添加效果器，点击下方「扫描」或「添加 .vst3 文件」'));
+            return;
+          }
+          slots.forEach(function (s) {
+            var row = el('div', 'set-lib-item fx-slot' + (s.broken ? ' broken' : ''));
+            var chk = document.createElement('input');
+            chk.type = 'checkbox'; chk.checked = !!s.enabled; chk.title = '启用 / 旁通';
+            chk.onchange = function () { fx.enable(s.id, s.path, chk.checked).catch(function (e) { chk.checked = !chk.checked; fxStat.textContent = '操作失败：' + e.message; }); };
+            row.appendChild(chk);
+            var nm = el('span', 'set-lib-path', (s.broken ? '⚠ ' : '') + (s.name || s.path));
+            nm.title = s.path + (s.broken ? '\n已旁通：插件处理异常，重新启用可复活' : '');
+            row.appendChild(nm);
+            var ops = el('span', 'fx-ops');
+            [['🖥', '打开插件原生界面（需播放中）', function () {
+                fx.openEditor(s.id).catch(function (e) { fxStat.textContent = e && e.message ? e.message : String(e); });
+              }],
+             ['🎛', '参数', function () { renderParams(s.id, s.path); }],
+             ['↑', '上移', function () { fx.move(s.id, s.path, -1).catch(function () { }); }],
+             ['↓', '下移', function () { fx.move(s.id, s.path, 1).catch(function () { }); }],
+             ['✕', '移除', function () { fx.remove(s.id, s.path).catch(function (e) { fxStat.textContent = '移除失败：' + e.message; }); }]]
+              .forEach(function (b) {
+                var btn = el('button', 'set-lib-del', b[0]); btn.title = b[1]; btn.onclick = b[2];
+                ops.appendChild(btn);
+              });
+            row.appendChild(ops);
+            fxBox.appendChild(row);
+          });
+          // 配置里有但引擎没加载上的（文件缺失等）
+          cfgs.forEach(function (c) {
+            if (slots.some(function (s) { return s.path === c.path; })) return;
+            var row = el('div', 'set-lib-item fx-slot broken');
+            row.appendChild(el('span', 'set-lib-path', '✕ ' + (c.name || c.path) + '（未加载）'));
+            var del = el('button', 'set-lib-del', '✕'); del.title = '从链中移除';
+            del.onclick = function () {
+              var i = fx.cfg.slots.indexOf(c);
+              if (i >= 0) { fx.cfg.slots.splice(i, 1); }
+              try { localStorage.setItem('annieplayer.vstfx', JSON.stringify(fx.cfg)); } catch (e) { }
+              renderFxSlots();
+            };
+            row.appendChild(del);
+            fxBox.appendChild(row);
+          });
+        }).catch(function () {
+          fxBox.innerHTML = '';
+          fxBox.appendChild(el('div', 'set-hint', '引擎未就绪，稍后重试'));
+        });
+      }
+      renderFxSlots();
+      onOpenHooks.push(renderFxSlots);
+      fx.onChange(function () { if (currentPage === 'fx') renderFxSlots(); });
+
+      // —— 管理按钮行 ——
+      var fxBtnRow = el('div', 'set-row');
+      var fxBtnLab = el('div'); fxBtnLab.appendChild(el('div', '', '管理'));
+      fxBtnLab.appendChild(el('div', 'set-hint', '扫描系统 VST3 目录，或手动选择 .vst3 文件'));
+      var fxBtnWrap = el('div', 'set-ctrl');
+      var scanBtn = el('button', 'btn-ghost', '扫描系统插件');
+      scanBtn.onclick = function () {
+        scanBtn.disabled = true; scanBtn.textContent = '扫描中…';
+        fx.scan().then(function (items) {
+          scanBtn.disabled = false; scanBtn.textContent = '扫描系统插件';
+          if (!items.length) { fxStat.textContent = '未在系统 VST3 目录发现插件'; return; }
+          // 扫描结果以临时列表呈现，点击即添加
+          fxBox.innerHTML = '';
+          fxBox.appendChild(el('div', 'set-hint', '发现 ' + items.length + ' 个插件，点击添加（再次打开本页回到链视图）'));
+          items.forEach(function (it) {
+            var row = el('div', 'set-lib-item');
+            row.appendChild(el('span', 'set-lib-path', it.name || it.path));
+            var add = el('button', 'set-lib-del', '＋'); add.title = '添加到效果器链';
+            add.onclick = function () {
+              add.disabled = true;
+              fx.addPath(it.path).then(function () { add.textContent = '✓'; })
+                .catch(function (e) { add.disabled = false; fxStat.textContent = '添加失败：' + e.message; });
+            };
+            row.appendChild(add);
+            fxBox.appendChild(row);
+          });
+        }).catch(function (e) {
+          scanBtn.disabled = false; scanBtn.textContent = '扫描系统插件';
+          fxStat.textContent = '扫描失败：' + e.message;
+        });
+      };
+      var pickBtn = el('button', 'btn-ghost', '添加 .vst3 文件…');
+      pickBtn.onclick = async function () {
+        pickBtn.disabled = true;
+        try {
+          var p = await window.mine.vstPickPlugin();
+          if (p) await fx.addPath(p);
+        } catch (e) { fxStat.textContent = '添加失败：' + (e && e.message ? e.message : e); }
+        pickBtn.disabled = false;
+      };
+      fxBtnWrap.appendChild(scanBtn); fxBtnWrap.appendChild(pickBtn);
+      fxBtnRow.appendChild(fxBtnLab); fxBtnRow.appendChild(fxBtnWrap);
+      sFx.appendChild(fxBtnRow);
+    })();
 
     /* ================= 媒体库 ================= */
     // 与侧栏「添加音乐文件夹 / 重新扫描」同一套逻辑（pickFolder / removeFolder / startLibraryScan）
@@ -900,6 +1084,63 @@
     fkExpWrap.appendChild(fkCsvBtn); fkExpWrap.appendChild(fkHtmlBtn);
     fkExpRow.appendChild(fkExpLab); fkExpRow.appendChild(fkExpWrap);
     sFk.appendChild(fkExpRow);
+
+    // —— V3.5.8：重复歌曲清理 ——
+    var dupRow = markItem(el('div', 'set-row'), '重复歌曲 清理 查重 duplicates 去重');
+    var dupLab = el('div'); dupLab.appendChild(el('div', '', '重复歌曲清理'));
+    dupLab.appendChild(el('div', 'set-hint', '按"标题+艺人"查重；同组默认保留体积最大的文件，其余勾选后移入回收站'));
+    var dupBtn = el('button', 'btn-ghost', '扫描重复');
+    dupRow.appendChild(dupLab); dupRow.appendChild(dupBtn);
+    sFk.appendChild(dupRow);
+    var dupBox = el('div');
+    sFk.appendChild(dupBox);
+    function renderDupGroups(dupGroups) {
+      dupBox.innerHTML = '';
+      if (!dupGroups.length) { dupBox.appendChild(el('div', 'set-hint', '未发现重复歌曲 ✓')); return; }
+      var total = 0;
+      dupGroups.forEach(function (g) { total += g.length - 1; });
+      dupBox.appendChild(el('div', 'set-hint', '发现 ' + dupGroups.length + ' 组重复（可多删 ' + total + ' 个文件）；默认勾选每组除最大文件外的全部'));
+      dupGroups.slice(0, 100).forEach(function (g) {
+        var box = el('div', 'set-dup-group');
+        box.appendChild(el('div', 'set-dup-head', (g[0].title || g[0].name) + ' · ' + (g[0].artist || '未知艺人') + '（' + g.length + ' 个副本）'));
+        g.forEach(function (t, i) {
+          var row = el('label', 'set-dup-item');
+          var cb = document.createElement('input');
+          cb.type = 'checkbox'; cb.checked = i > 0; cb.dataset.path = t.path; // 组内已按体积降序，默认保留第 0 个
+          row.appendChild(cb);
+          row.appendChild(el('span', 'set-dup-name', t.name + '（' + (t.size / 1048576).toFixed(1) + 'MB）'));
+          row.appendChild(el('span', 'set-dup-dir', t.dir));
+          box.appendChild(row);
+        });
+        dupBox.appendChild(box);
+      });
+      if (dupGroups.length > 100) dupBox.appendChild(el('div', 'set-hint', '仅显示前 100 组，处理后可再次扫描'));
+      var delBtn = el('button', 'btn-ghost', '删除选中（移入回收站）');
+      delBtn.onclick = function () {
+        var paths = [];
+        dupBox.querySelectorAll('input[type=checkbox]:checked').forEach(function (cb) { paths.push(cb.dataset.path); });
+        if (!paths.length) return;
+        if (!confirm('将 ' + paths.length + ' 个文件移入回收站？\n（可从系统回收站恢复）')) return;
+        delBtn.disabled = true; delBtn.textContent = '删除中…';
+        window.mine.libDeleteFiles(paths).then(function (r) {
+          var msg = '已删除 ' + (r.done ? r.done.length : 0) + ' 个文件' + ((r.failed && r.failed.length) ? '，失败 ' + r.failed.length + ' 个' : '');
+          delBtn.disabled = false; delBtn.textContent = '删除选中（移入回收站）';
+          try { if (typeof proToast === 'function') proToast(msg, 5000); } catch (e) { }
+          dupBox.innerHTML = '';
+          dupBox.appendChild(el('div', 'set-hint', msg + '，可重新扫描确认'));
+        }).catch(function () { delBtn.disabled = false; delBtn.textContent = '删除选中（移入回收站）'; });
+      };
+      dupBox.appendChild(delBtn);
+    }
+    dupBtn.onclick = function () {
+      if (!window.mine.libDuplicates) return;
+      dupBtn.disabled = true; dupBtn.textContent = '扫描中…';
+      dupBox.innerHTML = '';
+      window.mine.libDuplicates().then(function (groups) {
+        dupBtn.disabled = false; dupBtn.textContent = '扫描重复';
+        renderDupGroups(groups || []);
+      }).catch(function () { dupBtn.disabled = false; dupBtn.textContent = '扫描重复'; });
+    };
 
     // —— 诊断信息导出（Pro beat0.0.1：崩溃报障用） ——
     var diagRow = markItem(el('div', 'set-row'), '导出诊断信息 报障 日志 zip 崩溃');

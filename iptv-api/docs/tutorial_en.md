@@ -24,22 +24,21 @@
 
 ## Workflow deployment
 
-Use GitHub Actions to generate results manually, serve player subscriptions from the fork's own GitHub Pages site, and keep a fixed Release for downloading and saving result files.
+Use GitHub Actions to generate results manually, serve player subscriptions from the fork's own GitHub Pages site, and create a separate Release for every run to download and save result files.
 
 > [!IMPORTANT]
 > Because GitHub resources are limited, the workflow can only be triggered manually. Generated results are deployed
-> through a Pages artifact and the `playlist-latest` prerelease. They are not committed to Git, and no `gh-pages`
+> through a Pages artifact and a separate prerelease for every run. They are not committed to Git, and no `gh-pages`
 > branch is created. For frequent or scheduled runs, use Docker, the command line, the GUI, or external object storage.
 
 ### Enter the IPTV-API Project
 
-Open https://github.com/Guovin/iptv-api and click `Star` to favorite this project (Your Star is my motivation for
-continuous updates).
+Open the <a href="https://github.com/Guovin/iptv-api" target="_blank" rel="noopener noreferrer">IPTV-API project</a> and click `Star` to favorite it (Your Star is my motivation for continuous updates).
 ![Star](./images/star.png 'Star')
 
 ### Fork
 
-Copy the source code of this repository to your personal account repository.
+Open the <a href="https://github.com/Guovin/iptv-api/fork" target="_blank" rel="noopener noreferrer">Fork creation page</a> to copy this repository to your personal account.
 ![Fork button](./images/fork-btn.png 'Fork button')
 
 1. Name your personal repository as you like (the final live source result link depends on this name), here we use the
@@ -280,7 +279,8 @@ Now you can run the update workflow.
 ##### (3) Workflow in progress:
 
 Wait a moment, and you will see that your first update workflow is running!
-> [!NOTE]\
+> [!NOTE]
+>
 > Runtime depends on the template size, page settings, and network conditions. Speed testing may take 30–60 minutes and
 > runs in a generation job with a five-hour timeout. The ten-minute Pages deployment limit applies only to the separate
 > deployment job after generation completes; it does not include speed-testing time.
@@ -299,7 +299,7 @@ If everything is normal, after a short wait, you will see that the workflow has 
 mark).
 ![Workflow executed successfully](./images/workflow-success.png 'Workflow executed successfully')
 
-The workflow summary contains Pages links and Release download URLs. Players should use the Pages links directly:
+The workflow summary contains Pages links and Release download URLs. For online player use, open the Pages page and use the applicable result address:
 
 ```text
 https://your-github-username.github.io/repository-name/result.m3u
@@ -307,26 +307,32 @@ https://your-github-username.github.io/repository-name/result.txt
 https://your-github-username.github.io/repository-name/epg.gz
 ```
 
-Release assets continue to update. Because they use redirects and download-oriented response headers, use them to download and save result files instead of as player subscription URLs:
+Because Release assets use redirects and download-oriented response headers, use them to download and save result files instead of as player subscription URLs. Asset URLs use this format:
 
 ```text
-https://github.com/your-github-username/repository-name/releases/download/playlist-latest/result.m3u
+https://github.com/your-github-username/repository-name/releases/download/playlist-20260920-103000-utc-plus-0800/result.m3u
 ```
 
 `result.txt` is always published. `result.m3u` and `epg.gz` exist only when their features are enabled and generation succeeds. The M3U uses the Pages link for EPG.
+
+On the Pages results page, “Copy” always copies the original file URL for players. “Preview” opens an in-site viewer that explicitly decodes UTF-8, avoiding mojibake when a browser opens M3U responses without a charset. Because `epg.gz` is compressed, it only provides the original file action.
+
+Release and Fork destinations are generated from the repository running the workflow. The upstream site points to `Guovin/iptv-api`, while a fork's site points to that user's own fork. `Fork 项目` in the upstream results notice links directly to the upstream repository's Fork creation page.
 
 ![Username and Repository Name](./images/rep-info.png 'Username and Repository Name')
 
 If you can access this link and it returns the updated interface content, then your live source interface link has been
 successfully created! Simply copy and paste this link into software like `TVBox` in the configuration field to use~
 
-> [!NOTE]\
-> 1. Run `Run workflow` again after changing templates or configuration; the Pages and Release URLs remain unchanged.
+> [!NOTE]
+>
+> 1. Run `Run workflow` again after changing templates or configuration. The Pages URLs remain unchanged.
 > 2. In Actions, `open_history` only attempts to restore short-lived cached state. A full run without history is used
 >    when that cache has expired.
 > 3. Changes made by `open_auto_disable_source` are not committed. Use another deployment method when those changes
 >    must persist.
 > 4. Pages is deployed from a temporary artifact and does not write generated results to Git. Do not change it to commit a `gh-pages` branch.
+> 5. Playlist snapshots remain prereleases so they do not take the Latest label or interfere with stable GUI releases and update checks.
 
 ### Migrate from the legacy workflow
 
@@ -334,7 +340,7 @@ successfully created! Simply copy and paste this link into software like `TVBox`
 2. Disable any old workflow containing `schedule`; do not allow it to commit `output/` again.
 3. Use `Sync fork` → `Update branch`. Complete step 1 before using `Discard commits` if conflicts require it.
 4. Under `Settings → Pages`, set the publishing source to `GitHub Actions`.
-5. Run `Generate playlist manually` and confirm both the Pages deployment and `playlist-latest` prerelease were created.
+5. Run `Generate playlist manually` and confirm both the Pages deployment and the prerelease for that run were created.
 6. Replace legacy raw or Release URLs in players with the Pages link from the summary. The old raw URL retains only its last result and no longer updates.
 
 ## Command Line

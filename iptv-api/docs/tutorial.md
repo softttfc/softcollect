@@ -23,20 +23,20 @@
 
 ## 工作流部署
 
-使用 GitHub Actions 手动生成结果，通过 Fork 仓库自己的 GitHub Pages 提供播放器订阅，并同步保留固定 Release 供下载和保存结果文件。
+使用 GitHub Actions 手动生成结果，通过 Fork 仓库自己的 GitHub Pages 提供播放器订阅，并为每次运行创建独立的 Release，供下载和保存结果文件。
 
 > [!IMPORTANT]
-> GitHub Actions 资源有限，工作流只能手动触发。生成结果通过 Pages Artifact 和 `playlist-latest` 预发布版发布，不会提交到 Git，也不会创建 `gh-pages` 分支。
+> GitHub Actions 资源有限，工作流只能手动触发。生成结果通过 Pages Artifact 和每次运行独立的预发布版发布，不会提交到 Git，也不会创建 `gh-pages` 分支。
 > 如果需要频繁更新或定时执行，请使用 Docker、命令行、GUI 或外部对象存储。
 
 ### 进入IPTV-API项目
 
-打开 https://github.com/Guovin/iptv-api 点击`Star`收藏该项目（您的Star是我持续更新的动力）
+打开<a href="https://github.com/Guovin/iptv-api" target="_blank" rel="noopener noreferrer">IPTV-API 项目</a>点击`Star`收藏该项目（您的Star是我持续更新的动力）
 ![Star](./images/star.png 'Star')
 
 ### Fork
 
-将本仓库的源代码复制至个人账号仓库中
+打开<a href="https://github.com/Guovin/iptv-api/fork" target="_blank" rel="noopener noreferrer">Fork 创建页</a>，将本仓库的源代码复制至个人账号仓库中。
 ![Fork入口](./images/fork-btn.png 'Fork入口')
 
 1. 个人仓库命名，可按您喜欢的名字随意命名（最终直播源结果链接取决于该名称），这里以默认`iptv-api`为例
@@ -247,7 +247,8 @@ https://example.com/sub2.m3u UA="Mozilla/5.0 xxx"
 
 ![Workflow运行中](./images/workflow-running.png 'Workflow运行中')
 
-> [!NOTE]\
+> [!NOTE]
+>
 > 由于运行时间取决于模板频道数量、页数配置与网络状况，请耐心等待。测速可能需要 30 分钟至 1 小时；它在最长 5 小时的生成 job 中执行。Pages 的 10 分钟部署限制只作用于结果生成完成后的独立部署 job，不包含测速时间。
 
 ##### （4）Workflow 取消运行：
@@ -261,7 +262,7 @@ https://example.com/sub2.m3u UA="Mozilla/5.0 xxx"
 
 ![Workflow执行成功](./images/workflow-success.png 'Workflow执行成功')
 
-此时可以在工作流页面的 Summary 查看 Pages 链接和 Release 下载地址。播放器请直接使用 Pages 链接：
+此时可以在工作流页面的 Summary 查看 Pages 链接和 Release 下载地址。播放器在线使用请打开 Pages 页面获取相应的结果地址：
 
 ```text
 https://您的GitHub用户名.github.io/仓库名/result.m3u
@@ -269,24 +270,30 @@ https://您的GitHub用户名.github.io/仓库名/result.txt
 https://您的GitHub用户名.github.io/仓库名/epg.gz
 ```
 
-Release 下载地址仍会同步更新。由于存在重定向和下载响应头，建议用它下载和保存结果文件，不要直接作为播放器订阅地址：
+由于存在重定向和下载响应头，建议使用 Release 下载和保存结果文件，不要作为播放器订阅地址。附件下载地址格式如下：
 
 ```text
-https://github.com/您的GitHub用户名/仓库名/releases/download/playlist-latest/result.m3u
+https://github.com/您的GitHub用户名/仓库名/releases/download/playlist-20260920-103000-utc-plus-0800/result.m3u
 ```
 
 `result.txt` 始终发布；`result.m3u` 和 `epg.gz` 仅在对应功能开启且成功生成时存在。M3U 内的 EPG 地址使用 Pages 链接。
+
+Pages 结果页中的“复制链接”始终复制播放器可使用的原始文件地址；“预览内容”通过站内预览页强制按 UTF-8 解码，避免浏览器直接打开 M3U 时因响应缺少字符集而显示乱码。`epg.gz` 是压缩文件，只提供原始文件入口。
+
+Release 和 Fork 跳转地址均从运行工作流的仓库信息生成：主仓库页面指向 `Guovin/iptv-api`，Fork 仓库页面指向该用户自己的 Fork；主仓库结果说明中的 `Fork 项目` 可直接跳转到主仓库的 Fork 创建页。
 
 ![用户名与仓库名称](./images/rep-info.png '用户名与仓库名称')
 
 如果访问该链接能正常返回更新后的接口内容，说明您的直播源接口链接已经大功告成了！将该链接复制粘贴到`TVBox`
 等播放器配置栏中即可使用~
 
-> [!NOTE]\
-> 1. 如果您修改了模板或配置文件，可再次手动触发 `Run workflow`，Pages 和 Release 固定地址保持不变。
+> [!NOTE]
+>
+> 1. 如果您修改了模板或配置文件，可再次手动触发 `Run workflow`。Pages 地址保持不变。
 > 2. `open_history` 在 Actions 中仅尝试从短期缓存恢复，缓存失效时会执行无历史的完整生成。
 > 3. `open_auto_disable_source` 对配置文件的修改不会提交回仓库；需要持久保存时请使用其他部署方式。
 > 4. Pages 使用临时 Artifact 部署，不会向 Git 写入生成结果；请勿自行改为提交 `gh-pages` 分支。
+> 5. 播放列表结果继续使用预发布版，避免占用正式版的 Latest 标识或干扰 GUI 正式版本发布与更新检查。
 
 ### 从旧工作流迁移
 
@@ -294,7 +301,7 @@ https://github.com/您的GitHub用户名/仓库名/releases/download/playlist-la
 2. 在 Actions 中禁用含 `schedule` 的旧工作流，不要再让它提交 `output/`。
 3. 通过 `Sync fork` → `Update branch` 同步新版；若必须使用 `Discard commits`，请先完成第 1 步。
 4. 在 `Settings → Pages` 中将发布源设置为 `GitHub Actions`。
-5. 手动运行 `Generate playlist manually`，确认 Pages 部署和 `playlist-latest` 预发布版均已生成。
+5. 手动运行 `Generate playlist manually`，确认 Pages 部署和本次运行对应的预发布版均已生成。
 6. 将播放器中的旧 raw 或 Release 链接替换为 Summary 中的 Pages 链接。旧 raw 链接只保留最后一次结果，不再更新。
 
 ## 命令行

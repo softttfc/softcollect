@@ -1,0 +1,29 @@
+# Python bytecode and local tooling state
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# PyInstaller build output and temporary work files
+dist/
+build/
+pyi-build/
+*.spec
+
+# Generated runtime data, caches, reports, and downloaded sources
+reports/
+state.json
+discover_cache.json
+liveness_cache.json
+sources/
+洛雪音源工具箱数据/
+
+# Locally generated executable
+洛雪音源工具箱.exe
+
+# Local/editor/OS files
+.idea/
+.vscode/
+*.log
+Thumbs.db
+Desktop.ini

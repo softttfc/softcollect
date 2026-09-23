@@ -20,6 +20,11 @@ html[data-theme="am"] #level-dock,
 html[data-theme="am"] #tool-banner { display: none !important; }
 html[data-theme="am"] #titlebar { display: none !important; }
 
+/* V3.5.17：实时频谱可视化条（贴底细条，引擎 32 频段驱动） */
+.am-vizbar { flex: none; height: 22px; width: 100%; position: relative; z-index: 3;
+  pointer-events: none; opacity: .95; }
+#am-root.am-mini-on .am-vizbar, #am-root.am-imm-on .am-vizbar { display: none; }
+
 /* ---------- 设计变量（默认暗色；.am-light 覆盖为亮色） ---------- */
 #am-root {
   --am-accent: #fa2d55;
@@ -419,6 +424,12 @@ html[data-theme="am"] #titlebar { display: none !important; }
 .am-q-title { font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .am-q-sub { font-size: 11px; color: rgba(255,255,255,.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
 .am-q-dur { font-size: 11px; color: rgba(255,255,255,.55); flex: none; }
+.am-q-row.drag-over { outline: 1.5px dashed rgba(250,45,85,.75); outline-offset: -1.5px; }
+.am-q-row[draggable="true"] { cursor: grab; }
+.am-q-del { flex: none; width: 22px; height: 22px; border: none; border-radius: 6px; background: transparent; color: rgba(255,255,255,.45); font-size: 12px; line-height: 1; cursor: pointer; }
+.am-q-del:hover { background: rgba(250,45,85,.30); color: #fff; }
+#am-root.am-light .am-q-del { color: var(--am-text-3); }
+#am-root.am-light .am-q-del:hover { color: var(--am-text); background: rgba(250,45,85,.18); }
 .am-q-empty { color: rgba(255,255,255,.5); font-size: 12px; text-align: center; margin-top: 40px; }
 
 /* ================= V3.2：沉浸式播放界面 ================= */
@@ -548,3 +559,8 @@ html[data-theme="am"] #titlebar { display: none !important; }
 .am-chip-x { opacity:.45; margin-left:6px; font-size:11px; }
 .am-chip-x:hover { opacity:1; color:#ff6b6b; }
 span.am-chip { cursor:pointer; display:inline-flex; align-items:center; }
+
+/* ---- V3.5.19：评论面板（沉浸/迷你共享队列面板的第三页签） ---- */
+.am-cmt-row { padding: 10px 4px; border-bottom: 1px dashed rgba(128,128,128,.18); }
+.am-cmt-text { font-size: 13px; line-height: 1.6; color: inherit; word-break: break-word; }
+.am-cmt-meta { font-size: 11px; opacity: .5; margin-top: 4px; }

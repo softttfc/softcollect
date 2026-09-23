@@ -66,11 +66,18 @@ public sealed class PcmFloatSource : IWaveProvider
     public bool Limiter = true;
     /// <summary>15 段 EQ 链（EXP 7.28）：null = 直通。由 Engine 在创建源/收到 eq.set 时挂载。</summary>
     public EqChain? Eq;
+    /// <summary>参量 EQ 链（V3.5.19）：图示 EQ 之后处理；null = 直通。</summary>
+    public PeqChain? Peq;
+    /// <summary>声道矩阵（V3.5.19）：[mLL,mLR,mRL,mRR]，outL=inL·mLL+inR·mLR；null = 直通。整体引用替换，无锁。</summary>
+    public float[]? ChMatrix;
     /// <summary>VST实验区：本源私有的 VST3 效果器实例链（EQ 之前处理）；null/空 = 直通。</summary>
     public VstFxInstance[]? VstFx;
     public WaveFormat WaveFormat { get; }
     public event Action<float, float, float, float>? OnLevel; // rmsL, peakL, rmsR, peakR
     public long FramesRead => System.Threading.Interlocked.Read(ref _framesRead);
+    // V3.5.17：实时频谱环形缓冲（AM 可视化条；音频线程单写者，定时器线程读，允许撕裂）
+    public readonly float[] VizRing = new float[2048];
+    public int VizWritePos;
     // 输出健康：短读/欠载与限幅触发计数（音频线程 Interlocked 写，stats RPC 读）
     public long UnderrunCount;
     public long UnderrunFrames;
@@ -250,6 +257,21 @@ public sealed class PcmFloatSource : IWaveProvider
                 }
                 if (eq is not null)
                     for (int fr = 0; fr < frames; fr++) eq.ProcessFrame(f + fr * chs);
+                // V3.5.19：参量 EQ（图示 EQ 之后）
+                var peq = Peq;
+                if (peq is not null)
+                    for (int fr = 0; fr < frames; fr++) peq.ProcessFrame(f + fr * chs);
+                // V3.5.19：声道矩阵（平衡/互换/单声道/反相）——EQ 之后、增益限幅之前
+                var chm = ChMatrix;
+                if (chm is not null && chs == 2)
+                {
+                    for (int fr = 0; fr < frames; fr++)
+                    {
+                        float l = f[fr * 2], r = f[fr * 2 + 1];
+                        f[fr * 2] = l * chm[0] + r * chm[1];
+                        f[fr * 2 + 1] = l * chm[2] + r * chm[3];
+                    }
+                }
                 for (int i = 0; i < count / 4; i++)
                 {
                     float g = totalGain;
@@ -263,6 +285,7 @@ public sealed class PcmFloatSource : IWaveProvider
                     // Pro：软限幅器（tanh 软膝，|v|≤1 时近似线性，超限平滑压缩到 ±1 内）
                     if (limiter && (v > 1f || v < -1f)) { clipBlock = true; v = (float)Math.Tanh(v); }
                     f[i] = v;
+                    if (phase == 0) { VizRing[VizWritePos & 2047] = v; VizWritePos++; } // V3.5.17：频谱采样（L/单声道）
                     float a = Math.Abs(v);
                     if (phase == 0) { sumSqL += v * v; if (a > peakL) peakL = a; }
                     else { sumSqR += v * v; if (a > peakR) peakR = a; }

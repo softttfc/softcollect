@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('mine', {
   hotkeysGet: () => ipcRenderer.invoke('hotkeys:get'),
   hotkeysSetEnabled: (on) => ipcRenderer.invoke('hotkeys:setEnabled', on),
   playState: (s) => ipcRenderer.send('player:state', s),
+  playerProgress: (p) => ipcRenderer.send('player:progress', p), // V3.5.18：任务栏进度条
 
   // 曲库
   pickFolder: () => ipcRenderer.invoke('lib:pickFolder'),
@@ -77,6 +78,7 @@ contextBridge.exposeInMainWorld('mine', {
   streamGetPic: (params) => ipcRenderer.invoke('stream:getPic', params),
   streamCoverProxy: (url) => ipcRenderer.invoke('stream:coverProxy', url),
   streamHotSearch: (params) => ipcRenderer.invoke('stream:hotSearch', params),
+  streamHotComments: (params) => ipcRenderer.invoke('stream:hotComments', params), // V3.5.19：网易云热门评论
   // 发现音乐：排行榜 / 歌单广场（V3.5.4）
   streamLeaderboards: (params) => ipcRenderer.invoke('stream:leaderboards', params),
   streamLeaderboardList: (params) => ipcRenderer.invoke('stream:leaderboardList', params),
@@ -150,6 +152,7 @@ contextBridge.exposeInMainWorld('mine', {
   miniEnter: (miniBounds) => ipcRenderer.invoke('mini:enter', miniBounds),
   miniExit: () => ipcRenderer.invoke('mini:exit'),
   miniSetSize: (w, h) => ipcRenderer.invoke('mini:setSize', w, h),
+  miniPin: (on) => ipcRenderer.invoke('mini:pin', on), // V3.5.15：迷你窗口置顶开关
   dlyricsToggle: () => ipcRenderer.invoke('dlyrics:toggle'),
   dlyricsLine: (payload) => ipcRenderer.send('dlyrics:line', payload),
   dlyricsCtl: (payload) => ipcRenderer.send('dlyrics:ctl', payload),
@@ -172,5 +175,6 @@ contextBridge.exposeInMainWorld('mine', {
   },
 
   // Pro beat0.0.1：诊断包导出（rendererSnapshot 为渲染侧设置/状态快照）
-  diagExport: (rendererSnapshot) => ipcRenderer.invoke('diag:export', rendererSnapshot)
+  diagExport: (rendererSnapshot) => ipcRenderer.invoke('diag:export', rendererSnapshot),
+  reportError: (payload) => ipcRenderer.send('renderer-error', payload) // 渲染层 JS 错误上报（进诊断包）
 });

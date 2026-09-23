@@ -864,10 +864,22 @@ document.addEventListener('annie-settings-changed', () => {
 });
 
 /* ---------------- Pro beat0.0.1：响度归一化（EBU R128，目标 -16 LUFS） ---------------- */
+// V3.5.15：无缝播放开关（默认开；与交叉淡入独立——crossfade>0 时优先淡入淡出）
+function gaplessOn() { return !!(window.annieSettings && annieSettings.ui.gapless !== false); }
 const LOUD_TARGET = -16;
 function loudGainFor(p) {
   if (!window.annieSettings || (annieSettings.ui.loudMode || 'off') === 'off') return 1;
   const mc = state.library.metaCache && state.library.metaCache[p];
+  // V3.5.15：ReplayGain 标签直读优先（RG 基准 -18 LUFS，本机目标 -16 LUFS → +2dB 平移；免 ebur128 分析）
+  if (mc && mc.rg) {
+    const db = (annieSettings.ui.loudMode === 'album' && mc.rg.album != null) ? mc.rg.album : mc.rg.track;
+    if (db != null) {
+      let gain = Math.pow(10, (db + 2) / 20);
+      // 真峰 headroom：归一化后峰值不超过 -1dBFS（RG peak 为线性峰值）
+      if (typeof mc.rg.peak === 'number' && mc.rg.peak > 0) gain = Math.min(gain, 0.891 / mc.rg.peak);
+      return Math.max(0.05, Math.min(4, gain));
+    }
+  }
   const L = mc && mc.loudness;
   if (!L) { queueLoudness(p); return 1; }
   let i = L.i;
@@ -1006,7 +1018,7 @@ async function playAt(i, offsetSec = 0) {
     playPath = r.path; playOffset = 0;
     if (t.iso.dur && !state.duration) { state.duration = t.iso.dur; $('#t-total').textContent = fmtTime(t.iso.dur); }
   }
-  const method = cf > 0 && playOffset === 0 ? 'play.crossfade' : 'play';
+  const method = (cf > 0 || gaplessOn()) && playOffset === 0 ? 'play.crossfade' : 'play';
   try {
     await enginePlayRecover(method, { path: playPath, offsetSec: playOffset, loudGain });
   } catch (e) {
@@ -1063,7 +1075,7 @@ window.annieStreamPlay = async function (track) {
   try {
     // V1.1.4：流媒体切歌同样走 crossfade（设备保持）——与本地 playAt 一致，避免高频设备开关
     const cf = window.annieSettings ? (annieSettings.ui.crossfadeSec || 0) : 0;
-    const method = cf > 0 ? 'play.crossfade' : 'play';
+    const method = (cf > 0 || gaplessOn()) ? 'play.crossfade' : 'play';
     await enginePlayRecover(method, { path: track.url, offsetSec: 0, headers: track.headers });
   } catch (e) {
     setFormatChips([{ text: '流媒体播放失败: ' + e.message, cls: 'warn' }]);
@@ -1071,6 +1083,8 @@ window.annieStreamPlay = async function (track) {
   }
   // 悬浮信息层
   $('#thumb-title').textContent = track.title || '未知曲目';
+  if (window.annieListenStats) annieListenStats.recordPlay(track.url, track); // V3.5.17：听歌统计（流媒体）
+  if (window.annieSMTC) annieSMTC.setMeta(track); // V3.5.18：系统媒体浮层
   $('#thumb-artist').textContent = [track.artist, track.album].filter(Boolean).join(' · ');
   reportPlayerState(); // V3.5.8
   // V1.1.8：http 封面（kwcdn.kuwo.cn 等）经代理转 dataURL 再显示——
@@ -1093,6 +1107,8 @@ async function showMeta(p) {
   if (!state.metaCache.has(p)) state.metaCache.set(p, await window.mine.meta(p));
   const m = state.metaCache.get(p);
   if (state.currentPath !== p) return;
+  if (window.annieListenStats) annieListenStats.recordPlay(p, m); // V3.5.17：听歌统计
+  if (window.annieSMTC) annieSMTC.setMeta(m); // V3.5.18：系统媒体浮层
   $('#thumb-title').textContent = m.title || '未知曲目';
   reportPlayerState(); // V3.5.8
   $('#thumb-artist').textContent = [m.artist, m.album].filter(Boolean).join(' · ');
@@ -1147,6 +1163,14 @@ window.mine.onEngineEvent((event, d) => {
         if (window.annieViz) window.annieViz.setProgress(state.position, state.duration);
         startProgressInterp();
       }
+      // V3.5.17：听歌统计——按 position 事件累计收听时长（暂停无事件自然停表）
+      if (state.playing && window.annieListenStats) annieListenStats.tick(state.position);
+      // V3.5.18：任务栏进度条 + 系统媒体浮层位置（1s 节流）
+      if (performance.now() - _pbSentAt > 1000) {
+        _pbSentAt = performance.now();
+        window.mine.playerProgress({ ratio: state.duration > 0 ? state.position / state.duration : -1, playing: state.playing });
+        if (window.annieSMTC) annieSMTC.setPosition(state.position, state.duration);
+      }
       break;
     case 'state':
       state.playing = d.state === 'playing';
@@ -1156,6 +1180,10 @@ window.mine.onEngineEvent((event, d) => {
       // V1.1.7：暂停→停止插值（position 冻结）；恢复→重置锚点（下一 position 事件重新起算）
       if (!state.playing) cancelProgressInterp();
       else state._posAt = performance.now();
+      // V3.5.18：系统媒体浮层播放状态 + 任务栏进度条模式（正常/暂停/结束清除）
+      if (window.annieSMTC) annieSMTC.setPlaying(state.playing);
+      if (d.state === 'ended') window.mine.playerProgress({ ratio: -1, playing: false });
+      else window.mine.playerProgress({ ratio: state.duration > 0 ? state.position / state.duration : -1, playing: state.playing });
       if (d.state === 'ended') {
         if (state.currentStream && window.annieStream) window.annieStream.playNext();
         else if (window.annieAutoNext && window.annieAutoNext()) { /* 播放模式/定时已接管（仅本地） */ }
@@ -1196,6 +1224,11 @@ window.mine.onEngineEvent((event, d) => {
       $('#tb-backend').textContent = '引擎已退出';
       $('#tb-backend').classList.remove('live');
       break;
+    case 'engine-crash-storm': // V3.5.16：熔断——连崩 6 次停止自动重启，明确指引
+      $('#tb-backend').textContent = '引擎崩溃';
+      $('#tb-backend').classList.remove('live');
+      proToast('音频引擎反复崩溃（可能被安全软件拦截）。请检查 360/电脑管家等拦截记录，或点击播放重试；仍不行请到 设置中心 → 曲库工具 导出诊断信息反馈', 10000);
+      break;
     case 'engine-restarted': // Pro beat0.0.1：崩溃守护——恢复播放位置与队列
       if (d.ok) {
         $('#tb-backend').textContent = '引擎已自动恢复';
@@ -1222,6 +1255,7 @@ window.mine.onEngineEvent((event, d) => {
 
 /* ---------------- V3.5.8：播放状态上报（任务栏缩略图 / 窗口标题） ---------------- */
 let _psTimer = 0;
+let _pbSentAt = 0; // V3.5.18：任务栏进度条/SMTC 位置 1s 节流锚点
 function reportPlayerState() {
   if (_psTimer) return; // 合并连发（state 事件密集时）
   _psTimer = setTimeout(() => {
@@ -1468,4 +1502,10 @@ async function applyAudioSettings() {
   try { await window.mine.engine('dsd.setMode', { mode: u.dsdMode || 'pcm' }); } catch { }
   try { await window.mine.engine('buffer.set', { ms: u.bufferMs || 50, preload: !!u.preload }); } catch { }
   try { await window.mine.engine('crossfade.set', { seconds: u.crossfadeSec || 0 }); } catch { }
+  // V3.5.15：无缝播放 + 重采样质量 启动同步
+  try { await window.mine.engine('gapless.set', { on: u.gapless !== false }); } catch { }
+  try { await window.mine.engine('resample.set', { hq: !!u.resampleHq }); } catch { }
+  // V3.5.19：参量 EQ + 声道工具 启动同步
+  try { await window.mine.engine('peq.set', { enabled: !!u.peqOn, bands: u.peqBands || [] }); } catch { }
+  try { await window.mine.engine('channel.set', { mode: u.chMode || 'stereo', balance: u.chBalance || 0 }); } catch { }
 }

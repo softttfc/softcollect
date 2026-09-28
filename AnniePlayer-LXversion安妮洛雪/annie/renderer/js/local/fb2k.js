@@ -423,7 +423,22 @@
     var bNext = el('button', 'f2-tbtn'); bNext.innerHTML = SVG.next; bNext.title = '下一曲'; bNext.onclick = transportNext;
     var bStop = el('button', 'f2-tbtn'); bStop.innerHTML = SVG.stop; bStop.title = '停止';
     bStop.onclick = function () { window.mine.engine('stop').catch(function () { }); };
-    tp.append(bPrev, R.btnPlay, bNext, bStop);
+    // 播放模式循环切换（与 AM/粒子舞台共用 anniePlayMode 状态）
+    var bMode = el('button', 'f2-tbtn'); bMode.textContent = '→';
+    function syncModeBtn() {
+      if (!window.anniePlayMode) return;
+      var inf = window.anniePlayMode.info();
+      bMode.textContent = inf.icon;
+      bMode.title = '播放模式：' + inf.label + (inf.hint ? '\n' + inf.hint : '') + '\n（仅本地播放生效，点击切换）';
+    }
+    bMode.onclick = function () {
+      if (!window.anniePlayMode) return;
+      var inf = window.anniePlayMode.cycle();
+      try { if (typeof proToast === 'function') proToast('播放模式：' + inf.label); } catch (e) { }
+    };
+    document.addEventListener('annie-playmode-changed', syncModeBtn);
+    syncModeBtn();
+    tp.append(bPrev, R.btnPlay, bNext, bStop, bMode);
     bar.appendChild(tp);
 
     // 音量
@@ -928,6 +943,10 @@
       if (window.annieTagEdit) window.annieTagEdit.open(paths.length > 1 ? { paths: paths } : { path: t.path });
     }]);
     items.push(['在线匹配歌词 / 封面…', function () { if (window.annieMatch) window.annieMatch.open({ path: t.path }); }]);
+    if (S.sel.size > 1) items.push(['批量匹配歌词（' + S.sel.size + ' 首）…', function () {
+      var paths = []; forEachSel(function (x) { paths.push(x.path); });
+      if (window.annieBatchMatch) window.annieBatchMatch.open(paths);
+    }]);
     items.push(['从列表中移除（本次会话）', function () {
       forEachSel(function (x) { S.hiddenPaths.add(x.path); }); S.sel.clear(); rebuildRows();
     }]);
@@ -1299,6 +1318,8 @@
     return i === undefined ? -1 : i;
   }
   function transportNext() {
+    // 播放模式接管（随机/单曲循环等，与 AM/粒子舞台一致；本地队列上下文已在 playAt 时同步）
+    if (window.annieNextByMode && window.annieNextByMode()) return;
     var i = fb2kQueueIndex();
     if (i >= 0 && i + 1 < S.tracks.length) { state.queue = S.tracks; playAt(i + 1); }
   }

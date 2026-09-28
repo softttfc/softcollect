@@ -409,8 +409,33 @@
     checkRow(s4, '粒子总开关', 'particlesEnabled', applyInterface, '粒子总开关 舞台粒子 particles');
     checkRow(s4, '封面氛围背景', 'albumBg', applyInterface, '封面氛围背景 模糊 background blur');
     sliderRow(s4, '背景模糊', 'albumBgBlur', 40, 200, 10, fmtPx, applyInterface, '背景模糊 blur');
-    var ctRow = checkRow(s4, '关闭主窗口后驻留系统托盘', 'closeToTray', applyInterface, '关闭 最小化 托盘 驻留 后台 close tray minimize');
-    ctRow.title = '默认关闭（关窗即退出），保证在线更新顺利安装；开启后关窗仅隐藏到托盘';
+    /* V4.3：关闭按钮行为三选一（每次询问 / 最小化到托盘 / 直接退出），取代旧 closeToTray 开关。
+     * 主进程关闭对话框勾选「以后都这样执行」也会写同一键，经 onCloseBehaviorChanged 回同步。 */
+    var cbRow = markItem(el('div', 'set-row'), '关闭按钮 关闭行为 最小化 托盘 退出 驻留 后台 close tray minimize quit');
+    var cbLab = el('div'); cbLab.appendChild(el('div', '', '关闭按钮行为'));
+    cbLab.appendChild(el('div', 'set-hint', '点窗口 ✕ 时的动作；选「每次询问」会弹窗让你选，并可勾选以后都这样执行'));
+    var cbSel = document.createElement('select');
+    [['ask', '每次询问'], ['tray', '最小化到托盘'], ['quit', '直接退出']].forEach(function (kv) {
+      var op = document.createElement('option'); op.value = kv[0]; op.textContent = kv[1];
+      cbSel.appendChild(op);
+    });
+    var curBehavior = (ui.closeBehavior === 'tray' || ui.closeBehavior === 'quit') ? ui.closeBehavior
+      : (ui.closeToTray ? 'tray' : 'ask'); // 旧设置迁移显示
+    cbSel.value = curBehavior;
+    ui.closeBehavior = curBehavior;
+    cbSel.onchange = function () {
+      ui.closeBehavior = cbSel.value;
+      if (ui.closeBehavior === 'ask') delete ui.closeBehavior; // 询问=不记忆，主进程读不到键即弹窗
+      save();
+    };
+    if (window.mine && window.mine.onCloseBehaviorChanged) {
+      window.mine.onCloseBehaviorChanged(function (behavior) {
+        ui.closeBehavior = behavior;
+        cbSel.value = behavior;
+      });
+    }
+    cbRow.appendChild(cbLab); cbRow.appendChild(cbSel);
+    s4.appendChild(cbRow);
 
     // —— V3.5.8：全局快捷键（状态存主进程 store，IPC 开关） ——
     var sHk = section(pgGeneral, '全局快捷键');
@@ -1154,7 +1179,7 @@
     };
     renderPeqBands();
 
-    // —— AutoEq 耳机校正导入（V4.2）：精选子集内置（autoeq-subset.json，scripts/autoeq-build.js 生成） ——
+    // —— AutoEq 耳机校正导入（V4.2）：官方全量库内置（autoeq-subset.json，scripts/autoeq-build.js 生成） ——
     var aeWrap = markItem(el('div', 'set-row'), 'autoeq 耳机校正 headphone calibration 导入 型号');
     var aeLab = el('div'); aeLab.appendChild(el('div', '', 'AutoEq 耳机校正'));
     aeLab.appendChild(el('div', 'set-hint', '按耳机型号套用 AutoEq 实测校正曲线（oratory1990 / crinacle / Rtings 等来源）；低架/高架滤波以峰值滤波近似，前级增益由自动前级补偿接管'));
@@ -1182,7 +1207,7 @@
       var q = aeIn.value.trim().toLowerCase();
       if (!q || !aeData) { if (q && !aeData) aeLoad(); return; }
       var hits = aeData.models.filter(function (m) { return m.n.toLowerCase().includes(q); }).slice(0, 8);
-      if (!hits.length) { aeList.appendChild(el('div', 'set-hint', '子集内无匹配型号（共 ' + aeData.count + ' 款精选，冷门型号可手动按 AutoEq 网页结果加频段）')); return; }
+      if (!hits.length) { aeList.appendChild(el('div', 'set-hint', '库内无匹配型号（共 ' + aeData.count + ' 款，可手动按 AutoEq 网页结果加频段）')); return; }
       hits.forEach(function (m) {
         var it = el('div', 'autoeq-item' + (aeSel === m ? ' sel' : ''));
         it.appendChild(el('span', 'autoeq-name', m.n));
@@ -1247,6 +1272,29 @@
     lsCheckRow(sMatch, '保存封面（cover.jpg）', 'annieplayer.match.def.cover', true, null, '在线匹配 保存封面 cover');
     lsCheckRow(sMatch, '同时嵌入文件标签', 'annieplayer.match.def.embed', false, null, '在线匹配 嵌入标签 embed');
     sMatch.appendChild(matchHint);
+
+    // —— V4.3.4：批量匹配歌词（≥80% 自动存旁挂 .lrc；整个曲库 / 文件夹） ——
+    var sBm = section(pgLyrics, '批量匹配歌词');
+    var bmRow = markItem(el('div', 'set-row'), '批量匹配歌词 整个曲库 文件夹 自动 lrc batch lyrics');
+    var bmLab = el('div'); bmLab.appendChild(el('div', '', '自动批量匹配（歌词）'));
+    bmLab.appendChild(el('div', 'set-hint', '五平台搜索取最高分，匹配度 ≥80% 自动保存旁挂 .lrc（含翻译行）；已有歌词的默认跳过，未匹配的列清单'));
+    var bmWrap = el('div', 'set-ctrl');
+    var bmBtnAll = el('button', 'btn-ghost', '整个曲库');
+    var bmBtnDir = el('button', 'btn-ghost', '文件夹…');
+    bmBtnAll.onclick = function () {
+      var lib = (typeof state !== 'undefined') ? state.library : null;
+      if (!lib || !lib.tracks.length) return;
+      if (window.annieBatchMatch) window.annieBatchMatch.open(lib.tracks.map(function (t) { return t.path; }));
+    };
+    bmBtnDir.onclick = function () {
+      window.mine.fakeScanPickFolder().then(function (r) { // 复用：选文件夹并递归枚举音频
+        if (!r || !r.ok) return;
+        if (window.annieBatchMatch) window.annieBatchMatch.open(r.paths);
+      }).catch(function () { });
+    };
+    bmWrap.appendChild(bmBtnAll); bmWrap.appendChild(bmBtnDir);
+    bmRow.appendChild(bmLab); bmRow.appendChild(bmWrap);
+    sBm.appendChild(bmRow);
 
     // —— 舞台歌词 ——
     var s3 = section(pgLyrics, '舞台歌词');
@@ -1643,23 +1691,30 @@
       });
     }
     fkBtnAll.onclick = function () {
-      var lib = (typeof state !== 'undefined') ? state.library : null;
-      if (!lib || !lib.tracks.length) return;
-      fkRun(lib.tracks.map(function (t) { return t.path; }), fkBtnAll);
+      if (fkBusy) { window.mine.fakeScanCancel(); return; }
+      window.annieConfirmFakeScan(function () {
+        var lib = (typeof state !== 'undefined') ? state.library : null;
+        if (!lib || !lib.tracks.length) return;
+        fkRun(lib.tracks.map(function (t) { return t.path; }), fkBtnAll);
+      });
     };
     fkBtnDir.onclick = function () {
       if (fkBusy) { window.mine.fakeScanCancel(); return; }
-      window.mine.fakeScanPickFolder().then(function (r) {
-        if (!r || !r.ok) return;
-        fkRun(r.paths, fkBtnDir);
-      }).catch(function () { });
+      window.annieConfirmFakeScan(function () {
+        window.mine.fakeScanPickFolder().then(function (r) {
+          if (!r || !r.ok) return;
+          fkRun(r.paths, fkBtnDir);
+        }).catch(function () { });
+      });
     };
     fkBtnOne.onclick = function () {
       if (fkBusy) { window.mine.fakeScanCancel(); return; }
-      window.mine.fakeScanPickFile().then(function (r) {
-        if (!r || !r.ok) return;
-        fkRun(r.paths, fkBtnOne, 'one');
-      }).catch(function () { });
+      window.annieConfirmFakeScan(function () {
+        window.mine.fakeScanPickFile().then(function (r) {
+          if (!r || !r.ok) return;
+          fkRun(r.paths, fkBtnOne, 'one');
+        }).catch(function () { });
+      });
     };
     fkWrap.appendChild(fkBtnAll); fkWrap.appendChild(fkBtnDir); fkWrap.appendChild(fkBtnOne);
     fkRow.appendChild(fkLab); fkRow.appendChild(fkWrap);
@@ -2157,6 +2212,24 @@
       renderExtSources();
     };
     extBtnWrap.appendChild(extImportBtn);
+    /* V4.3：在线导入（洛雪同款）——粘贴音源脚本链接，主进程拉取后走同一沙箱验证管线 */
+    var extUrlBtn = el('button', 'btn-ghost', '在线导入…');
+    extUrlBtn.title = '粘贴洛雪音源脚本的 http/https 链接，在线拉取导入';
+    extUrlBtn.onclick = function () {
+      window.anniePrompt('音源脚本链接（http/https）', 'https://', async function (url) {
+        if (!url || !String(url).trim() || String(url).trim() === 'https://') return;
+        extUrlBtn.disabled = true;
+        extStat.textContent = '正在从链接下载音源…';
+        try {
+          var r = await window.mine.streamSourcesImportUrl({ url: String(url).trim() });
+          if (r && r.error) extStat.textContent = '导入失败：' + r.error;
+          else if (r && r.source) extStat.textContent = '音源「' + r.source.name + '」导入成功并已启用';
+        } catch (e) { extStat.textContent = '导入失败：' + (e.message || e); }
+        extUrlBtn.disabled = false;
+        renderExtSources();
+      });
+    };
+    extBtnWrap.appendChild(extUrlBtn);
     extBtnRow.appendChild(extBtnLab); extBtnRow.appendChild(extBtnWrap);
     sExt.appendChild(extBtnRow);
     function renderExtSources() {

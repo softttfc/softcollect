@@ -276,8 +276,10 @@ html[data-theme="am"] #titlebar { display: none !important; }
   transition: color .3s, filter .3s, transform .3s, opacity .3s;
   transform-origin: left center;
 }
-.am-lyr-line .tly { display: block; font-size: 14px; font-weight: 500; opacity: .8; margin-top: 2px; }
+.am-lyr-line .tly { display: block; font-size: calc(14px * var(--am-tly-scale, 1)); font-weight: 500; opacity: .8; margin-top: 2px; }
 .am-lyr-line.far { filter: blur(1.6px); opacity: .55; }
+/* 歌词虚化开关（默认开）：关闭后非当前行仅压暗不模糊 */
+#am-root.am-no-lyrblur .am-lyr-line.far, #am-root.am-no-lyrblur .am-imm-lyr .am-lyr-line.far { filter: none; }
 .am-lyr-line.near { color: var(--am-text-2); }
 .am-lyr-line.cur { color: var(--am-text); transform: scale(1.04); filter: none; }
 .am-lyr-line:hover { color: var(--am-text-2); }
@@ -499,7 +501,7 @@ html[data-theme="am"] #titlebar { display: none !important; }
 .am-imm-lyr { display: none; width: 46%; max-height: 100%; overflow-y: auto; overflow-x: hidden; padding: 0 8px; position: relative; }
 #am-root.am-imm-lyr-on .am-imm-lyr { display: block; }
 .am-imm-lyr .am-lyr-line { font-size: calc(26px * var(--am-lyr-scale, 1)); font-weight: 700; padding: 12px 0; color: rgba(255,255,255,.9); transform-origin: left center; }
-.am-imm-lyr .am-lyr-line .tly { font-size: 16px; }
+.am-imm-lyr .am-lyr-line .tly { font-size: calc(16px * var(--am-tly-scale, 1)); }
 .am-imm-lyr .am-lyr-line.far { filter: blur(2px); opacity: .45; }
 .am-imm-lyr .am-lyr-line.near { color: rgba(255,255,255,.65); }
 .am-imm-lyr .am-lyr-line.cur { color: #fff; transform: scale(1.03); filter: none; }
@@ -512,6 +514,15 @@ html[data-theme="am"] #titlebar { display: none !important; }
   border-left: 1px solid rgba(255,255,255,.12);
 }
 #am-root.am-imm-q-on .am-imm-queue { display: flex; }
+/* 收回小标签：抽屉左缘外侧、垂直居中 */
+.am-imm-q-fold {
+  position: absolute; left: -26px; top: 50%; transform: translateY(-50%);
+  width: 26px; height: 68px; padding: 0;
+  border: 1px solid rgba(255,255,255,.12); border-right: none; border-radius: 10px 0 0 10px;
+  background: rgba(18,18,22,.66); backdrop-filter: blur(36px); -webkit-backdrop-filter: blur(36px);
+  color: rgba(255,255,255,.65); font-size: 14px; line-height: 1; cursor: pointer;
+}
+.am-imm-q-fold:hover { color: #fff; background: rgba(40,40,48,.8); }
 
 /* ================= V3.2：AM 迷你模式 ================= */
 .am-mini { position: absolute; inset: 0; z-index: 70; display: none; flex-direction: column; background: #1b1b1f; }

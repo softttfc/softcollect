@@ -27,6 +27,9 @@ contextBridge.exposeInMainWorld('mine', {
   metaFullBatch: (paths) => ipcRenderer.invoke('lib:metaFullBatch', paths), // V3.1：批量完整 meta（含封面）
   matchSearch: (params) => ipcRenderer.invoke('match:search', params), // V3.3.1：在线歌词/封面匹配
   matchApply: (params) => ipcRenderer.invoke('match:apply', params),
+  matchBatchStart: (paths, opts) => ipcRenderer.invoke('match:batchStart', paths, opts), // V4.3.4：批量匹配歌词
+  matchBatchCancel: () => ipcRenderer.invoke('match:batchCancel'),
+  onMatchBatchEvent: (cb) => { const h = (_e, ev) => cb(ev); ipcRenderer.on('match:batch:event', h); return () => ipcRenderer.removeListener('match:batch:event', h); },
   tagPickCover: () => ipcRenderer.invoke('tag:pickCover'),            // V3.5.9：标签编辑选封面
   tagEdit: (params) => ipcRenderer.invoke('tag:edit', params),        // V3.5.9：写回标签
   tagEditBatch: (params) => ipcRenderer.invoke('tag:editBatch', params), // Track B：批量写回标签
@@ -84,6 +87,9 @@ contextBridge.exposeInMainWorld('mine', {
   streamLeaderboardList: (params) => ipcRenderer.invoke('stream:leaderboardList', params),
   streamSongLists: (params) => ipcRenderer.invoke('stream:songLists', params),
   streamSongListDetail: (params) => ipcRenderer.invoke('stream:songListDetail', params),
+  // V4.3：专辑搜索 / 专辑曲目
+  streamAlbumSearch: (params) => ipcRenderer.invoke('stream:albumSearch', params),
+  streamAlbumSongs: (params) => ipcRenderer.invoke('stream:albumSongs', params),
 
   // 设置中心：版本 / 手动检查更新 / 外链 / 更新状态订阅
   appVersion: () => ipcRenderer.invoke('app:getVersion'),
@@ -99,6 +105,7 @@ contextBridge.exposeInMainWorld('mine', {
   // 洛雪式音源管理
   streamSourcesList: () => ipcRenderer.invoke('stream:sources:list'),
   streamSourcesImport: () => ipcRenderer.invoke('stream:sources:import'),
+  streamSourcesImportUrl: (params) => ipcRenderer.invoke('stream:sources:importUrl', params),
   streamSourcesRemove: (params) => ipcRenderer.invoke('stream:sources:remove', params),
   streamSourcesSetEnabled: (params) => ipcRenderer.invoke('stream:sources:setEnabled', params),
 
@@ -174,6 +181,12 @@ contextBridge.exposeInMainWorld('mine', {
     const listener = (_e, action) => cb(action);
     ipcRenderer.on('tray:action', listener);
     return () => ipcRenderer.removeListener('tray:action', listener);
+  },
+  // 关闭行为被系统对话框「以后都这样执行」修改后同步渲染层
+  onCloseBehaviorChanged: (cb) => {
+    const listener = (_e, behavior) => cb(behavior);
+    ipcRenderer.on('annie:closeBehaviorChanged', listener);
+    return () => ipcRenderer.removeListener('annie:closeBehaviorChanged', listener);
   },
 
   // Pro beat0.0.1：诊断包导出（rendererSnapshot 为渲染侧设置/状态快照）

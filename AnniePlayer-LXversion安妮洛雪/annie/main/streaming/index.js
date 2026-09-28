@@ -52,6 +52,9 @@ async function leaderboards(params) { return lxsdk.leaderboards(params); }
 async function leaderboardList(params) { return lxsdk.leaderboardList(params); }
 async function songLists(params) { return lxsdk.songLists(params); }
 async function songListDetail(params) { return lxsdk.songListDetail(params); }
+/* V4.3：专辑搜索 / 专辑曲目 */
+async function albumSearch(params) { return lxsdk.albumSearch(params); }
+async function albumSongs(params) { return lxsdk.albumSongs(params); }
 
 /**
  * 封面代理：把 HTTP(S) 图片转成 dataURL 交给渲染层。
@@ -193,11 +196,11 @@ async function writeDownloadedTags(dest, song, provider, opts) {
   try {
     // 1) 补全专辑详情元数据（尽力而为，接口失败返回空字段）
     const detail = await lxsdk.albumDetail({ provider, song }).catch(() => ({}));
-    // 2) 拉歌词（嵌入标签始终做；旁挂 .lrc 受 saveLrc 控制）
-    let lrc = '';
+    // 2) 拉歌词（嵌入标签始终做；旁挂 .lrc 受 saveLrc 控制）；译文轨一并带回（外文歌词翻译行）
+    let lrc = '', tlyric = '';
     try {
       const lr = await lxsdk.lyric({ provider, song });
-      if (lr && lr.lrc) lrc = lr.lrc;
+      if (lr && lr.lrc) { lrc = lr.lrc; tlyric = lr.tlyric || ''; }
     } catch { }
     // 3) 封面：song.cover 可能为空（kw/kg 搜索 img:null）→ getPic 补全（嵌入始终做）
     let coverUrl = (song && (song.cover || (song.meta && song.meta.img))) || '';
@@ -227,7 +230,7 @@ async function writeDownloadedTags(dest, song, provider, opts) {
     // 5) 独立文件（受开关控制）：
     //    - saveLrc   → 旁挂同名 .lrc
     //    - saveCover → 独立封面图片文件（同名 .jpg/.png）
-    if (wantLrc && lrc && lrc.trim()) tagWriter.writeLyric({ dest, lrc, tlyric: '' });
+    if (wantLrc && lrc && lrc.trim()) tagWriter.writeLyric({ dest, lrc, tlyric });
     if (wantCover && coverBuf) tagWriter.writeCoverFile({ dest, coverBytes: coverBuf });
     return tagRes && tagRes.ok;
   } catch (e) {
@@ -238,7 +241,7 @@ async function writeDownloadedTags(dest, song, provider, opts) {
 
 module.exports = {
   init, search, songUrl, lyric, getPic, coverProxy, hotSearch, hotComments, download, downloadDir, setDownloadDir,
-  leaderboards, leaderboardList, songLists, songListDetail,
+  leaderboards, leaderboardList, songLists, songListDetail, albumSearch, albumSongs,
   PROVIDERS,
   sources, // 音源管理 API 透出给 IPC 层
 };

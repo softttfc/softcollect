@@ -1,7 +1,7 @@
 {
   "name": "lx-lxwalnut-music-mobile",
-  "version": "26.09.20",
-  "versionCode": 260920,
+  "version": "26.09.28",
+  "versionCode": 260928,
   "private": true,
   "scripts": {
     "dev": "react-native run-android --active-arch-only",
@@ -50,6 +50,7 @@
     "@react-native-community/cli-platform-android": "12.3.7",
     "@react-native-community/slider": "^4.5.5",
     "@react-native-cookies/cookies": "^6.2.1",
+    "@shopify/react-native-skia": "^1.12.4",
     "@vibrant/color": "^4.0.4",
     "@vibrant/core": "^4.0.4",
     "@vibrant/generator-default": "^4.0.4",

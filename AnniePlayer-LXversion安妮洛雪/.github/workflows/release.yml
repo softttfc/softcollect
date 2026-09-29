@@ -86,3 +86,4 @@ jobs:
             setupEXE/annie-player-svlx-setup-*.exe
             setupEXE/annie-player-svlx-setup-*.exe.blockmap
             setupEXE/V*-setup.exe
+      # V4.3.8：自建更新源方案已废弃（回纯 GitHub Releases），V4.3.7 的 SCP 同步步骤已移除。

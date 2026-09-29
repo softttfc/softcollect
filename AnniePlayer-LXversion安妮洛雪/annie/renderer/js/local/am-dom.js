@@ -25,6 +25,7 @@
   var prev = AM.prev;
   var seek = AM.seek;
   var renderStreamView = AM.renderStreamView;
+  var renderSplView = AM.renderSplView; // V4.3.5：在线歌单视图（am-stream 片先加载，引用有效）
   var applyLyrStyle = AM.applyLyrStyle;
   var toggleLyrSetPop = AM.toggleLyrSetPop;
   // 前向引用：目标函数由后加载分片注册到桥，调用时才取值（加载期取不到）
@@ -115,7 +116,7 @@
     R.btnLocate = el('button', 'am-tbtn', '🎯'); R.btnLocate.title = '定位当前播放文件';
     R.btnLocate.onclick = locatePlaying;
     right.appendChild(R.btnExcl); right.appendChild(R.btnLocate);
-    // 播放模式循环切换（仅本地播放生效）
+    // 播放模式循环切换（本地全量；在线支持顺序/随机/单曲循环）
     R.btnMode = el('button', 'am-tbtn', '→');
     syncModeBtn();
     R.btnMode.onclick = function () {
@@ -143,6 +144,15 @@
     btnDlyr.onclick = function () { if (window.annieDlyricsToggle) window.annieDlyricsToggle(); };
     document.addEventListener('annie-dlyrics-changed', function (e) { btnDlyr.classList.toggle('on', !!(e.detail && e.detail.on)); });
     right.appendChild(btnDlyr);
+    // V4.3.5：播放中一键收藏（仅在线歌曲；本地歌曲走行内 ♥）
+    var btnNpFav = el('button', 'am-tbtn', '♥');
+    btnNpFav.title = '收藏正在播放的在线歌曲到在线歌单';
+    btnNpFav.onclick = function (e) {
+      e.stopPropagation(); // 防 document 点击代理把刚打开的收藏弹层立刻关掉
+      var r = btnNpFav.getBoundingClientRect();
+      if (AM.favCurrentStream) AM.favCurrentStream(r.left, r.bottom + 6);
+    };
+    right.appendChild(btnNpFav);
     // 设置中心入口（与粒子舞台顶栏 ⚙ 同一个面板）
     var btnSet = el('button', 'am-tbtn', '⚙'); btnSet.title = '设置中心（Ctrl+,）';
     btnSet.onclick = function () { if (window.annieSettings) window.annieSettings.togglePanel(); };
@@ -177,8 +187,7 @@
     /* 主体 */
     var body = el('div', 'am-body');
     R.sidebar = el('nav', 'am-side');
-    R.content = el('div', 'am-content');
-    // 窗口化渲染：滚动时按可视区重建行（rAF 合并，避免滚动事件风暴）
+    R.content = el('div', 'am-content');    // 窗口化渲染：滚动时按可视区重建行（rAF 合并，避免滚动事件风暴）
     R.content.addEventListener('scroll', function () {
       if (!S._tbl || S._tblRAF) return;
       S._tblRAF = requestAnimationFrame(function () { S._tblRAF = 0; renderAmWindow(); });
@@ -233,6 +242,7 @@
 
     sb.appendChild(el('div', 'am-side-h', '媒体库'));
     sb.appendChild(nav('🔍', '在线音乐', 'stream'));
+    sb.appendChild(nav('🔷', 'Qobuz', 'qobuz')); // V4.3.6：Qobuz 在线播放/下载（登录自己的付费账号）
     // 添加文件夹：只作入口，文件夹列表不外显在 AM 界面（与粒子舞台/FB2K 不同）
     var addFolder = el('button', 'am-nav am-new');
     addFolder.appendChild(el('span', 'am-nav-ico', '＋'));
@@ -283,6 +293,70 @@
     };
     sb.appendChild(add);
 
+    // V4.3.5：在线歌单（流媒体收藏；与本地播放列表并列但互不相混）
+    sb.appendChild(el('div', 'am-side-h', '在线歌单'));
+    (S.streamPlaylists || []).forEach(function (pl) {
+      var b = nav('☁️', pl.name, 'spl:' + pl.id);
+      // 图标位换成第一首曲目的封面缩略图（整专收藏即专辑封面），无封面保留 ☁️
+      var fc = pl.items && pl.items.length && pl.items[0].song && pl.items[0].song.cover;
+      if (fc) {
+        var ico = b.querySelector('.am-nav-ico');
+        var cv = el('img'); cv.alt = ''; cv.loading = 'lazy';
+        cv.style.cssText = 'width:18px;height:18px;border-radius:4px;object-fit:cover;flex:none';
+        cv.src = fc; cv.onerror = function () { cv.style.visibility = 'hidden'; };
+        ico.textContent = ''; ico.appendChild(cv);
+      }
+      var del = el('button', 'am-nav-del', '✕');
+      del.title = '删除在线歌单';
+      del.onclick = function (e) {
+        e.stopPropagation();
+        if (!confirm('删除在线歌单「' + pl.name + '」？（不影响任何本地文件）')) return;
+        window.mine.splDelete(pl.id).then(function (pls) {
+          S.streamPlaylists = pls;
+          if (S.view === 'spl:' + pl.id) S.view = 'stream';
+          renderSidebar(); renderView();
+        });
+      };
+      b.appendChild(del);
+      sb.appendChild(b);
+    });
+    var addSpl = el('button', 'am-nav am-new');
+    addSpl.appendChild(el('span', 'am-nav-ico', '＋'));
+    addSpl.appendChild(el('span', 'am-nav-name', '新建在线歌单'));
+    addSpl.onclick = function () {
+      amPrompt('在线歌单名称', '新建在线歌单', function (name) {
+        window.mine.splCreate(name).then(function (pls) {
+          S.streamPlaylists = pls;
+          S.view = 'spl:' + pls[pls.length - 1].id;
+          renderSidebar(); renderView();
+        });
+      });
+    };
+    sb.appendChild(addSpl);
+
+    // 收藏的平台歌单（歌单广场 ☆ 收藏歌单 的来源；localStorage，am-stream 片提供存取与跳转）
+    var slFavs = AM.slFavs ? AM.slFavs() : [];
+    if (slFavs.length) {
+      sb.appendChild(el('div', 'am-side-h', '收藏的歌单'));
+      slFavs.forEach(function (f) {
+        var b = el('button', 'am-nav');
+        b.appendChild(el('span', 'am-nav-ico', '🎵'));
+        var pf = (AM.PLATFORMS && AM.PLATFORMS[f.provider]) ? AM.PLATFORMS[f.provider].replace('音乐', '') : f.provider;
+        b.appendChild(el('span', 'am-nav-name', pf + ' · ' + f.name));
+        b.onclick = function () { if (AM.openFavSongList) AM.openFavSongList(f); };
+        var del = el('button', 'am-nav-del', '✕');
+        del.title = '取消收藏';
+        del.onclick = function (e) {
+          e.stopPropagation();
+          if (!AM.slFavSave) return;
+          AM.slFavSave(AM.slFavs().filter(function (v) { return !(v.id === f.id && v.provider === f.provider); }));
+          renderSidebar(); renderView();
+        };
+        b.appendChild(del);
+        sb.appendChild(b);
+      });
+    }
+
     // 本地搜索（AM 语义：全库搜索；输入即切回歌曲视图并深加载全库标签）
     var sch = el('div', 'am-search');
     sch.appendChild(el('span', null, '⌕'));
@@ -310,6 +384,10 @@
     if (!R.content || (window.annieTheme && annieTheme.current !== 'am')) return;
     var c = R.content;
     c.innerHTML = '';
+    // V4.3.8：A–Z 索引栏挂在 .am-body 上（不随 content 清空），非歌曲视图需主动移除
+    var oldAz = c.parentElement && c.parentElement.querySelector('.am-az');
+    if (oldAz) oldAz.remove();
+    S._az = null;
     // V4.1：视图切换动画只在「视图签名变化」时播放——切歌高亮/搜索输入/标签到达的重绘不闪
     var sig = S.view + '|' + (S.albumKey || '') + '|' + (S.folderKey ? S.folderKey.root + S.folderKey.seg : '');
     if (sig !== S._vswSig) {
@@ -320,6 +398,8 @@
     }
 
     if (S.view === 'stream') { renderStreamView(c); return; }
+    if (S.view === 'qobuz') { if (AM.renderQobuzView) AM.renderQobuzView(c); return; } // V4.3.6：Qobuz 视图
+    if (S.view.indexOf('spl:') === 0) { renderSplView(c); return; } // V4.3.5：在线歌单
 
     var tracks = currentTracks();
 
@@ -344,6 +424,10 @@
         S.view === 'favorites' ? '喜爱歌曲' : '歌曲'));
     }
 
+    if (S.view === 'songs') {
+      ensureMetaDeep(); // V4.3.8：字母排序依赖全库标题，闲时深加载（按块到达自动重排）
+    }
+
     if (!tracks.length) {
       c.appendChild(el('div', 'am-empty',
         S.view === 'favorites' ? '还没有喜爱的歌曲' :
@@ -351,6 +435,7 @@
       return;
     }
     renderTrackTable(c, tracks);
+    if (S.view === 'songs') renderAzBar(c, tracks); // V4.3.8：右侧 A–Z 索引栏
     ensureMeta(tracks.slice(0, 120));
   }
 
@@ -533,6 +618,59 @@
     if (end < win.tracks.length) frag.appendChild(amSpacerRow((win.tracks.length - end) * win.rowH, win.cols));
     win.body.innerHTML = '';
     win.body.appendChild(frag);
+    azSyncActive(win, start); // V4.3.8：滚动联动索引栏当前字母
+  }
+
+  /* ---------- V4.3.8：A–Z 索引栏（仅全曲库「歌曲」视图，配合 am.js 首字母排序） ---------- */
+  function renderAzBar(c, tracks) {
+    var cache = S._azCache;
+    if (!cache || cache.out !== tracks) return; // 非首字母排序结果（理论不发生）不出栏
+    var firstIdx = cache.firstIdx;
+    var bar = el('div', 'am-az');
+    var present = [];
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZ#'.split('').forEach(function (L) {
+      var has = firstIdx[L] !== undefined;
+      if (has) present.push(L);
+      var s = el('span', 'am-az-l' + (has ? '' : ' off'), L);
+      if (has) {
+        s.dataset.letter = L;
+        s.onclick = function () { azJump(L); };
+      }
+      bar.appendChild(s);
+    });
+    S._az = { bar: bar, firstIdx: firstIdx, present: present, cur: '' };
+    // 挂 .am-body（content 是滚动容器，索引栏需悬浮且不随 innerHTML 清空）
+    (c.parentElement || c).appendChild(bar);
+  }
+  function azJump(L) {
+    var az = S._az;
+    if (!az) return;
+    var idx = az.firstIdx[L];
+    if (idx === undefined) return;
+    var c = R.content, win = S._tbl;
+    if (win && win.body.isConnected) {
+      // 窗口化：与 scrollRowIntoView 同一套 base 换算；
+      // 再多回退「表头 + 一行 + 6px」，否则字母组首行会被 sticky 表头（歌曲/艺人/专辑）盖住
+      var headH = win.tb.tHead ? win.tb.tHead.offsetHeight : 0;
+      var base = win.tb.getBoundingClientRect().top - c.getBoundingClientRect().top + c.scrollTop + headH;
+      c.scrollTo({ top: base + idx * win.rowH - headH - win.rowH - 6, behavior: 'smooth' });
+    } else {
+      var rows = c.querySelectorAll('tr.am-tr');
+      if (rows[idx]) rows[idx].scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }
+  }
+  /* 滚动时按首个可见行反推当前字母并高亮（仅窗口化路径调用，小列表无感） */
+  function azSyncActive(win, start) {
+    var az = S._az;
+    if (!az || !az.bar.isConnected) return;
+    var cur = az.present[0] || '';
+    for (var i = 0; i < az.present.length; i++) {
+      if (az.firstIdx[az.present[i]] <= start) cur = az.present[i]; else break;
+    }
+    if (cur === az.cur) return;
+    az.cur = cur;
+    var kids = az.bar.children;
+    for (var k = 0; k < kids.length; k++) kids[k].classList.toggle('cur', kids[k].dataset.letter === cur);
   }
 
   /* V4.1：应用内输入对话框——Electron 不支持原生 window.prompt()（静默无反应），

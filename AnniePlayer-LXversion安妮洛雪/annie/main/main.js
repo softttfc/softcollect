@@ -12,6 +12,7 @@ const streaming = require('./streaming');
 const onlineMatch = require('./onlineMatch');
 const analyzer = require('./analyzer');
 const tagWriter = require('./tagWriter'); // V3.5.9：曲库标签编辑（与下载写标签同一实现）
+const qobuz = require('./qobuz'); // V4.3.6：Qobuz 在线播放/下载（用户登录自己的付费账号）
 
 const engine = new EngineClient();
 let mainWindow = null;
@@ -205,11 +206,12 @@ function loadStore() {
     const s = JSON.parse(fs.readFileSync(storePath(), 'utf8'));
     if (!Array.isArray(s.favorites)) s.favorites = [];
     if (!Array.isArray(s.playlists)) s.playlists = []; // SVLX 1.3.0：自建播放列表 [{id,name,paths,created}]
+    if (!Array.isArray(s.streamPlaylists)) s.streamPlaylists = []; // V4.3.5：在线歌单 [{id,name,items:[{provider,song,addedAt}],created}]
     if (!s.metaCache || typeof s.metaCache !== 'object') s.metaCache = {};
     if (!s.stats || typeof s.stats !== 'object') s.stats = {}; // Pro beat0.0.1：播放统计
     _storeMem = s;
   }
-  catch { _storeMem = { folders: [], tracks: [], volume: 1, backend: null, favorites: [], playlists: [], metaCache: {}, stats: {} }; }
+  catch { _storeMem = { folders: [], tracks: [], volume: 1, backend: null, favorites: [], playlists: [], streamPlaylists: [], metaCache: {}, stats: {} }; }
   return _storeMem;
 }
 
@@ -619,6 +621,69 @@ function registerIpc() {
     const pl = store.playlists.find(p => p.id === id);
     if (pl) { pl.paths = pl.paths.filter(p => p !== trackPath); saveStore({ playlists: store.playlists }); }
     return store.playlists;
+  });
+
+  // V4.3.5：在线歌单（流媒体收藏）——items 存 {provider, song, addedAt}；
+  // song 为洛雪 lx-sdk 原始曲目对象（含平台 ID/meta），播放地址每次现解析，不落盘 URL
+  const splItemKey = (it) => {
+    const s = (it && it.song) || {};
+    return (it && it.provider || '') + '|' + String(s.songmid || s.id || s.hash || s.rid ||
+      ((s.name || '') + '|' + (s.artist || '') + '|' + (s.duration || '')));
+  };
+  const splNormalize = (song) => {
+    if (!song || typeof song !== 'object' || !song.provider) return null;
+    return { provider: String(song.provider), song, addedAt: Date.now() };
+  };
+  ipcMain.handle('spl:list', () => loadStore().streamPlaylists);
+  ipcMain.handle('spl:create', (_e, name) => {
+    const store = loadStore();
+    const pl = {
+      id: 'spl-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7),
+      name: String(name || '').trim() || '新建在线歌单',
+      items: [],
+      created: Date.now()
+    };
+    store.streamPlaylists.push(pl);
+    saveStore({ streamPlaylists: store.streamPlaylists });
+    return store.streamPlaylists;
+  });
+  ipcMain.handle('spl:rename', (_e, id, name) => {
+    const store = loadStore();
+    const pl = store.streamPlaylists.find(p => p.id === id);
+    if (pl) { const n = String(name || '').trim(); if (n) { pl.name = n; saveStore({ streamPlaylists: store.streamPlaylists }); } }
+    return store.streamPlaylists;
+  });
+  ipcMain.handle('spl:delete', (_e, id) => {
+    const store = loadStore();
+    saveStore({ streamPlaylists: store.streamPlaylists.filter(p => p.id !== id) });
+    return loadStore().streamPlaylists;
+  });
+  ipcMain.handle('spl:add', (_e, id, songs) => {
+    const store = loadStore();
+    const pl = store.streamPlaylists.find(p => p.id === id);
+    let added = 0;
+    if (pl && Array.isArray(songs)) {
+      const keys = new Set(pl.items.map(splItemKey));
+      for (const raw of songs) {
+        const it = splNormalize(raw);
+        if (!it) continue;
+        const k = splItemKey(it);
+        if (keys.has(k)) continue; // 同平台同曲去重
+        keys.add(k); pl.items.push(it); added++;
+      }
+      if (added) saveStore({ streamPlaylists: store.streamPlaylists });
+    }
+    return { playlists: store.streamPlaylists, added };
+  });
+  ipcMain.handle('spl:remove', (_e, id, indexes) => {
+    const store = loadStore();
+    const pl = store.streamPlaylists.find(p => p.id === id);
+    if (pl && Array.isArray(indexes)) {
+      const del = new Set(indexes.filter(i => Number.isInteger(i)));
+      pl.items = pl.items.filter((_, i) => !del.has(i));
+      saveStore({ streamPlaylists: store.streamPlaylists });
+    }
+    return store.streamPlaylists;
   });
 
   // 批量读取标签（排序用），结果写入 metaCache 持久化，避免重复解析
@@ -1151,6 +1216,8 @@ function setupAutoUpdate() {
   try { autoUpdater.logger = require('electron-log'); } catch (e) { }
   const ulog = autoUpdater.logger || console;
   autoUpdater.autoInstallOnAppQuit = true;
+  // V4.3.8：自建更新源方案已废弃（用户拍板回纯 GitHub），V4.3.7 曾短暂使用双源。
+  // 服务器 latest.yml 已删除 → V4.3.7 客户端检查 404 → error 分支回落 GitHub，不会卡死。
   // 设置中心「更新」页状态推送（checking/available/latest/downloading/ready/error）
   const sendUpd = (status, data) => {
     try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('app:updateStatus', { status, data }); } catch { }
@@ -1243,6 +1310,7 @@ if (global.__svlxBoot) {
   registerIpc();
   setupLibraryWatch(); // V3.5.8：媒体库文件夹监听
   streaming.init(app);
+  qobuz.init({ loadStore, flushStore });
   setupImageReferer();
   engine.start();
   // 预热：引擎首次 devices.list 需 ~20s（WASAPI 枚举），后台预跑避免 UI 超时
@@ -1277,6 +1345,7 @@ if (!gotLock) {
     registerIpc();
     setupLibraryWatch(); // V3.5.8：媒体库文件夹监听
     streaming.init(app); // 恢复流媒体登录态（userData/stream-cookies.json）
+    qobuz.init({ loadStore, flushStore });
     setupImageReferer(); // 流媒体封面 CDN 防盗链 Referer 注入
     engine.start(); // 引擎拉起失败不阻塞 UI，调用时再报错
     // 预热：引擎首次 devices.list 需 ~20s（WASAPI 枚举），后台预跑避免 UI 超时

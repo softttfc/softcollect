@@ -40,6 +40,13 @@ contextBridge.exposeInMainWorld('mine', {
   playlistRename: (id, name) => ipcRenderer.invoke('lib:playlist:rename', id, name),
   playlistDelete: (id) => ipcRenderer.invoke('lib:playlist:delete', id),
   playlistAdd: (id, paths) => ipcRenderer.invoke('lib:playlist:add', id, paths),
+  // V4.3.5：在线歌单（流媒体收藏）
+  splList: () => ipcRenderer.invoke('spl:list'),
+  splCreate: (name) => ipcRenderer.invoke('spl:create', name),
+  splRename: (id, name) => ipcRenderer.invoke('spl:rename', id, name),
+  splDelete: (id) => ipcRenderer.invoke('spl:delete', id),
+  splAdd: (id, songs) => ipcRenderer.invoke('spl:add', id, songs),
+  splRemove: (id, indexes) => ipcRenderer.invoke('spl:remove', id, indexes),
   playlistRemove: (id, p) => ipcRenderer.invoke('lib:playlist:remove', id, p),
 
   // EXP 7.28：Worker 曲库扫描（批量/进度/取消）
@@ -106,6 +113,25 @@ contextBridge.exposeInMainWorld('mine', {
   streamSourcesList: () => ipcRenderer.invoke('stream:sources:list'),
   streamSourcesImport: () => ipcRenderer.invoke('stream:sources:import'),
   streamSourcesImportUrl: (params) => ipcRenderer.invoke('stream:sources:importUrl', params),
+
+  // V4.3.6：Qobuz 在线播放/下载
+  qobuzStatus: () => ipcRenderer.invoke('qobuz:status'),
+  qobuzLogin: (p) => ipcRenderer.invoke('qobuz:login', p),
+  qobuzLogout: () => ipcRenderer.invoke('qobuz:logout'),
+  qobuzSearch: (p) => ipcRenderer.invoke('qobuz:search', p),
+  qobuzAlbumGet: (id) => ipcRenderer.invoke('qobuz:albumGet', id),
+  qobuzPlaylistGet: (id) => ipcRenderer.invoke('qobuz:playlistGet', id),
+  qobuzArtistGet: (id) => ipcRenderer.invoke('qobuz:artistGet', id),
+  qobuzFavorites: (type) => ipcRenderer.invoke('qobuz:favorites', type),
+  qobuzUserPlaylists: () => ipcRenderer.invoke('qobuz:userPlaylists'),
+  qobuzFav: (p) => ipcRenderer.invoke('qobuz:fav', p),
+  qobuzFileUrl: (p) => ipcRenderer.invoke('qobuz:fileUrl', p),
+  qobuzLyricMatch: (p) => ipcRenderer.invoke('qobuz:lyricMatch', p),
+  qobuzParseUrl: (text) => ipcRenderer.invoke('qobuz:parseUrl', text),
+  qobuzDownload: (p) => ipcRenderer.invoke('qobuz:download', p),
+  qobuzDlCancel: () => ipcRenderer.invoke('qobuz:dlCancel'),
+  qobuzPickDlDir: (reset) => ipcRenderer.invoke('qobuz:pickDlDir', reset),
+  onQobuzDlEvent: (cb) => { const h = (_e, ev) => cb(ev); ipcRenderer.on('qobuz:dl:event', h); return () => ipcRenderer.removeListener('qobuz:dl:event', h); },
   streamSourcesRemove: (params) => ipcRenderer.invoke('stream:sources:remove', params),
   streamSourcesSetEnabled: (params) => ipcRenderer.invoke('stream:sources:setEnabled', params),
 

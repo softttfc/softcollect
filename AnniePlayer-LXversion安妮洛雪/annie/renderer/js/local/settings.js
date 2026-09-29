@@ -962,7 +962,7 @@
     var sPm = section(pgPlayback, '播放模式');
     var pmRow = markItem(el('div', 'set-row'), '播放模式 顺序播放 随机播放 单曲循环 shuffle repeat');
     var pmLab = el('div'); pmLab.appendChild(el('div', '', '默认播放模式'));
-    pmLab.appendChild(el('div', 'set-hint', '与播放栏的模式按钮同步，仅本地播放生效'));
+    pmLab.appendChild(el('div', 'set-hint', '与播放栏的模式按钮同步；本地全量生效，在线播放支持顺序/随机/单曲循环'));
     var pmSel = document.createElement('select');
     if (window.anniePlayMode) {
       window.anniePlayMode.list.forEach(function (m) {
@@ -2184,7 +2184,10 @@
     var btnLx = el('button', 'btn-ghost', '洛雪音乐 LX Music');
     btnLx.title = 'musicSdk 音源';
     btnLx.onclick = function () { window.mine.openExternal('https://github.com/lyswhut/lx-music-desktop'); };
-    thWrap.appendChild(btnDog); thWrap.appendChild(btnLx);
+    var btnQb = el('button', 'btn-ghost', 'QobuzDownloaderX @ImAiiR');
+    btnQb.title = 'Qobuz 下载器先驱 · V4.3.6 Qobuz 功能的设计参考';
+    btnQb.onclick = function () { window.mine.openExternal('https://github.com/ImAiiR/QobuzDownloaderX'); };
+    thWrap.appendChild(btnDog); thWrap.appendChild(btnLx); thWrap.appendChild(btnQb);
     thRow.appendChild(thLab); thRow.appendChild(thWrap);
     sThanks.appendChild(thRow);
 

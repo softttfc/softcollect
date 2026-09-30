@@ -1075,6 +1075,7 @@ window.annieStreamPlay = async function (track) {
     const method = (cf > 0 || gaplessOn()) ? 'play.crossfade' : 'play';
     await enginePlayRecover(method, { path: track.url, offsetSec: 0, headers: track.headers });
   } catch (e) {
+    window.__annieLastStreamError = String(e && e.message || e); // V4.3.10：AM 错误提示带出引擎具体原因
     setFormatChips([{ text: '流媒体播放失败: ' + e.message, cls: 'warn' }]);
     return false; // SVLX：返回值供 AM 主题弹出错误提示
   }
@@ -1246,6 +1247,11 @@ window.mine.onEngineEvent((event, d) => {
       break;
     case 'notify': // Pro：引擎通知（DoP 回退 / Native 不支持等）
       proToast(d.text || '');
+      break;
+    case 'devices.changed': // V4.3.12：设备热插拔——实时刷新下拉列表（不自动切换输出）
+      refreshDevices();
+      proToast('检测到音频设备变更，设备列表已更新');
+      try { document.dispatchEvent(new CustomEvent('annie-devices-changed')); } catch { }
       break;
   }
 });

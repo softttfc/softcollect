@@ -11,6 +11,7 @@ public static class WasapiErrors
     public const uint UNSUPPORTED_FORMAT = 0x88890008;   // AUDCLNT_E_UNSUPPORTED_FORMAT
     public const uint EXCLUSIVE_NOT_ALLOWED = 0x8889000E;
     public const uint INVALID_DEVICE_PERIOD = 0x88890003;
+    public const uint DEVICE_INVALIDATED = 0x88890004;   // AUDCLNT_E_DEVICE_INVALIDATED（USB DAC/网桥重协商时常见）
     public const uint E_INVALIDARG = 0x80070057;
 
     public static bool IsFormatRejection(COMException ce)
@@ -19,6 +20,7 @@ public static class WasapiErrors
     public static string Translate(COMException ce, string deviceName) => (uint)ce.HResult switch
     {
         DEVICE_IN_USE => $"设备 [{deviceName}] 正被其他程序占用（独占冲突）。请关闭 foobar2000 等其他播放器的独占输出后重试；刚切换设备时系统释放有延迟，等一秒再点播放即可。",
+        DEVICE_INVALIDATED => $"设备 [{deviceName}] 被系统断开/重建（USB DAC 或 Diretta 网桥重新协商）。已自动重新枚举设备，仍失败请检查连接，或在设置里改用 WASAPI 共享模式。",
         EXCLUSIVE_NOT_ALLOWED => $"设备 [{deviceName}] 未开启独占权限：设置 → 系统 → 声音 → 更多声音设置 → 播放 → 双击该设备 → 高级，勾选两个「允许应用程序独占控制」。",
         INVALID_DEVICE_PERIOD => $"设备 [{deviceName}] 拒绝了缓冲周期设置。",
         _ => $"WASAPI 错误 0x{(uint)ce.HResult:X8}（设备：{deviceName}）",
@@ -391,7 +393,9 @@ public sealed class WasapiExclusiveBackend : IOutputBackend
 {
     private static readonly int[] FallbackRates = { 384000, 352800, 192000, 176400, 96000, 88200, 48000, 44100 };
 
-    private readonly MMDevice _device;
+    private MMDevice _device;
+    private readonly string _deviceId; // V4.3.10：设备失效（Diretta 网桥/USB DAC 重协商）后按 ID 重新枚举
+    private bool _invalidatedSeen;     // 本轮 TryOpen 是否见过 DEVICE_INVALIDATED
     private readonly AudioClientShareMode _shareMode; // V1.1.9：Exclusive（默认）| Shared
     private WasapiOut? _out;
     private IWaveProvider? _source;
@@ -409,6 +413,7 @@ public sealed class WasapiExclusiveBackend : IOutputBackend
     public WasapiExclusiveBackend(MMDevice device, bool exclusive = true)
     {
         _device = device;
+        _deviceId = device.ID;
         _shareMode = exclusive ? AudioClientShareMode.Exclusive : AudioClientShareMode.Shared;
         DeviceName = device.FriendlyName;
     }
@@ -440,11 +445,37 @@ public sealed class WasapiExclusiveBackend : IOutputBackend
         {
             // 诊断：探测失败时记录真实原因（格式拒绝以外的错误会伪装成"不支持"）
             Console.Error.WriteLine($"[wasapi] 探测 {fmt.SampleRate}Hz/{fmt.BitsPerSample}bit/{fmt.Channels}ch 异常: 0x{(ex is COMException ce ? (uint)ce.HResult : 0xFFFFFFFF):X8} {ex.Message.Split('\n')[0]}");
+            // V4.3.10：设备失效（Diretta 网桥/USB DAC 重协商，缓存的 MMDevice 句柄变陈旧）→ 标记，触发重新枚举
+            if (ex is COMException ce2 && (uint)ce2.HResult == WasapiErrors.DEVICE_INVALIDATED) _invalidatedSeen = true;
             return false;
         }
     }
 
+    /// <summary>V4.3.10：设备被系统重建后，缓存的 MMDevice 引用永久失效（所有探测都 DEVICE_INVALIDATED）。
+    /// 按持久化的设备 ID 重新枚举拿新引用；设备消失则回退系统默认输出。</summary>
+    private void RefreshDevice()
+    {
+        var fresh = FindById(_deviceId) ?? GetDefault();
+        if (fresh is null) return;
+        Console.Error.WriteLine($"[wasapi] 设备失效，已重新枚举：{DeviceName} → {fresh.FriendlyName}");
+        if (_out is null) { try { _device.Dispose(); } catch { } }
+        _device = fresh;
+    }
+
     public int? TryOpen(IWaveProvider source, int requestedRate, int channels)
+    {
+        // V4.3.10：两遍尝试——第一遍若全程 DEVICE_INVALIDATED（句柄陈旧），重新枚举设备后再来一遍
+        for (int pass = 0; pass < 2; pass++)
+        {
+            _invalidatedSeen = false;
+            try { return TryOpenCore(source, requestedRate, channels); }
+            catch (InvalidOperationException) when (pass == 0 && _invalidatedSeen) { RefreshDevice(); }
+        }
+        // 不可达（第二遍异常直接抛出），仅为编译通过
+        return TryOpenCore(source, requestedRate, channels);
+    }
+
+    private int? TryOpenCore(IWaveProvider source, int requestedRate, int channels)
     {
         _source = source;
         RequestedRate = requestedRate;
@@ -520,6 +551,7 @@ public sealed class WasapiExclusiveBackend : IOutputBackend
             {
                 try { _out?.Dispose(); } catch { }
                 _out = null;
+                if ((uint)ce.HResult == WasapiErrors.DEVICE_INVALIDATED) _invalidatedSeen = true; // V4.3.10：句柄陈旧 → 触发重新枚举
                 if ((uint)ce.HResult == WasapiErrors.DEVICE_IN_USE && attempt < 4)
                 {
                     Thread.Sleep(350);
@@ -653,6 +685,8 @@ public sealed class AsioBackend : IOutputBackend
 {
     private AsioOut? _asio;
     private readonly string _driverName;
+    // 驱动拒绝源采样率时的回退表（高→低，PCM/DSD 两族都覆盖）
+    private static readonly int[] AsioFallbackRates = { 768000, 705600, 384000, 352800, 192000, 176400, 96000, 88200, 48000, 44100 };
 
     public string Kind => "asio";
     public string DeviceName => _driverName;
@@ -755,13 +789,26 @@ public sealed class AsioBackend : IOutputBackend
                 $"ASIO 驱动 [{_driverName}] 初始化失败: {ex.Message}。请确认驱动已正确安装且未被其他程序独占占用。");
         }
 
-        // 验证采样率支持
+        // 验证采样率支持；驱动拒绝时按回退率表逐一对齐驱动（对齐成功 → 返回该率，引擎重采样重开）
+        // V4.3.12：DSD 转 PCM 会产生 705.6k/1411.2k 等超高率，驱动必拒——没有回退就是"播放失败 17 秒无声"
         if (!_asio.IsSampleRateSupported(requestedRate))
         {
-            _asio.Dispose(); _asio = null;
+            try { _asio.Dispose(); } catch { }
+            _asio = null;
+            foreach (var r in AsioFallbackRates)
+            {
+                if (r == requestedRate) continue;
+                Console.Error.WriteLine($"[asio] {requestedRate}Hz 被拒，尝试对齐驱动到 {r}Hz…");
+                if (ProbeAndAlignRateCore(r) == r)
+                {
+                    Console.Error.WriteLine($"[asio] 驱动已对齐 {r}Hz，交由引擎重采样");
+                    Resampled = true;
+                    return r;
+                }
+            }
             throw new InvalidOperationException(
-                $"ASIO 驱动 [{_driverName}] 不支持 {requestedRate}Hz 采样率。" +
-                (aligned > 0 ? $" 驱动当前为 {aligned}Hz，请打开驱动控制面板手动切换或调整源文件。" : " 请打开驱动控制面板手动设置采样率。"));
+                $"ASIO 驱动 [{_driverName}] 不支持 {requestedRate}Hz 采样率，回退采样率也全部被拒。" +
+                " 若驱动面板显示未连接/未就绪，请重新插拔 DAC 后再试。");
         }
 
         // ASIO 驱动位深各异：优先 float32（直通无损），失败回退 int16
@@ -814,4 +861,41 @@ public sealed class AsioBackend : IOutputBackend
         _asio = null;
     });
     public void Dispose() => Stop();
+}
+
+/// <summary>
+/// V4.3.12：系统音频设备变更监听（插拔耳机/USB DAC/蓝牙）。
+/// NAudio 3.x 把 IMMNotificationClient 收为 internal，无法注册系统回调；
+/// 改为每 2s 轮询设备 ID+状态快照，变了才通知（纯枚举毫秒级——devices.list 慢是逐台 DoP 探测，这里不做）。
+/// 只通知不切换输出；DeviceState.All 含 NotPresent→Active，耳机插孔插拔也能捕获。
+/// </summary>
+public sealed class DeviceChangeWatcher
+{
+    private readonly Action _notify;
+    private Timer? _timer;
+    private string _snapshot = "";
+
+    public DeviceChangeWatcher(Action notify) { _notify = notify; }
+
+    public void Start()
+    {
+        _timer = new Timer(_ => Tick(), null, 2000, 2000);
+        Console.Error.WriteLine("[wasapi] 设备热插拔轮询已启动（2s）");
+    }
+
+    private void Tick()
+    {
+        string snap;
+        try
+        {
+            using var en = new MMDeviceEnumerator();
+            snap = string.Join("|", en.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.All)
+                .Select(d => d.ID + ":" + (int)d.State).OrderBy(s => s, StringComparer.Ordinal));
+        }
+        catch { return; } // 枚举瞬态失败（服务重启等）：保持旧快照，下轮再试
+        if (snap == _snapshot) return;
+        var first = _snapshot.Length == 0; // 首张快照只是建档，不算变更
+        _snapshot = snap;
+        if (!first) { try { _notify(); } catch { } }
+    }
 }

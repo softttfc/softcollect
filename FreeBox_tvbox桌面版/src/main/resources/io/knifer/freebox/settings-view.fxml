@@ -1,0 +1,427 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import io.knifer.freebox.component.converter.NetworkInterfaceAndIP2StringConverter?>
+<?import io.knifer.freebox.component.converter.PlayerType2StringConverter?>
+<?import io.knifer.freebox.constant.PlayerType?>
+<?import io.knifer.freebox.constant.VideoPlaybackTrigger?>
+<?import javafx.collections.FXCollections?>
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import org.controlsfx.control.SearchableComboBox?>
+<?import org.kordamp.ikonli.javafx.*?>
+<?import org.tinylog.*?>
+<?import java.lang.Double?>
+
+<BorderPane fx:id="root" stylesheets="@css/view/settings-view.css" xmlns="http://javafx.com/javafx/17.0.12" xmlns:fx="http://javafx.com/fxml/1" fx:controller="io.knifer.freebox.controller.SettingsController">
+   <fx:define>
+      <NetworkInterfaceAndIP2StringConverter fx:id="ipChoiceBoxConverter" />
+      <PlayerType2StringConverter fx:id="playerTypeChoiceBoxConverter" />
+   </fx:define>
+   <center>
+      <TabPane BorderPane.alignment="CENTER">
+         <tabs>
+            <Tab closable="false" text="%settings.general">
+               <graphic>
+                  <FontIcon iconLiteral="fa-cog:15:gray" />
+               </graphic>
+               <content>
+                  <StackPane prefHeight="400.0" prefWidth="600.0">
+                     <ScrollPane>
+                        <VBox alignment="TOP_CENTER" spacing="20.0" styleClass="setting-panel">
+                           <GridPane hgap="30" vgap="30" VBox.vgrow="ALWAYS">
+                              <columnConstraints>
+                                 <ColumnConstraints halignment="LEFT" hgrow="NEVER"/>
+                                 <ColumnConstraints halignment="LEFT" hgrow="ALWAYS"/>
+                              </columnConstraints>
+                              <rowConstraints>
+                                 <RowConstraints valignment="CENTER" />
+                                 <RowConstraints valignment="CENTER" />
+                              </rowConstraints>
+                              <children>
+
+                                 <Label text="%settings.application-setting" styleClass="setting-title-label" GridPane.rowIndex="0" GridPane.columnIndex="0" />
+
+                                 <Label fx:id="applicationDataLabel" styleClass="fs-big, bold" text="%settings.application-data" GridPane.rowIndex="1" GridPane.columnIndex="0" />
+                                 <Button focusTraversable="false" onAction="#onDeleteApplicationDataButtonAction" text="%settings.delete-application-data" GridPane.rowIndex="1" GridPane.columnIndex="1">
+                                    <graphic>
+                                       <FontIcon iconLiteral="fa-trash:12:red" />
+                                    </graphic>
+                                 </Button>
+
+                                 <Label fx:id="applicationVersionLabel" styleClass="fs-big, bold" text="%settings.application-version" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+                                 <HBox alignment="CENTER_LEFT" spacing="10.0" GridPane.rowIndex="2" GridPane.columnIndex="1">
+                                    <Button fx:id="checkUpgradeButton" focusTraversable="false" onAction="#onCheckUpgradeButtonAction" text="%settings.check-upgrade">
+                                       <graphic>
+                                          <FontIcon iconLiteral="fa-cloud-download:12:#1E90FF" />
+                                       </graphic>
+                                    </Button>
+                                    <Label fx:id="alreadyLatestVersionLabel" visible="false" text="%settings.upgrade.already-latest-version">
+                                       <graphic>
+                                          <FontIcon iconLiteral="fa-check-circle-o:16:green" />
+                                       </graphic>
+                                    </Label>
+                                 </HBox>
+
+                                 <Label styleClass="fs-big, bold" text="%settings.auto-check-upgrade" GridPane.rowIndex="3" GridPane.columnIndex="0"/>
+                                 <CheckBox fx:id="autoCheckUpgradeCheckBox" text="%settings.auto-check-upgrade-enable" onAction="#onAutoCheckUpgradeCheckBoxAction" mnemonicParsing="false" focusTraversable="false" GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+
+                                 <Label text="%settings.play" styleClass="setting-title-label" GridPane.rowIndex="4" GridPane.columnIndex="0"/>
+
+                                 <HBox spacing="5.0" alignment="CENTER_LEFT" GridPane.rowIndex="5" GridPane.columnIndex="0">
+                                    <Label styleClass="fs-big, bold" text="%settings.ad-filter"/>
+                                    <Label styleClass="fs-big">
+                                       <graphic>
+                                          <FontIcon iconLiteral="fa-question-circle:16:#1E90FF" />
+                                       </graphic>
+                                       <tooltip>
+                                          <Tooltip showDelay="200ms" showDuration="1m"
+                                                   text="%settings.ad-filter.tooltip" styleClass="fs-big"/>
+                                       </tooltip>
+                                    </Label>
+                                 </HBox>
+                                 <HBox spacing="160.0" alignment="CENTER_LEFT" GridPane.rowIndex="5" GridPane.columnIndex="1">
+                                    <fx:define>
+                                       <ToggleGroup fx:id="adFilterDynamicThresholdFactorToggleGroup"/>
+                                    </fx:define>
+                                    <CheckBox fx:id="adFilterCheckBox" text="%settings.ad-filter-enable" onAction="#onAdFilterCheckBoxAction" mnemonicParsing="false" focusTraversable="false"/>
+                                    <HBox spacing="10.0" alignment="CENTER_LEFT">
+                                       <HBox spacing="5.0" alignment="CENTER_LEFT">
+                                          <Label styleClass="fs-big, bold" text="%settings.ad-filter-dynamic-threshold-factor"/>
+                                          <Label styleClass="fs-big">
+                                             <graphic>
+                                                <FontIcon iconLiteral="fa-question-circle:16:#1E90FF" />
+                                             </graphic>
+                                             <tooltip>
+                                                <Tooltip showDelay="200ms" showDuration="1m"
+                                                         text="%settings.ad-filter-dynamic-threshold-factor.tooltip" styleClass="fs-big"/>
+                                             </tooltip>
+                                          </Label>
+                                       </HBox>
+                                       <RadioButton text="%common.close" toggleGroup="$adFilterDynamicThresholdFactorToggleGroup" onAction="#onAdFilterDynamicThresholdFactorRadioButtonAction" mnemonicParsing="false" focusTraversable="false">
+                                          <properties>
+                                             <value>
+                                                <Double fx:value="-1"/>
+                                             </value>
+                                          </properties>
+                                       </RadioButton>
+                                       <RadioButton text="%settings.ad-filter-dynamic-threshold-factor.conservative" toggleGroup="$adFilterDynamicThresholdFactorToggleGroup" onAction="#onAdFilterDynamicThresholdFactorRadioButtonAction" mnemonicParsing="false" focusTraversable="false">
+                                          <properties>
+                                             <value>
+                                                <Double fx:value="0.3"/>
+                                             </value>
+                                          </properties>
+                                       </RadioButton>
+                                       <RadioButton text="%settings.ad-filter-dynamic-threshold-factor.aggressive" toggleGroup="$adFilterDynamicThresholdFactorToggleGroup" onAction="#onAdFilterDynamicThresholdFactorRadioButtonAction" mnemonicParsing="false" focusTraversable="false">
+                                          <properties>
+                                             <value>
+                                                <Double fx:value="0.1"/>
+                                             </value>
+                                          </properties>
+                                       </RadioButton>
+                                    </HBox>
+                                 </HBox>
+
+                                 <Label styleClass="fs-big, bold" text="%settings.player" GridPane.rowIndex="6" GridPane.columnIndex="0"/>
+                                 <HBox spacing="5.0" alignment="CENTER_LEFT" GridPane.rowIndex="6" GridPane.columnIndex="1">
+                                    <ComboBox fx:id="playerTypeComboBox" onAction="#onPlayerComboBoxAction" converter="$playerTypeChoiceBoxConverter">
+                                       <items>
+                                          <FXCollections fx:factory="observableArrayList">
+                                             <PlayerType fx:value="VLC"/>
+                                             <PlayerType fx:value="MPV_EXTERNAL"/>
+                                          </FXCollections>
+                                       </items>
+                                    </ComboBox>
+                                    <HBox spacing="3.0" alignment="CENTER_LEFT">
+                                       <Label text="播放器状态:" />
+                                       <Label fx:id="playerStatusLabel" />
+                                       <Hyperlink fx:id="playerSelectHyperlink" onAction="#onPlayerSelectHyperlinkAction" text="%settings.please-select" />
+                                    </HBox>
+                                 </HBox>
+
+                                 <Label text="%settings.usage" styleClass="setting-title-label" GridPane.rowIndex="7" GridPane.columnIndex="0"/>
+
+                                 <Label styleClass="fs-big, bold" text="%settings.font-family" GridPane.rowIndex="8" GridPane.columnIndex="0"/>
+                                 <HBox spacing="5.0" alignment="CENTER_LEFT" GridPane.rowIndex="8" GridPane.columnIndex="1">
+                                    <SearchableComboBox fx:id="usageFontFamilyComboBox" onAction="#onUsageFontFamilyComboBoxAction" />
+                                    <Label fx:id="usageFontFamilyExampleLabel" text="%settings.font-family-example" />
+                                 </HBox>
+
+                                 <HBox spacing="5.0" alignment="CENTER_LEFT" GridPane.rowIndex="9" GridPane.columnIndex="0">
+                                    <Label styleClass="fs-big, bold" text="%settings.movie-playback-trigger"/>
+                                    <Label styleClass="fs-big">
+                                       <graphic>
+                                          <FontIcon iconLiteral="fa-question-circle:16:#1E90FF" />
+                                       </graphic>
+                                       <tooltip>
+                                          <Tooltip showDelay="200ms" showDuration="1m"
+                                                   text="%settings.movie-playback-trigger.tooltip" styleClass="fs-big"/>
+                                       </tooltip>
+                                    </Label>
+                                 </HBox>
+                                 <HBox spacing="5.0" alignment="CENTER_LEFT" GridPane.rowIndex="9" GridPane.columnIndex="1">
+                                    <fx:define>
+                                       <ToggleGroup fx:id="videoPlaybackTriggerToggleGroup"/>
+                                    </fx:define>
+                                    <RadioButton text="%settings.video-playback-trigger.single-click" toggleGroup="$videoPlaybackTriggerToggleGroup" onAction="#onVideoPlaybackTriggerRadioButtonAction" mnemonicParsing="false" focusTraversable="false">
+                                       <properties>
+                                          <value>
+                                             <VideoPlaybackTrigger fx:value="SINGLE_CLICK"/>
+                                          </value>
+                                       </properties>
+                                    </RadioButton>
+                                    <RadioButton text="%settings.video-playback-trigger.double-click" toggleGroup="$videoPlaybackTriggerToggleGroup" onAction="#onVideoPlaybackTriggerRadioButtonAction" mnemonicParsing="false" focusTraversable="false">
+                                       <properties>
+                                          <value>
+                                             <VideoPlaybackTrigger fx:value="DOUBLE_CLICK"/>
+                                          </value>
+                                       </properties>
+                                    </RadioButton>
+                                 </HBox>
+
+                                 <Label text="%settings.other" styleClass="setting-title-label" GridPane.rowIndex="10" GridPane.columnIndex="0" />
+
+                                 <Label styleClass="fs-big, bold" text="%settings.license" GridPane.rowIndex="11" GridPane.columnIndex="0"/>
+                                 <Button text="%settings.show-license" onAction="#onShowLicenseButtonAction" mnemonicParsing="false" focusTraversable="false" GridPane.rowIndex="11" GridPane.columnIndex="1"/>
+                              </children>
+                           </GridPane>
+                        </VBox>
+                     </ScrollPane>
+                  </StackPane>
+               </content>
+            </Tab>
+            <Tab closable="false" text="%settings.network-and-service">
+                <graphic>
+                    <FontIcon iconLiteral="fa-wifi:15:#4169E1" />
+                </graphic>
+               <content>
+                  <StackPane prefHeight="400.0" prefWidth="600.0">
+                     <ProgressIndicator fx:id="loadingProgressIndicator" />
+                     <HBox fx:id="networkAndServiceHBox" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="400.0" prefWidth="600.0" visible="false">
+                        <children>
+                           <BorderPane prefHeight="200.0" prefWidth="200.0" HBox.hgrow="ALWAYS">
+                              <top>
+                                 <VBox BorderPane.alignment="CENTER">
+                                    <BorderPane.margin>
+                                       <Insets bottom="15.0" top="15.0" />
+                                    </BorderPane.margin>
+                                    <children>
+                                       <HBox alignment="CENTER" spacing="5">
+                                          <children>
+                                             <Label text="%settings.http" styleClass="fs-large" />
+                                             <Label styleClass="fs-large">
+                                                <graphic>
+                                                   <FontIcon iconLiteral="fa-question-circle:20:#1E90FF" />
+                                                </graphic>
+                                                <tooltip>
+                                                   <Tooltip showDelay="200ms" showDuration="1m"
+                                                            text="%settings.http.tooltip" styleClass="fs-big"/>
+                                                </tooltip>
+                                             </Label>
+                                          </children>
+                                       </HBox>
+                                       <HBox alignment="CENTER" prefHeight="30.0" prefWidth="200.0">
+                                          <children>
+                                             <Label fx:id="httpServiceStatusLabel" style="-fx-font-size: 18;">
+                                                <graphic>
+                                                   <FontIcon fx:id="httpServiceStatusFontIcon" iconLiteral="fa-circle" />
+                                                </graphic>
+                                             </Label>
+                                          </children>
+                                          <VBox.margin>
+                                             <Insets right="10.0" top="10.0" />
+                                          </VBox.margin>
+                                       </HBox>
+                                    </children>
+                                 </VBox>
+                              </top>
+                              <center>
+                                 <VBox alignment="CENTER" spacing="20.0" BorderPane.alignment="CENTER">
+                                    <children>
+                                       <HBox alignment="CENTER">
+                                          <children>
+                                             <ChoiceBox fx:id="httpIpChoiceBox" onAction="#onIpChoiceBoxAction" prefWidth="250.0" HBox.hgrow="ALWAYS" converter="$ipChoiceBoxConverter" />
+                                          </children>
+                                       </HBox>
+                                       <HBox alignment="CENTER" spacing="10.0">
+                                          <children>
+                                             <TextField fx:id="httpPortTextField" alignment="center" promptText="%settings.hint-port" />
+                                             <CheckBox fx:id="httpAutoStartCheckBox" mnemonicParsing="false" onAction="#onHttpAutoStartCheckBoxAction" text="%settings.auto-start" />
+                                          </children>
+                                       </HBox>
+                                    </children>
+                                 </VBox>
+                              </center>
+                              <bottom>
+                                 <HBox alignment="CENTER" prefHeight="100.0" prefWidth="200.0" spacing="10.0" BorderPane.alignment="CENTER">
+                                    <children>
+                                       <Button fx:id="httpServiceStartBtn" mnemonicParsing="false" onAction="#onHttpServiceStartBtnAction" text="%settings.service-start" />
+                                       <Button fx:id="httpServiceStopBtn" mnemonicParsing="false" onAction="#onHttpServiceStopBtnAction" text="%settings.service-stop" />
+                                    </children>
+                                    <BorderPane.margin>
+                                       <Insets bottom="90.0" />
+                                    </BorderPane.margin>
+                                 </HBox>
+                              </bottom></BorderPane>
+                           <BorderPane prefHeight="200.0" prefWidth="200.0" HBox.hgrow="ALWAYS">
+                              <center>
+                                 <VBox alignment="CENTER" spacing="20.0" BorderPane.alignment="CENTER">
+                                    <children>
+                                       <HBox alignment="CENTER">
+                                          <children>
+                                             <ChoiceBox fx:id="wsIpChoiceBox" onAction="#onIpChoiceBoxAction" prefWidth="250.0" converter="$ipChoiceBoxConverter" />
+                                          </children>
+                                       </HBox>
+                                       <HBox alignment="CENTER" spacing="10.0">
+                                          <children>
+                                             <TextField fx:id="wsPortTextField" alignment="center" promptText="%settings.hint-port" />
+                                             <CheckBox fx:id="wsAutoStartCheckBox" mnemonicParsing="false" onAction="#onWsAutoStartCheckBoxAction" text="%settings.auto-start" />
+                                          </children>
+                                       </HBox>
+                                    </children></VBox>
+                              </center>
+                              <top>
+                                 <VBox alignment="CENTER" BorderPane.alignment="CENTER">
+                                    <children>
+                                       <HBox alignment="CENTER" spacing="5.0">
+                                          <children>
+                                             <Label text="%settings.ws" styleClass="fs-large" />
+                                             <Label styleClass="fs-large">
+                                                <graphic>
+                                                   <FontIcon iconLiteral="fa-question-circle:20:#1E90FF" />
+                                                </graphic>
+                                                <tooltip>
+                                                   <Tooltip showDelay="200ms" showDuration="1m" text="%settings.ws.tooltip" styleClass="fs-big" />
+                                                </tooltip>
+                                             </Label>
+                                          </children>
+                                       </HBox>
+                                       <HBox alignment="CENTER" prefHeight="30.0" prefWidth="200.0">
+                                          <children>
+                                             <Label fx:id="wsServiceStatusLabel" style="-fx-font-size: 18;">
+                                                <graphic>
+                                                   <FontIcon fx:id="wsServiceStatusFontIcon" iconLiteral="fa-circle" />
+                                                </graphic>
+                                             </Label>
+                                          </children>
+                                          <VBox.margin>
+                                             <Insets right="10.0" top="10.0" />
+                                          </VBox.margin></HBox>
+                                    </children>
+                                    <BorderPane.margin>
+                                       <Insets bottom="15.0" top="15.0" />
+                                    </BorderPane.margin>
+                                 </VBox>
+                              </top>
+                              <bottom>
+                                 <HBox alignment="CENTER" prefHeight="100.0" prefWidth="200.0" spacing="10.0" BorderPane.alignment="CENTER">
+                                    <BorderPane.margin>
+                                       <Insets bottom="90.0" />
+                                    </BorderPane.margin>
+                                    <children>
+                                       <Button fx:id="wsServiceStartBtn" mnemonicParsing="false" onAction="#onWsServiceStartBtnAction" text="%settings.service-start" />
+                                       <Button fx:id="wsServiceStopBtn" mnemonicParsing="false" onAction="#onWsServiceStopBtnAction" text="%settings.service-stop" />
+                                    </children>
+                                 </HBox>
+                              </bottom></BorderPane>
+                        </children>
+                        <padding>
+                           <Insets left="20.0" right="20.0" />
+                        </padding>
+                     </HBox>
+                  </StackPane>
+               </content>
+            </Tab>
+            <Tab closable="false" text="%settings.debugging">
+               <graphic>
+                  <FontIcon iconLiteral="fa-bug:15:#FF00FF" />
+               </graphic>
+               <content>
+                  <StackPane prefHeight="400.0" prefWidth="600.0">
+                     <ScrollPane>
+                        <VBox alignment="TOP_CENTER" spacing="20.0" styleClass="setting-panel">
+                            <GridPane hgap="30" vgap="30" VBox.vgrow="ALWAYS">
+                                 <columnConstraints>
+                                     <ColumnConstraints halignment="LEFT" hgrow="NEVER"/>
+                                     <ColumnConstraints halignment="LEFT" hgrow="ALWAYS"/>
+                                 </columnConstraints>
+                                 <rowConstraints>
+                                     <RowConstraints valignment="CENTER" />
+                                     <RowConstraints valignment="CENTER" />
+                                 </rowConstraints>
+                                 <children>
+                                     <Label text="%settings.debugging.log-setting" styleClass="setting-title-label" GridPane.rowIndex="0" GridPane.columnIndex="0" />
+
+                                     <HBox spacing="5.0" alignment="CENTER_LEFT" GridPane.rowIndex="1" GridPane.columnIndex="0">
+                                         <Label styleClass="fs-big, bold" text="%settings.debugging.log-level"/>
+                                         <Label styleClass="fs-big">
+                                             <graphic>
+                                                 <FontIcon iconLiteral="fa-question-circle:16:#1E90FF" />
+                                             </graphic>
+                                             <tooltip>
+                                                 <Tooltip showDelay="200ms" showDuration="1m"
+                                                          text="%settings.debugging.log-level.tooltip" styleClass="fs-big"/>
+                                             </tooltip>
+                                         </Label>
+                                     </HBox>
+                                     <ComboBox fx:id="logLevelComboBox" onAction="#onLogLevelComboBoxAction" focusTraversable="false" GridPane.rowIndex="1" GridPane.columnIndex="1">
+                                         <items>
+                                             <FXCollections fx:factory="observableArrayList">
+                                                 <Level fx:value="DEBUG" />
+                                                 <Level fx:value="INFO" />
+                                                 <Level fx:value="WARN" />
+                                                 <Level fx:value="ERROR" />
+                                                 <Level fx:value="OFF" />
+                                             </FXCollections>
+                                         </items>
+                                     </ComboBox>
+
+                                     <Label styleClass="fs-big, bold" text="%settings.debugging.log-export" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+                                     <Button onAction="#onLogExportButtonAction" text="%settings.debugging.log-export" mnemonicParsing="false" GridPane.rowIndex="2" GridPane.columnIndex="1">
+                                         <graphic>
+                                             <FontIcon iconLiteral="fa-upload:16:#1E90FF" />
+                                         </graphic>
+                                     </Button>
+
+                                    <Label styleClass="fs-big, bold" text="%settings.debugging.log-console" GridPane.rowIndex="3" GridPane.columnIndex="0"/>
+                                    <Button onAction="#onOpenLogConsoleButtonAction" text="%settings.debugging.log-console" mnemonicParsing="false" GridPane.rowIndex="3" GridPane.columnIndex="1">
+                                       <graphic>
+                                          <FontIcon iconLiteral="fa-terminal:16" />
+                                       </graphic>
+                                    </Button>
+
+                                    <Label text="%settings.debugging.debug-setting" styleClass="setting-title-label" GridPane.rowIndex="4" GridPane.columnIndex="0" />
+
+                                    <Label styleClass="fs-big, bold" text="%settings.debugging.gc" GridPane.rowIndex="5" GridPane.columnIndex="0"/>
+                                    <Button onAction="#onDoGcButtonAction" text="%settings.debugging.do-gc" mnemonicParsing="false" GridPane.rowIndex="5" GridPane.columnIndex="1">
+                                       <graphic>
+                                          <FontIcon iconLiteral="fa-flag:16:red" />
+                                       </graphic>
+                                    </Button>
+
+                                 </children>
+                             </GridPane>
+                        </VBox>
+                     </ScrollPane>
+                  </StackPane>
+               </content>
+            </Tab>
+         </tabs>
+      </TabPane>
+   </center>
+   <bottom>
+      <ButtonBar prefHeight="40.0" prefWidth="200.0" BorderPane.alignment="CENTER">
+        <buttons>
+          <Button fx:id="saveBtn" disable="true" mnemonicParsing="false" onAction="#onSaveBtnAction" text="%settings.save">
+             <graphic>
+                <FontIcon iconLiteral="fa-check:16:green" />
+             </graphic>
+          </Button>
+            <Button mnemonicParsing="false" onAction="#onCancelBtnAction" text="%common.cancel" />
+        </buttons>
+         <BorderPane.margin>
+            <Insets left="20.0" right="20.0" />
+         </BorderPane.margin>
+      </ButtonBar>
+   </bottom>
+</BorderPane>

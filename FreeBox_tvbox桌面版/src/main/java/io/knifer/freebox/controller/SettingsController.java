@@ -1,0 +1,848 @@
+package io.knifer.freebox.controller;
+
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.ZipUtil;
+import io.knifer.freebox.component.router.Router;
+import io.knifer.freebox.component.validator.PortValidator;
+import io.knifer.freebox.constant.*;
+import io.knifer.freebox.context.Context;
+import io.knifer.freebox.controller.dialog.LicenseDialogController;
+import io.knifer.freebox.controller.dialog.LogConsoleDialogController;
+import io.knifer.freebox.controller.dialog.UpgradeDialogController;
+import io.knifer.freebox.handler.PlayerCheckHandler;
+import io.knifer.freebox.handler.PlayerConfigApplyHandler;
+import io.knifer.freebox.helper.*;
+import io.knifer.freebox.model.bo.UpgradeCheckResultBO;
+import io.knifer.freebox.net.http.server.FreeBoxHttpServerHolder;
+import io.knifer.freebox.net.websocket.server.KebSocketServerHolder;
+import io.knifer.freebox.service.CheckPortUsingService;
+import io.knifer.freebox.service.LoadConfigService;
+import io.knifer.freebox.service.LoadNetworkInterfaceDataService;
+import io.knifer.freebox.service.UpgradeCheckService;
+import io.knifer.freebox.util.AsyncUtil;
+import io.knifer.freebox.util.CastUtil;
+import io.knifer.freebox.util.FXMLUtil;
+import io.knifer.freebox.util.FormattingUtil;
+import jakarta.inject.Inject;
+import javafx.application.Platform;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.collections.ObservableList;
+import javafx.concurrent.Service;
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.scene.control.*;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.stage.*;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.BooleanUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.ThreadUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.controlsfx.control.SearchableComboBox;
+import org.controlsfx.validation.ValidationSupport;
+import org.kordamp.ikonli.javafx.FontIcon;
+import org.tinylog.Level;
+import org.tinylog.provider.ProviderRegistry;
+
+import javax.annotation.Nullable;
+import java.io.File;
+import java.net.NetworkInterface;
+import java.time.Duration;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.Consumer;
+
+
+/**
+ * 设置
+ *
+ * @author Knifer
+ */
+@Slf4j
+@RequiredArgsConstructor(onConstructor_ = @__(@Inject))
+public class SettingsController {
+
+    @FXML
+    private BorderPane root;
+    @FXML
+    private Button saveBtn;
+    @FXML
+    private HBox networkAndServiceHBox;
+    @FXML
+    private ChoiceBox<Pair<NetworkInterface, String>> httpIpChoiceBox;
+    @FXML
+    private ProgressIndicator loadingProgressIndicator;
+    @FXML
+    private TextField httpPortTextField;
+    @FXML
+    private CheckBox httpAutoStartCheckBox;
+    @FXML
+    private Label httpServiceStatusLabel;
+    @FXML
+    private FontIcon httpServiceStatusFontIcon;
+    @FXML
+    private Button httpServiceStartBtn;
+    @FXML
+    public Button httpServiceStopBtn;
+    @FXML
+    private ChoiceBox<Pair<NetworkInterface, String>> wsIpChoiceBox;
+    @FXML
+    public Label wsServiceStatusLabel;
+    @FXML
+    public FontIcon wsServiceStatusFontIcon;
+    @FXML
+    private Button wsServiceStartBtn;
+    @FXML
+    public Button wsServiceStopBtn;
+    @FXML
+    private TextField wsPortTextField;
+    @FXML
+    private CheckBox wsAutoStartCheckBox;
+    @FXML
+    private Label applicationDataLabel;
+    @FXML
+    private Label applicationVersionLabel;
+    @FXML
+    private Button checkUpgradeButton;
+    @FXML
+    private Label alreadyLatestVersionLabel;
+    @FXML
+    private CheckBox autoCheckUpgradeCheckBox;
+    @FXML
+    private SearchableComboBox<String> usageFontFamilyComboBox;
+    @FXML
+    private Label usageFontFamilyExampleLabel;
+    @FXML
+    private CheckBox adFilterCheckBox;
+    @FXML
+    private ToggleGroup adFilterDynamicThresholdFactorToggleGroup;
+    @FXML
+    private ComboBox<PlayerType> playerTypeComboBox;
+    @FXML
+    private Label playerStatusLabel;
+    @FXML
+    private Hyperlink playerSelectHyperlink;
+    @FXML
+    private ToggleGroup videoPlaybackTriggerToggleGroup;
+    @FXML
+    private ComboBox<Level> logLevelComboBox;
+
+    private Stage stage;
+    private FileChooser logZipFileSaveChooser;
+
+    private String oldUsageFontFamily;
+    private Level oldLogLevel;
+
+    private final ObjectProperty<Pair<NetworkInterface, String>> ipValueProp = new SimpleObjectProperty<>();
+    private final BooleanProperty ipChoiceBoxDisableProp = new SimpleBooleanProperty();
+
+    private final LoadConfigService loadConfigService = new LoadConfigService();
+    private final ValidationSupport validationSupport = new ValidationSupport();
+
+    private final FreeBoxHttpServerHolder httpServer;
+    private final KebSocketServerHolder wsServer;
+    private final Context context;
+    private final Router router;
+    private final PlayerConfigApplyHandler playerConfigApplyHandler;
+    private final PortValidator portValidator;
+
+    @FXML
+    private void initialize() {
+        LoadNetworkInterfaceDataService loadNetworkInterfaceService = new LoadNetworkInterfaceDataService();
+
+        setupComponent();
+        loadConfigService.setOnSucceeded(evt -> {
+            setupComponentData();
+            loadNetworkInterfaceService.restart();
+        });
+        loadNetworkInterfaceService.setOnSucceeded(evt -> {
+            // 网卡信息获取完成，填充数据
+            putDataInIpChoiceBox(loadNetworkInterfaceService.getValue());
+            loadingProgressIndicator.setVisible(false);
+            networkAndServiceHBox.setVisible(true);
+            saveBtn.setDisable(false);
+        });
+        loadConfigService.start();
+        Platform.runLater(() -> stage = WindowHelper.getStage(root));
+    }
+
+    private void putDataInIpChoiceBox(
+            Collection<Pair<NetworkInterface, String>> networkInterfaceAndIps
+    ) {
+        ObservableList<Pair<NetworkInterface, String>> items;
+        String configIP;
+
+        if (networkInterfaceAndIps.isEmpty()) {
+            ToastHelper.showErrorI18n(I18nKeys.SETTINGS_FORM_HINT_NO_AVAILABLE_IP);
+
+            return;
+        }
+        items = httpIpChoiceBox.getItems();
+        wsIpChoiceBox.setItems(items);
+        items.clear();
+        items.add(Pair.of(null, BaseValues.ANY_LOCAL_IP));
+        items.addAll(networkInterfaceAndIps);
+        configIP = ConfigHelper.getServiceIPv4();
+        if (StringUtils.isBlank(configIP)) {
+            // 如果没有找到 网卡-IP 配置，填充可用列表中的第一个
+            ipValueProp.setValue(items.get(0));
+        } else {
+            // 如果配置了 网卡-IP，尝试填充
+            for (Pair<NetworkInterface, String> item : items) {
+                if (Objects.equals(item.getRight(), configIP)) {
+                    ipValueProp.setValue(item);
+
+                    return;
+                }
+            }
+            // 网络环境发生了改变，自动填充第一个配置，并标记配置更新
+            ipValueProp.setValue(items.get(0));
+            ConfigHelper.markToUpdate();
+        }
+    }
+
+    private void setupComponent() {
+        // 注册表单验证器
+        validationSupport.registerValidator(httpPortTextField, portValidator);
+        validationSupport.registerValidator(wsPortTextField, portValidator);
+
+        // 表单数据监听与绑定
+        httpPortTextField.textProperty().addListener((ob, oldVal, newVal) -> onHttpPortTextFieldChange());
+        wsPortTextField.textProperty().addListener((ob, oldVal, newVal) -> onWsPortTextFieldChange());
+        httpIpChoiceBox.valueProperty().bindBidirectional(ipValueProp);
+        wsIpChoiceBox.valueProperty().bindBidirectional(ipValueProp);
+        httpIpChoiceBox.disableProperty().bind(ipChoiceBoxDisableProp);
+        wsIpChoiceBox.disableProperty().bind(ipChoiceBoxDisableProp);
+
+        // 其他组件监听与绑定
+        playerStatusLabel.textProperty().addListener((ob, oldVal, newVal) -> {
+            if (newVal.equals(I18nHelper.get(I18nKeys.SETTINGS_PLAYER_STATUS_NOT_FOUND))) {
+                playerSelectHyperlink.setVisible(true);
+                playerStatusLabel.setTextFill(Color.RED);
+            } else {
+                playerSelectHyperlink.setVisible(false);
+                playerStatusLabel.setTextFill(Color.GREEN);
+            }
+        });
+    }
+
+    private void setupComponentData() {
+        String applicationDataSize;
+        Integer configPort = ConfigHelper.getHttpPort();
+        List<String> fontFamilies = Font.getFamilies();
+        String usageFontFamily = ConfigHelper.getUsageFontFamily();
+        SingleSelectionModel<String> selectionModel = usageFontFamilyComboBox.getSelectionModel();
+
+        if (configPort != null) {
+            httpPortTextField.setText(configPort.toString());
+        }
+        configPort = ConfigHelper.getWsPort();
+        if (configPort != null) {
+            wsPortTextField.setText(configPort.toString());
+        }
+        httpAutoStartCheckBox.setSelected(BooleanUtils.toBoolean(ConfigHelper.getAutoStartHttp()));
+        wsAutoStartCheckBox.setSelected(BooleanUtils.toBoolean(ConfigHelper.getAutoStartWs()));
+        // 服务状态显示
+        if (httpServer.isRunning()) {
+            showServiceStatus(
+                    httpServiceStatusLabel,
+                    httpServiceStatusFontIcon,
+                    Color.GREEN
+            );
+            httpServiceStartBtn.setDisable(true);
+            disableHttpServiceForm();
+        } else {
+            showServiceStatus(
+                    httpServiceStatusLabel,
+                    httpServiceStatusFontIcon,
+                    Color.GRAY
+            );
+            httpServiceStopBtn.setDisable(true);
+        }
+        if (wsServer.isRunning()) {
+            showServiceStatus(
+                    wsServiceStatusLabel,
+                    wsServiceStatusFontIcon,
+                    Color.GREEN
+            );
+            wsServiceStartBtn.setDisable(true);
+            disableWsServiceForm();
+        } else {
+            showServiceStatus(
+                    wsServiceStatusLabel,
+                    wsServiceStatusFontIcon,
+                    Color.GRAY
+            );
+            wsServiceStopBtn.setDisable(true);
+        }
+        // 常规设置tab
+        applicationDataSize = FormattingUtil.sizeFormat(FileUtil.size(StorageHelper.getLocalStoragePath().toFile()));
+        applicationDataLabel.setText(I18nHelper.getFormatted(I18nKeys.SETTINGS_APPLICATION_DATA, applicationDataSize));
+        applicationVersionLabel.setText(
+                I18nHelper.getFormatted(I18nKeys.SETTINGS_APPLICATION_VERSION, ConfigHelper.getAppVersion())
+        );
+        autoCheckUpgradeCheckBox.setSelected(BooleanUtils.toBoolean(ConfigHelper.getAutoCheckUpgrade()));
+        usageFontFamilyComboBox.getItems().addAll(fontFamilies);
+        oldUsageFontFamily = usageFontFamily;
+        if (CollUtil.contains(usageFontFamilyComboBox.getItems(), usageFontFamily)) {
+            selectionModel.select(usageFontFamily);
+        } else {
+            selectionModel.selectFirst();
+        }
+        adFilterCheckBox.setSelected(BooleanUtils.toBoolean(ConfigHelper.getAdFilter()));
+        setupToggleGroup(
+                adFilterDynamicThresholdFactorToggleGroup,
+                ConfigHelper.getAdFilterDynamicThresholdFactor(),
+                toggle -> {
+                    RadioButton radioButton = (RadioButton) toggle;
+
+                    radioButton.disableProperty().bind(adFilterCheckBox.selectedProperty().not());
+                }
+        );
+        setupToggleGroup(videoPlaybackTriggerToggleGroup, ConfigHelper.getVideoPlaybackTrigger(), null);
+        playerStatusLabel.setText(
+                PlayerCheckHandler.select().handle() ?
+                        I18nHelper.get(I18nKeys.SETTINGS_PLAYER_STATUS_OK) :
+                        I18nHelper.get(I18nKeys.SETTINGS_PLAYER_STATUS_NOT_FOUND)
+        );
+        playerTypeComboBox.getSelectionModel().select(ConfigHelper.getPlayerType());
+        // 调试设置tab
+        oldLogLevel = ConfigHelper.getLogLevel();
+        logLevelComboBox.getSelectionModel().select(oldLogLevel);
+    }
+
+    private void setupToggleGroup(
+            ToggleGroup toggleGroup,
+            Object selectedValue,
+            @Nullable Consumer<Toggle> toggleInitConsumer
+    ) {
+        List<Toggle> toggles = toggleGroup.getToggles();
+
+        for (Toggle toggle : toggles) {
+            if (Objects.equals(toggle.getProperties().get("value"), selectedValue)) {
+                toggleGroup.selectToggle(toggle);
+            }
+            if (toggleInitConsumer != null) {
+                toggleInitConsumer.accept(toggle);
+            }
+        }
+    }
+
+    private void disableHttpServiceForm() {
+        ipChoiceBoxDisableProp.set(true);
+        httpAutoStartCheckBox.setDisable(true);
+        httpPortTextField.setDisable(true);
+    }
+
+    private void enableHttpServiceForm() {
+        if (!wsServer.isRunning()) {
+            ipChoiceBoxDisableProp.set(false);
+        }
+        httpAutoStartCheckBox.setDisable(false);
+        httpPortTextField.setDisable(false);
+    }
+
+    private void disableWsServiceForm() {
+        ipChoiceBoxDisableProp.set(true);
+        wsAutoStartCheckBox.setDisable(true);
+        wsPortTextField.setDisable(true);
+    }
+
+    private void enableWsServiceForm() {
+        if (!httpServer.isRunning()) {
+            ipChoiceBoxDisableProp.set(false);
+        }
+        wsAutoStartCheckBox.setDisable(false);
+        wsPortTextField.setDisable(false);
+    }
+
+    private void onHttpPortTextFieldChange() {
+        // 延迟执行，等待Validator验证结束
+        Platform.runLater(() -> {
+            int newPort;
+
+            if (!ValidationHelper.validate(validationSupport, httpPortTextField)) {
+                return;
+            }
+            newPort = Integer.parseInt(httpPortTextField.getText());
+            if (Objects.equals(ConfigHelper.getHttpPort(), newPort)) {
+                return;
+            }
+            ConfigHelper.setHttpPort(newPort);
+            ConfigHelper.markToUpdate();
+        });
+    }
+
+    @FXML
+    private void onSaveBtnAction() {
+        String usageFontFamily;
+        List<Window> windows;
+        Level logLevel;
+        Pair<Stage, LogConsoleDialogController> logConsoleDialogStageAndController;
+        LogConsoleDialogController logConsoleDialogController;
+
+        if (!ValidationHelper.validate(validationSupport)) {
+
+            return;
+        }
+        WindowHelper.close(root);
+        if (!ConfigHelper.checkAndSave()) {
+
+            return;
+        }
+        // 处理字体更新
+        usageFontFamily = usageFontFamilyComboBox.getValue();
+        if (!StringUtils.equals(oldUsageFontFamily, usageFontFamily)) {
+            windows = Window.getWindows();
+            windows.forEach(window -> WindowHelper.setFontFamily(window, usageFontFamily));
+            context.postEvent(new AppEvents.UsageFontChangedEvent(usageFontFamily));
+        }
+        // 处理日志等级更新
+        logConsoleDialogStageAndController = router.getSecondary(Views.LOG_CONSOLE_DIALOG);
+        logLevel = logLevelComboBox.getValue();
+        if (logLevel != oldLogLevel) {
+            log.info("set log level to {}", logLevel.name());
+            if (
+                    logConsoleDialogStageAndController == null ||
+                    !logConsoleDialogStageAndController.getLeft().isShowing()
+            ) {
+                SystemHelper.reloadLogging();
+            } else {
+                log.debug("log console is alive, restart log listening");
+                logConsoleDialogController = logConsoleDialogStageAndController.getRight();
+                logConsoleDialogController.stopListening();
+                SystemHelper.reloadLogging();
+                AsyncUtil.execute(() -> {
+                    ThreadUtils.sleepQuietly(Duration.ofSeconds(2L));
+                    Platform.runLater(logConsoleDialogController::startListening);
+                });
+            }
+        }
+        context.postEvent(AppEvents.SETTINGS_SAVED);
+    }
+
+    @FXML
+    private void onCancelBtnAction() {
+        WindowHelper.close(root);
+        ConfigHelper.unmarkToUpdate();
+        loadConfigService.restart();
+    }
+
+    @FXML
+    @SuppressWarnings("unchecked")
+    private void onIpChoiceBoxAction(ActionEvent event) {
+        ChoiceBox<Pair<NetworkInterface, String>> ipChoiceBox =
+                (ChoiceBox<Pair<NetworkInterface, String>>) event.getTarget();
+        Pair<NetworkInterface, String> value = ipChoiceBox.getValue();
+        String newIP;
+
+        if (value == null) {
+            return;
+        }
+        newIP = value.getRight();
+        if (Objects.equals(ConfigHelper.getServiceIPv4(), newIP)) {
+            return;
+        }
+        ConfigHelper.setServiceIPv4(value.getRight());
+        ConfigHelper.markToUpdate();
+    }
+
+    @FXML
+    private void onHttpAutoStartCheckBoxAction() {
+        boolean autoStartHttp = httpAutoStartCheckBox.isSelected();
+
+        if (Objects.equals(ConfigHelper.getAutoStartHttp(), autoStartHttp)) {
+            return;
+        }
+        ConfigHelper.setAutoStartHttp(autoStartHttp);
+        ConfigHelper.markToUpdate();
+    }
+
+    @FXML
+    public void onHttpServiceStartBtnAction() {
+        Integer httpPort = ConfigHelper.getHttpPort();
+        String ip = ConfigHelper.getServiceIPv4();
+
+        if (!ValidationHelper.validate(validationSupport, httpPortTextField)) {
+            return;
+        }
+        disableHttpServiceBtn();
+        disableHttpServiceForm();
+        showServiceStatus(
+                httpServiceStatusLabel,
+                httpServiceStatusFontIcon,
+                Color.ORANGE
+        );
+        if (httpServer.start(ip, httpPort)) {
+            ConfigHelper.checkAndSave();
+            showServiceStatus(
+                    httpServiceStatusLabel,
+                    httpServiceStatusFontIcon,
+                    Color.GREEN
+            );
+            httpServiceStopBtn.setDisable(false);
+            ToastHelper.showSuccessI18n(I18nKeys.SETTINGS_HTTP_SERVICE_UP);
+        } else {
+            showServiceStatus(
+                    httpServiceStatusLabel,
+                    httpServiceStatusFontIcon,
+                    Color.GRAY
+            );
+            httpServiceStartBtn.setDisable(false);
+            enableHttpServiceForm();
+        }
+    }
+
+    @FXML
+    public void onHttpServiceStopBtnAction() {
+        disableHttpServiceBtn();
+        httpServer.stop(() -> {
+            showServiceStatus(
+                    httpServiceStatusLabel,
+                    httpServiceStatusFontIcon,
+                    Color.GRAY
+            );
+            httpServiceStartBtn.setDisable(false);
+            enableHttpServiceForm();
+            ToastHelper.showSuccessI18n(I18nKeys.SETTINGS_HTTP_SERVICE_DOWN);
+        });
+    }
+
+    private void disableHttpServiceBtn() {
+        httpServiceStartBtn.setDisable(true);
+        httpServiceStopBtn.setDisable(true);
+    }
+
+    @FXML
+    private void onWsAutoStartCheckBoxAction() {
+        boolean autoStartWs = wsAutoStartCheckBox.isSelected();
+
+        if (Objects.equals(ConfigHelper.getAutoStartWs(), autoStartWs)) {
+            return;
+        }
+        ConfigHelper.setAutoStartWs(autoStartWs);
+        ConfigHelper.markToUpdate();
+    }
+
+    private void onWsPortTextFieldChange() {
+        Platform.runLater(() -> {
+            int newPort;
+
+            if (!ValidationHelper.validate(validationSupport, wsPortTextField)) {
+                return;
+            }
+            newPort = Integer.parseInt(wsPortTextField.getText());
+            if (Objects.equals(ConfigHelper.getWsPort(), newPort)) {
+                return;
+            }
+            ConfigHelper.setWsPort(newPort);
+            ConfigHelper.markToUpdate();
+        });
+    }
+
+    @FXML
+    private void onWsServiceStartBtnAction() {
+        Integer wsPort = ConfigHelper.getWsPort();
+        String ip = ConfigHelper.getServiceIPv4();
+        CheckPortUsingService checkPortUsingService;
+
+        if (!ValidationHelper.validate(validationSupport, wsPortTextField)) {
+            return;
+        }
+        checkPortUsingService = new CheckPortUsingService(wsPort);
+        disableWsServiceBtn();
+        disableWsServiceForm();
+        showServiceStatus(
+                wsServiceStatusLabel,
+                wsServiceStatusFontIcon,
+                Color.ORANGE
+        );
+        checkPortUsingService.setOnSucceeded(evt -> {
+            if (checkPortUsingService.getValue()) {
+                ToastHelper.showError(String.format(
+                        I18nHelper.get(I18nKeys.SETTINGS_PORT_IN_USE),
+                        wsPort
+                ));
+                showServiceStatus(
+                        wsServiceStatusLabel,
+                        wsServiceStatusFontIcon,
+                        Color.GRAY
+                );
+                wsServiceStartBtn.setDisable(false);
+                enableWsServiceForm();
+            } else {
+                ConfigHelper.checkAndSave();
+                wsServer.start(ip, wsPort);
+                showServiceStatus(
+                        wsServiceStatusLabel,
+                        wsServiceStatusFontIcon,
+                        Color.GREEN
+                );
+                wsServiceStopBtn.setDisable(false);
+                ToastHelper.showSuccessI18n(I18nKeys.SETTINGS_WS_SERVICE_UP);
+            }
+        });
+        checkPortUsingService.start();
+    }
+
+    private void showServiceStatus(
+            Label label,
+            FontIcon icon,
+            Color color
+    ) {
+        if (color == Color.GREEN) {
+            label.setText(I18nHelper.get(I18nKeys.SETTINGS_SERVICE_UP));
+        } else if (color == Color.ORANGE) {
+            label.setText(I18nHelper.get(I18nKeys.SETTINGS_SERVICE_STARTING));
+        } else if (color == Color.GRAY) {
+            label.setText(I18nHelper.get(I18nKeys.SETTINGS_SERVICE_DOWN));
+        }
+        icon.setIconColor(color);
+    }
+
+    @FXML
+    private void onWsServiceStopBtnAction() {
+        disableWsServiceBtn();
+        wsServer.stop(() -> {
+            showServiceStatus(
+                    wsServiceStatusLabel,
+                    wsServiceStatusFontIcon,
+                    Color.GRAY
+            );
+            wsServiceStartBtn.setDisable(false);
+            enableWsServiceForm();
+            ToastHelper.showSuccessI18n(I18nKeys.SETTINGS_WS_SERVICE_DOWN);
+        });
+    }
+
+    private void disableWsServiceBtn() {
+        wsServiceStartBtn.setDisable(true);
+        wsServiceStopBtn.setDisable(true);
+    }
+
+    @FXML
+    private void onDeleteApplicationDataButtonAction() {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        DialogPane dialogPane = alert.getDialogPane();
+        Button okBtn;
+
+        alert.setContentText(I18nHelper.get(I18nKeys.SETTINGS_DELETE_APPLICATION_DATA_ALERT));
+        alert.getButtonTypes().add(ButtonType.CLOSE);
+        WindowHelper.setFontFamily(dialogPane, ConfigHelper.getUsageFontFamily());
+        okBtn = CastUtil.cast(dialogPane.lookupButton(ButtonType.OK));
+        okBtn.setOnAction(evt -> {
+            LoadingHelper.showLoading(stage, I18nKeys.MESSAGE_QUIT_LOADING);
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try {
+                    ProviderRegistry.getLoggingProvider().shutdown();
+                } catch (InterruptedException ignored) {}
+                StorageHelper.clearData();
+            }));
+            Platform.exit();
+        });
+        alert.show();
+    }
+
+    @FXML
+    private void onCheckUpgradeButtonAction() {
+        Service<UpgradeCheckResultBO> service;
+
+        checkUpgradeButton.setDisable(true);
+        if (alreadyLatestVersionLabel.isVisible()) {
+            alreadyLatestVersionLabel.setVisible(false);
+        }
+        service = new UpgradeCheckService();
+        service.setOnSucceeded(evt -> {
+            UpgradeCheckResultBO upgradeCheckResult = service.getValue();
+            Pair<Stage, UpgradeDialogController> stageAndController;
+
+            checkUpgradeButton.setDisable(false);
+            if (upgradeCheckResult == null) {
+
+                return;
+            }
+            if (!upgradeCheckResult.isHasNewVersion()) {
+                alreadyLatestVersionLabel.setVisible(true);
+
+                return;
+            }
+            stageAndController = FXMLUtil.loadDialog(Views.UPGRADE_DIALOG);
+            stageAndController.getRight().setData(upgradeCheckResult);
+            stageAndController.getLeft().showAndWait();
+        });
+        service.start();
+    }
+
+    @FXML
+    private void onAutoCheckUpgradeCheckBoxAction() {
+        boolean autoCheckUpgrade = autoCheckUpgradeCheckBox.isSelected();
+
+        if (Objects.equals(ConfigHelper.getAutoCheckUpgrade(), autoCheckUpgrade)) {
+            return;
+        }
+        ConfigHelper.setAutoCheckUpgrade(autoCheckUpgrade);
+        ConfigHelper.markToUpdate();
+    }
+
+    @FXML
+    private void onShowLicenseButtonAction() {
+        Pair<Stage, LicenseDialogController> stageAndController = FXMLUtil.loadDialog(Views.LICENSE_DIALOG);
+
+        stageAndController.getLeft().showAndWait();
+    }
+
+    @FXML
+    private void onUsageFontFamilyComboBoxAction() {
+        Label fontFamily = usageFontFamilyExampleLabel;
+
+        fontFamily.setStyle("-fx-font-family:\"" + usageFontFamilyComboBox.getValue() + "\";-fx-text-fill: blue;");
+        ConfigHelper.setUsageFontFamily(usageFontFamilyComboBox.getValue());
+        ConfigHelper.markToUpdate();
+    }
+
+    @FXML
+    private void onAdFilterCheckBoxAction() {
+        boolean adFilter = adFilterCheckBox.isSelected();
+
+        if (Objects.equals(ConfigHelper.getAdFilter(), adFilter)) {
+            return;
+        }
+        ConfigHelper.setAdFilter(adFilter);
+        ConfigHelper.markToUpdate();
+    }
+
+    @FXML
+    private void onAdFilterDynamicThresholdFactorRadioButtonAction(ActionEvent event) {
+        RadioButton radioButton = (RadioButton) event.getSource();
+        Double value = (Double) radioButton.getProperties().get("value");
+
+        if (Objects.equals(ConfigHelper.getAdFilterDynamicThresholdFactor(), value)) {
+            return;
+        }
+        ConfigHelper.setAdFilterDynamicThresholdFactor(value);
+        ConfigHelper.markToUpdate();
+    }
+
+    @FXML
+    private void onPlayerComboBoxAction() {
+        PlayerType playerType = playerTypeComboBox.getValue();
+
+        if (playerType == ConfigHelper.getPlayerType()) {
+            // 可能在赋初值，忽略事件触发
+            return;
+        }
+        LoadingHelper.showLoading(stage);
+        playerConfigApplyHandler.handle(playerType, stage, this::acceptPlayerSelection);
+    }
+
+    @FXML
+    private void onVideoPlaybackTriggerRadioButtonAction(ActionEvent event) {
+        RadioButton radioButton = (RadioButton) event.getSource();
+        VideoPlaybackTrigger playbackTrigger = (VideoPlaybackTrigger) radioButton.getProperties().get("value");
+
+        if (playbackTrigger == ConfigHelper.getVideoPlaybackTrigger()) {
+
+            return;
+        }
+        ConfigHelper.setVideoPlaybackTrigger(playbackTrigger);
+        ConfigHelper.markToUpdate();
+    }
+
+    @FXML
+    private void onPlayerSelectHyperlinkAction() {
+        LoadingHelper.showLoading(stage);
+        playerConfigApplyHandler.handle(playerTypeComboBox.getValue(), stage, this::acceptPlayerSelection);
+    }
+
+    private void acceptPlayerSelection(Pair<Boolean, String> successFlagAndPlayerPath) {
+        Boolean successFlag = successFlagAndPlayerPath.getLeft();
+        String playerPath = successFlagAndPlayerPath.getRight();
+
+        Platform.runLater(() -> {
+            playerStatusLabel.setText(I18nHelper.get(
+                    successFlag ? I18nKeys.SETTINGS_PLAYER_STATUS_OK : I18nKeys.SETTINGS_PLAYER_STATUS_NOT_FOUND
+            ));
+            applyPlayerTypeSetting(playerTypeComboBox.getValue(), playerPath);
+            LoadingHelper.hideLoading();
+        });
+    }
+
+    private void applyPlayerTypeSetting(PlayerType playerType, @Nullable String playerPath) {
+        if (playerType == PlayerType.VLC) {
+            if (!Objects.equals(ConfigHelper.getVlcPath(), playerPath)) {
+                ConfigHelper.setVlcPath(playerPath);
+                ConfigHelper.markToUpdate();
+            }
+        } else if (playerType == PlayerType.MPV_EXTERNAL) {
+            if (!Objects.equals(ConfigHelper.getMpvPath(), playerPath)) {
+                ConfigHelper.setMpvPath(playerPath);
+                ConfigHelper.markToUpdate();
+            }
+        }
+        if (playerType != ConfigHelper.getPlayerType()) {
+            ConfigHelper.setPlayerType(playerType);
+            ConfigHelper.markToUpdate();
+        }
+    }
+
+    @FXML
+    private void onLogLevelComboBoxAction() {
+        Level level = logLevelComboBox.getValue();
+
+        if (level == ConfigHelper.getLogLevel()) {
+
+            return;
+        }
+        ConfigHelper.setLogLevel(level);
+        ConfigHelper.markToUpdate();
+    }
+
+    @FXML
+    private void onLogExportButtonAction() {
+        List<FileChooser.ExtensionFilter> filters;
+        File saveFile;
+
+        if (logZipFileSaveChooser == null) {
+            logZipFileSaveChooser = new FileChooser();
+            logZipFileSaveChooser.setTitle(I18nHelper.get(I18nKeys.SETTINGS_DEBUGGING_LOG_EXPORT));
+            filters = logZipFileSaveChooser.getExtensionFilters();
+            filters.add(new FileChooser.ExtensionFilter("zip", "*.zip"));
+            filters.add(new FileChooser.ExtensionFilter("*", "*.*"));
+            logZipFileSaveChooser.setInitialFileName("latest_logs.zip");
+        }
+        saveFile = logZipFileSaveChooser.showSaveDialog(stage);
+        if (saveFile == null) {
+
+            return;
+        }
+        LoadingHelper.showLoading(stage);
+        AsyncUtil.execute(() -> {
+            ZipUtil.zip(StorageHelper.getLogStoragePath().toString(), saveFile.getPath(), true);
+            Platform.runLater(() -> {
+                LoadingHelper.hideLoading();
+                ToastHelper.showSuccessI18n(I18nKeys.COMMON_MESSAGE_SUCCESS);
+                HostServiceHelper.openFileInExplorer(saveFile);
+            });
+        });
+    }
+
+    @FXML
+    private void onOpenLogConsoleButtonAction() {
+        router.openSecondary(Views.LOG_CONSOLE_DIALOG, I18nKeys.SETTINGS_DEBUGGING_LOG_CONSOLE);
+    }
+
+    @FXML
+    private void onDoGcButtonAction() {
+        System.gc();
+        ToastHelper.showSuccessI18n(I18nKeys.COMMON_MESSAGE_SUCCESS);
+    }
+}

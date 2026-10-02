@@ -1,0 +1,73 @@
+package io.knifer.freebox.constant;
+
+import com.google.common.io.Resources;
+import io.knifer.freebox.FreeBoxApplication;
+import io.knifer.freebox.helper.SystemHelper;
+import javafx.scene.image.Image;
+import lombok.experimental.UtilityClass;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+
+import java.io.InputStream;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Properties;
+
+/**
+ * 资源
+ *
+ * @author Knifer
+ */
+@Slf4j
+@UtilityClass
+@SuppressWarnings("ConstantConditions")
+public class BaseResources {
+
+    public static final Image LOGO_IMG = loadImage("image/logo.png");
+    public static final Image PICTURE_PLACEHOLDER_IMG = loadImage("image/picture_placeholder.png");
+    public static final Image LOAD_MORE_IMG = loadImage("image/load_more.png");
+    public static final Image PLAYING_GIF = loadImage("image/playing.gif");
+    public static final Image PLAY_BUTTON_IMG = loadImage("image/play_button.png");
+    public static final Image JAVASCRIPT_LOGO_IMG = loadImage("image/javascript_logo.png");
+
+    public static final Properties X_PROPERTIES = new Properties() {
+        {
+            try (InputStream in = Resources.getResource("x.properties").openStream()) {
+                load(in);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+    };
+
+    @NotNull
+    public static final URL PLAYER_CSS = FreeBoxApplication.class.getResource("css/player.css");
+    @NotNull
+    public static final URL LOADING_DIALOG_CSS =
+            FreeBoxApplication.class.getResource("css/dialog/loading-dialog.css");
+
+    public static final Path JS_SPIDER_WORKING_DIRECTORY = switch (SystemHelper.getEnvProfile()) {
+        case DEV -> Path.of("resources/app-assets/spider-js").toAbsolutePath();
+        case PROD -> Path.of(System.getProperty("java.home"), "spider-js");
+    };
+
+    static {
+        if (PLAYER_CSS == null) {
+            log.error("player.css not found");
+            System.exit(-1);
+        }
+        if (LOADING_DIALOG_CSS == null) {
+            log.error("loading-dialog.css not found");
+            System.exit(-1);
+        }
+        if (!Files.exists(JS_SPIDER_WORKING_DIRECTORY)) {
+            log.error("spider-js not found");
+            System.exit(-1);
+        }
+    }
+
+    private static Image loadImage(String path) {
+        return new Image(FreeBoxApplication.class.getResourceAsStream(path));
+    }
+}

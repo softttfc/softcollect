@@ -24,6 +24,7 @@
   var next = AM.next;
   var prev = AM.prev;
   var seek = AM.seek;
+  var bindProgDrag = AM.bindProgDrag; // V4.3.16：进度条拖动（顶栏/沉浸/迷你共用）
   var playStreamAt = AM.playStreamAt;
   var patchStreamPlayNext = AM.patchStreamPlayNext;
   var build = AM.build;
@@ -326,10 +327,7 @@
     var bar = el('div', 'am-imm-bar');
     R.immFill = el('div', 'am-imm-fill');
     bar.appendChild(R.immFill);
-    bar.onclick = function (e) {
-      var r = bar.getBoundingClientRect();
-      if (S.dur > 0) seek(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * S.dur);
-    };
+    bindProgDrag(bar, R.immFill, R.immCur); // V4.3.16：可拖动（原仅点击）
     R.immRemain = el('span', 'am-imm-time', '-0:00');
     prog.appendChild(R.immCur); prog.appendChild(bar); prog.appendChild(R.immRemain);
     left.appendChild(prog);
@@ -429,10 +427,7 @@
     var bar = el('div', 'am-mini-bar');
     R.miniFill = el('div', 'am-mini-fill');
     bar.appendChild(R.miniFill);
-    bar.onclick = function (e) {
-      var r = bar.getBoundingClientRect();
-      if (S.dur > 0) seek(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * S.dur);
-    };
+    bindProgDrag(bar, R.miniFill, R.miniCur); // V4.3.16：可拖动（原仅点击）
     R.miniRemain = el('span', 'am-mini-time', '-0:00');
     prog.appendChild(R.miniCur); prog.appendChild(bar); prog.appendChild(R.miniRemain);
     m.appendChild(prog);
@@ -542,6 +537,7 @@
     }
   }
   function refreshAuxProgress() {
+    if (state.seeking) return; // V4.3.16：拖动预览期间不覆盖沉浸/迷你进度
     var pct = S.dur > 0 ? Math.min(1, S.pos / S.dur) : 0;
     var cur = fmtTime(S.pos);
     var rem = S.dur > 0 ? '-' + fmtTime(Math.max(0, S.dur - S.pos)) : '-0:00';
@@ -620,6 +616,7 @@
   }
   function refreshTimes() {
     if (!R.npCur) return;
+    if (state.seeking) return; // V4.3.16：拖动预览期间不覆盖
     R.npCur.textContent = fmtTime(S.pos);
     R.npRemain.textContent = S.dur > 0 ? fmtRemain(S.dur - S.pos) : '0:00';
     if (R.npProgFill && S.dur > 0) R.npProgFill.style.width = (Math.min(1, S.pos / S.dur) * 100) + '%';
@@ -695,6 +692,14 @@
     });
     window.mine.onEngineEvent(function (event, data) {
       if (event === 'position' && data) {
+        // V4.3.16：拖动预览期间位置事件不回写（预览归拖动器负责）
+        if (state.seeking) return;
+        // V4.3.16：seek 保护——引擎重缓冲期间的旧位置事件丢弃（在线曲目 1~3s 回拉根因），到达目标后解除
+        if (state.seekPending) {
+          var rel = Math.max(0, (data.seconds || 0) - (state.currentCue ? state.currentCue.start : 0));
+          if (rel >= (state.seekTarget || 0) - 0.5) { state.seekPending = false; clearTimeout(state.seekTimer); }
+          else return;
+        }
         S.pos = Math.max(0, (data.seconds || 0) - (state.currentCue ? state.currentCue.start : 0));
         S.dur = state.currentCue ? (state.currentCue.end - state.currentCue.start)
           : (data.duration || (state.currentStream && state.duration) || 0);
@@ -750,10 +755,15 @@
   var vizBands = new Float32Array(32);
   var vizSmooth = new Float32Array(32);
   var vizAccA = '', vizAccB = '', vizColorAt = 0;
+  /* V4.3.17：配色模式——accent 主题强调色 / cover 封面双色 / coverMulti 封面多色 / rainbow 彩虹频段 / heat 幅度热成像 */
+  var vizMode = 'cover', vizCoverSrc = null, vizPal = null, vizRainbowW = 0, vizRainbowGrad = null;
   if (window.mine && window.mine.onEngineEvent) {
     window.mine.onEngineEvent(function (ev, d) {
       if (ev === 'spectrum' && d && d.bands) { for (var i = 0; i < 32; i++) vizBands[i] = d.bands[i] || 0; }
     });
+  }
+  function vizHeatColor(t) { // 幅度热成像：安静冷蓝 → 爆棚白金
+    return 'hsl(' + (210 - 170 * t).toFixed(0) + ',90%,' + (45 + 27 * t).toFixed(0) + '%)';
   }
   function vizLoop() {
     requestAnimationFrame(vizLoop);
@@ -766,22 +776,47 @@
     if (!w || !h) return;
     if (cv.width !== w * 2) { cv.width = w * 2; cv.height = h * 2; } // 2x 高清
     var now = Date.now();
-    if (now - vizColorAt > 1000) { // 强调色 1s 缓存（支持自定义强调色实时切换）
+    if (now - vizColorAt > 1000) { // 强调色/模式/封面 1s 轮询（支持自定义强调色与切歌实时切换）
       vizColorAt = now;
       var cs = getComputedStyle(document.getElementById('am-root'));
       vizAccA = cs.getPropertyValue('--am-accent').trim() || '#fa2d55';
       vizAccB = cs.getPropertyValue('--am-accent-2').trim() || '#ff5c7a';
+      vizMode = (window.annieSettings && annieSettings.ui.amVizColor) || 'cover';
+      var src = (R.npCover && R.npCover.getAttribute('src')) || '';
+      if (src !== vizCoverSrc) {
+        vizCoverSrc = src; vizPal = null;
+        if (src && window.amVizColor) {
+          (function (u) { amVizColor.analyze(u, function (p) { if (vizCoverSrc === u) vizPal = p; }); })(src);
+        }
+      }
     }
     var ctx = cv.getContext('2d');
     ctx.clearRect(0, 0, cv.width, cv.height);
-    var grad = ctx.createLinearGradient(0, 0, cv.width, 0);
-    grad.addColorStop(0, vizAccA); grad.addColorStop(1, vizAccB);
-    ctx.fillStyle = grad;
+    var grad = null;
+    if (vizMode !== 'heat') {
+      grad = ctx.createLinearGradient(0, 0, cv.width, 0);
+      if (vizMode === 'rainbow') {
+        if (!vizRainbowGrad || vizRainbowW !== cv.width) { // 彩虹频段渐变按宽度缓存
+          vizRainbowW = cv.width; vizRainbowGrad = grad;
+          var hues = [265, 230, 200, 160, 110, 55, 15]; // 低频紫 → 高频红
+          for (var hi = 0; hi < hues.length; hi++) vizRainbowGrad.addColorStop(hi / (hues.length - 1), 'hsl(' + hues[hi] + ',85%,58%)');
+        }
+        grad = vizRainbowGrad;
+      } else if (vizMode === 'coverMulti' && vizPal && vizPal.stops && vizPal.stops.length >= 2) {
+        for (var si = 0; si < vizPal.stops.length; si++) grad.addColorStop(si / (vizPal.stops.length - 1), vizPal.stops[si]);
+      } else if ((vizMode === 'cover' || vizMode === 'coverMulti') && vizPal) {
+        grad.addColorStop(0, vizPal.primary); grad.addColorStop(1, vizPal.accent);
+      } else { // accent 模式 / 封面取色失败（无封面、黑白封面、CORS 被拦）回落
+        grad.addColorStop(0, vizAccA); grad.addColorStop(1, vizAccB);
+      }
+      ctx.fillStyle = grad;
+    }
     var n = 32, bw = cv.width / n;
     for (var i = 0; i < n; i++) {
       var target = vizBands[i];
       vizSmooth[i] += (target - vizSmooth[i]) * 0.35; // 帧间插值
       var bh = Math.max(2, vizSmooth[i] * (cv.height - 4));
+      if (vizMode === 'heat') ctx.fillStyle = vizHeatColor(Math.min(1, vizSmooth[i]));
       ctx.globalAlpha = 0.35 + vizSmooth[i] * 0.6;
       ctx.fillRect(i * bw + 1, cv.height - bh, bw - 2, bh);
     }

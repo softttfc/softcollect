@@ -189,6 +189,14 @@ html[data-theme="am"] #titlebar { display: none !important; }
 /* 内容区 */
 .am-content { flex: 1; min-width: 0; overflow-y: auto; padding: 20px 28px 40px; overflow-anchor: none; /* 禁滚动锚定：窗口化重建表格时浏览器异步挪 scrollTop，与可视区脱节（切歌后列表空白） */ }
 .am-view-h { font-size: 26px; font-weight: 700; margin: 4px 0 16px; letter-spacing: -.01em; }
+/* V4.3.15：歌曲视图标题行（标题 + 排序下拉，样式对齐 .am-st-quality） */
+.am-view-head { display: flex; align-items: baseline; gap: 16px; }
+.am-view-head .am-view-h { flex: 1; min-width: 0; }
+.am-sort-sel {
+  flex: none; border: 1px solid var(--am-sep); background: var(--am-glass-2); color: var(--am-text);
+  border-radius: 8px; padding: 5px 8px; font: 12px var(--am-font); outline: none; cursor: pointer;
+  margin-bottom: 16px;
+}
 
 /* 专辑网格 */
 .am-album-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 22px 18px; }
@@ -732,7 +740,22 @@ html[data-motion="off"] #am-root::before {
 .am-az-l:hover { color: var(--am-accent); background: var(--am-hover); }
 .am-az-l.cur { color: var(--am-accent); }
 .am-az-l.off { opacity: .28; cursor: default; pointer-events: none; }
+/* V4.3.16：悬浮回顶部（滚过 ~1.5 屏浮出；歌词面板展开时跟随左移） */
+.am-backtop {
+  position: absolute; right: 22px; bottom: 22px; z-index: 9;
+  width: 38px; height: 38px; border-radius: 50%;
+  border: 1px solid var(--am-sep); background: var(--am-glass-2); color: var(--am-text);
+  font-size: 17px; line-height: 1; cursor: pointer;
+  backdrop-filter: var(--am-blur); -webkit-backdrop-filter: var(--am-blur);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .25);
+  opacity: 0; pointer-events: none; transform: translateY(10px);
+  transition: opacity .18s ease, transform .18s ease, right .25s ease, background .12s ease, color .12s ease;
+}
+.am-backtop.on { opacity: 1; pointer-events: auto; transform: none; }
+.am-backtop:hover { background: var(--am-accent); color: var(--am-accent-ink); border-color: transparent; }
+#am-root.am-lyr-on .am-backtop { right: 382px; }
 /* 迷你/沉浸模式下内容区被顶栏取代，索引栏隐藏 */
-#am-root.am-mini-on .am-az, #am-root.am-imm-on .am-az { display: none; }
+#am-root.am-mini-on .am-az, #am-root.am-imm-on .am-az,
+#am-root.am-mini-on .am-backtop, #am-root.am-imm-on .am-backtop { display: none; }
 /* 索引跳转/定位播放时，行顶部预留 sticky 表头 + 一行的高度，避免首行被表头遮挡（非窗口化路径由 scrollIntoView 走这里） */
 .am-table tbody .am-tr { scroll-margin-top: 100px; }

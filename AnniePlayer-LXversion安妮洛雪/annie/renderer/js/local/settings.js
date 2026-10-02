@@ -19,6 +19,7 @@
     // —— 界面 ——
     particlesEnabled: true, albumBg: true, albumBgBlur: 120,
     sortMode: 'name', sidebarCollapsed: false, viewMode: 'tree',
+    amSongSort: 'az',       // V4.3.15：AM 歌曲视图排序 az|azArtist|name|mtimeDesc|mtimeAsc|sizeDesc|sizeAsc
     // 侧栏宽度（px）与可视化面板整体关闭状态（持久化，重启后恢复）
     sidebarWidth: 320, vizBarHidden: false,
     // Plus：配色方案（gold 暗夜金 / aurora 靛蓝极光 / jade 翡翠深空 / day 白昼）
@@ -42,7 +43,8 @@
     saveCover: true,        // 下载时在目录生成封面图片文件（嵌入标签始终做）
     closeToTray: false,      // V3.5.9：关闭主窗口后驻留系统托盘（默认关=关窗即退出，保证更新顺利安装）
     accent: 'default',       // V3.5.17：强调色（default=主题原色；AM/粒子舞台生效）
-    amViz: true              // V3.5.17：AM 主题底部实时频谱条
+    amViz: true,              // V3.5.17：AM 主题底部实时频谱条
+    amVizColor: 'cover'      // V4.3.17：频谱条配色 cover|coverMulti|rainbow|heat|accent
   };
 
   /* V3.5.17：强调色预设——内联 style 写到 <html>，优先级高于所有 CSS 变量定义（含 data-palette 方案） */
@@ -562,6 +564,19 @@
     vizWrap.appendChild(vizChk); vizWrap.appendChild(el('span', 'knob'));
     vizRow.appendChild(vizLab); vizRow.appendChild(vizWrap);
     s5.appendChild(vizRow);
+
+    // —— AM 频谱条配色模式（V4.3.17） ——
+    var vcRow = markItem(el('div', 'set-row'), '频谱条配色 颜色 封面取色 彩虹 热成像 spectrum color');
+    var vcLab = el('div'); vcLab.appendChild(el('div', '', '频谱条配色'));
+    vcLab.appendChild(el('div', 'set-hint', '跟随封面：切歌自动换封面主色；封面多色：呈现封面多种颜色；黑白封面/无封面自动回落主题强调色'));
+    var vcSel = document.createElement('select');
+    [['cover', '跟随专辑封面'], ['coverMulti', '封面多色渐变'], ['rainbow', '彩虹频段'], ['heat', '幅度热成像'], ['accent', '主题强调色']].forEach(function (o) {
+      var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; vcSel.appendChild(op);
+    });
+    vcSel.value = ui.amVizColor || 'cover';
+    vcSel.onchange = function () { ui.amVizColor = vcSel.value; save(); };
+    vcRow.appendChild(vcLab); vcRow.appendChild(vcSel);
+    s5.appendChild(vcRow);
 
     // —— 氛围模式（V3.5.18：全屏频谱，任意主题可用） ——
     var ambRow = markItem(el('div', 'set-row'), '氛围模式 全屏 频谱 可视化 ambient');
@@ -1244,7 +1259,7 @@
     sPeq.appendChild(aeWrap);
     var aeBox = el('div', 'autoeq-box');
     var aeIn = document.createElement('input');
-    aeIn.type = 'text'; aeIn.className = 'autoeq-search'; aeIn.placeholder = '输入耳机型号，如 HD 650 / AirPods / Kato…';
+    aeIn.type = 'text'; aeIn.className = 'autoeq-search'; aeIn.placeholder = '输入耳机型号，如 HD650 / 森海 / AirPods / Kato…';
     aeBox.appendChild(aeIn);
     var aeList = el('div', 'autoeq-list');
     var aePrev = el('div', 'set-hint');
@@ -1252,6 +1267,17 @@
     sPeq.appendChild(aeBox);
     var aeData = null, aeSel = null, aeLoading = false;
     var AE_TYPE = { 'in-ear': '入耳', 'over-ear': '头戴', 'earbud': '平头/耳塞', other: '其他' };
+    /* V4.3.15：型号归一化匹配——忽略空格/连字符（HD650 = HD 650）+ 中文品牌别名（森海=Sennheiser 等）。
+     * 别名键按长度降序排列（"森海塞尔"先于"森海"命中）。 */
+    var AE_ALIAS = {
+      '森海塞尔': 'sennheiser', '拜亚动力': 'beyerdynamic', '铁三角': 'audio-technica',
+      '水月雨': 'moondrop', '天使吉米': 'tangzu', '弱水时砂': 'rose technics', '达音科': 'dunu',
+      '森海': 'sennheiser', '索尼': 'sony', '苹果': 'apple', '拜亚': 'beyerdynamic',
+      '舒尔': 'shure', '爱科技': 'akg', '歌德': 'grado', '飞傲': 'fiio', '兴戈': 'simgot',
+      '博士': 'bose', '音特美': 'etymotic', '漫步者': 'edifier', '宁梵': 'nf audio'
+    };
+    var AE_ALIAS_KEYS = Object.keys(AE_ALIAS);
+    var aeNorm = function (s) { return String(s).toLowerCase().replace(/[\s\-_·]+/g, ''); };
     function aeLoad() { // 首次输入时懒加载子集
       if (aeData || aeLoading) return; aeLoading = true;
       fetch('autoeq-subset.json').then(function (r) { return r.json(); }).then(function (d) {
@@ -1263,8 +1289,14 @@
       aeList.innerHTML = '';
       var q = aeIn.value.trim().toLowerCase();
       if (!q || !aeData) { if (q && !aeData) aeLoad(); return; }
-      var hits = aeData.models.filter(function (m) { return m.n.toLowerCase().includes(q); }).slice(0, 8);
-      if (!hits.length) { aeList.appendChild(el('div', 'set-hint', '库内无匹配型号（共 ' + aeData.count + ' 款，可手动按 AutoEq 网页结果加频段）')); return; }
+      for (var ai = 0; ai < AE_ALIAS_KEYS.length; ai++) q = q.split(AE_ALIAS_KEYS[ai]).join(AE_ALIAS[AE_ALIAS_KEYS[ai]]);
+      var tokens = q.split(/\s+/).filter(Boolean).map(aeNorm);
+      // 每个词元都要求命中（归一化后子串），多词可组合过滤（如「森海 hd650」）
+      var hits = aeData.models.filter(function (m) {
+        var n = aeNorm(m.n);
+        return tokens.every(function (t) { return n.indexOf(t) >= 0; });
+      }).slice(0, 8);
+      if (!hits.length) { aeList.appendChild(el('div', 'set-hint', '库内无匹配型号（共 ' + aeData.count + ' 款，支持中文品牌名如「森海」；可手动按 AutoEq 网页结果加频段）')); return; }
       hits.forEach(function (m) {
         var it = el('div', 'autoeq-item' + (aeSel === m ? ' sel' : ''));
         it.appendChild(el('span', 'autoeq-name', m.n));
@@ -1790,6 +1822,26 @@
     };
     loudBtnRow.appendChild(loudBtnLab); loudBtnRow.appendChild(loudBtn);
     sFk.appendChild(loudBtnRow);
+
+    // —— V4.3.16：曲库节奏（BPM）补算——为「找相似歌曲」供特征 ——
+    var bpmBtnRow = markItem(el('div', 'set-row'), '曲库节奏补算 BPM 相似推荐 music-tempo');
+    var bpmBtnLab = el('div'); bpmBtnLab.appendChild(el('div', '', '曲库节奏补算（BPM）'));
+    bpmBtnLab.appendChild(el('div', 'set-hint', '后台逐轨分析节奏（music-tempo，约每首数秒），供「找相似歌曲」打分；CUE/ISO 分轨跳过'));
+    var bpmBtn = el('button', 'btn-ghost', '开始补算');
+    var bpmBusy = false;
+    bpmBtn.onclick = async function () {
+      if (bpmBusy) { window.annieRhythm.batchCancel(); return; }
+      bpmBusy = true;
+      bpmBtn.textContent = '补算中…（点击取消）';
+      var r = await window.annieRhythm.batchFill(function (done, total) {
+        bpmBtn.textContent = '补算中 ' + done + '/' + total + '（点击取消）';
+      });
+      bpmBusy = false;
+      bpmBtn.textContent = r.canceled ? '已取消（' + r.ok + ' 首已分析）' : (r.total ? '完成：' + r.ok + '/' + r.total + ' 首' : '全部已分析 ✓');
+      setTimeout(function () { bpmBtn.textContent = '开始补算'; }, 4000);
+    };
+    bpmBtnRow.appendChild(bpmBtnLab); bpmBtnRow.appendChild(bpmBtn);
+    sFk.appendChild(bpmBtnRow);
 
     // —— 假无损批量检测（V4.0.5：四方法加权融合；整库/文件夹/单曲三种范围；只出报告不打标） ——
     var fkRow = markItem(el('div', 'set-row'), '假无损 批量检测 频谱 fake lossless 文件夹 单曲');

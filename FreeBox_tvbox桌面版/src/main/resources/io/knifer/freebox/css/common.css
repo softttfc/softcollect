@@ -1,0 +1,69 @@
+@import "base/color.css";
+
+.fs-big {
+    -fx-font-size: 16px;
+}
+
+.fs-large {
+    -fx-font-size: 20px;
+}
+
+.fse-medium {
+    -fx-emoji-size: 15px;
+}
+
+.fse-big {
+    -fx-emoji-size: 18px;
+}
+
+.fse-large {
+    -fx-emoji-size: 22px;
+}
+
+.bold {
+    -fx-font-weight: bold;
+}
+
+.bordered {
+    -fx-border-width: 1px;
+    -fx-border-color: gray;
+}
+
+.dialog {
+    -fx-background-color: white;
+    -fx-background-radius: 5;
+    -fx-border: 1;
+    -fx-border-color: #e0e0e0;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 10, 0.5, 0, 0);
+}
+
+.movie-info-overlay {
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+}
+
+.movie-info-overlay-selected {
+    -fx-font-weight: bold;
+    -fx-font-size: 14px;
+    -fx-background-color: rgba(30, 144, 255, 0.2);
+    -fx-border-color: #1E90FF;
+    -fx-border-width: 2px;
+    -fx-border-radius: 3px;
+    -fx-background-radius: 3px;
+}
+
+.link-label {
+    -fx-text-fill: #3498DB;
+    -fx-cursor: hand;
+}
+.link-label:hover {
+    -fx-underline: true;
+}
+.link-label:pressed {
+    -fx-translate-y: 1;
+}
+
+.video-details-ep-btn-selected {
+    -fx-background-color: #007BFF;
+    -fx-text-fill: white;
+}

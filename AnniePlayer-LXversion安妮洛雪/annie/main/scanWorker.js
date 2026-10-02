@@ -127,9 +127,20 @@ async function metaBatch(jobId, paths) {
       try {
         const m = await mm.parseFile(p, { duration: true, skipCovers: true });
         const c = m.common || {};
+        let title = c.title || '', artist = c.artist || '', album = c.album || '';
+        // V4.3.15/4.3.16：WAV LIST/INFO 直读 + pickWavField 仲裁（GBK 乱码/INFO 全?已毁两种现场）
+        if (p.toLowerCase().endsWith('.wav')) {
+          const lib = require('./library');
+          const wi = lib.readWavInfo(p);
+          if (wi) {
+            title = lib.cleanWavTitle(lib.pickWavField(wi.INAM, title) || title);
+            artist = lib.pickWavField(wi.IART, artist) || artist;
+            album = lib.pickWavField(wi.IPRD, album) || album;
+          }
+        }
         batch[p] = {
           ok: true,
-          title: c.title || '', artist: c.artist || '', album: c.album || '',
+          title, artist, album,
           genre: (c.genre && c.genre[0]) || '', year: c.year || 0
         };
       } catch (e) { batch[p] = { ok: false, error: e.message }; }

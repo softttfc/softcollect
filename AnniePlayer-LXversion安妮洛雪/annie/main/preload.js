@@ -224,6 +224,7 @@ contextBridge.exposeInMainWorld('mine', {
   remoteSetEnabled: (enabled) => ipcRenderer.invoke('remote:setEnabled', { enabled: !!enabled }),
   remoteRegenCode: () => ipcRenderer.invoke('remote:regenCode'),
   remotePushState: (state) => ipcRenderer.send('remote:push', state),
+  remotePushLib: (list) => ipcRenderer.send('remote:pushLib', list), // 遥控二期：曲库快照
   onRemoteCmd: (cb) => {
     const listener = (_e, payload) => cb(payload);
     ipcRenderer.on('remote:cmd', listener);
@@ -232,5 +233,8 @@ contextBridge.exposeInMainWorld('mine', {
 
   // Pro beat0.0.1：诊断包导出（rendererSnapshot 为渲染侧设置/状态快照）
   diagExport: (rendererSnapshot) => ipcRenderer.invoke('diag:export', rendererSnapshot),
+  backupExport: () => ipcRenderer.invoke('backup:export'),   // V4.3.19：配置备份（脑暴 10.1）
+  backupImport: () => ipcRenderer.invoke('backup:import'),
+  relaunchApp: () => ipcRenderer.invoke('app:relaunch'),
   reportError: (payload) => ipcRenderer.send('renderer-error', payload) // 渲染层 JS 错误上报（进诊断包）
 });

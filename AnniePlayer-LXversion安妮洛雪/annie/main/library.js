@@ -4,6 +4,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const AUDIO_EXTS = new Set([
   '.flac', '.mp3', '.wav', '.ape', '.m4a', '.aac', '.alac',
@@ -134,6 +135,78 @@ function setCachedCover(filePath, mtimeMs, cover) {
   while (coverCache.size > COVER_CACHE_MAX) coverCache.delete(coverCache.keys().next().value);
 }
 
+/* V4.3.18：封面磁盘缓存（头脑风暴 2.3）——内存 LRU 之下的持久层，二次启动免 readMeta 整文件解析。
+ * 文件名 <sha1(path)>_<mtimeMs>.<ext>：mtime 变了文件名就变，天然失效；.none = 已知无封面标记。
+ * 目录索引启动时一次建成（Map: sha1 -> 文件名），查找 O(1) 不 readdir。
+ * 返回值语义与 getCachedCover 一致：undefined = 未缓存；null = 已知无封面。 */
+let coverDiskDir = null;
+let coverDiskIndex = null; // sha1 -> filename
+const COVER_DISK_MAX = 3000;
+
+function initCoverDiskCache(dir) {
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    coverDiskDir = dir;
+    coverDiskIndex = new Map();
+    for (const f of fs.readdirSync(dir)) {
+      const m = /^([0-9a-f]{40})_\d+\..+$/.exec(f);
+      if (m) coverDiskIndex.set(m[1], f);
+    }
+  } catch { coverDiskDir = null; coverDiskIndex = null; }
+}
+const coverSha1 = (p) => crypto.createHash('sha1').update(p).digest('hex');
+
+function getDiskCover(filePath, mtimeMs) {
+  if (!coverDiskIndex || !mtimeMs) return undefined;
+  const h = coverSha1(filePath);
+  const fn = coverDiskIndex.get(h);
+  if (!fn || !fn.startsWith(h + '_' + Math.floor(mtimeMs) + '.')) return undefined; // mtime 漂移 = 失效
+  if (fn.endsWith('.none')) return null;
+  try {
+    const buf = fs.readFileSync(path.join(coverDiskDir, fn));
+    const ext = fn.slice(fn.lastIndexOf('.') + 1);
+    const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : ext === 'gif' ? 'image/gif' : 'image/jpeg';
+    return `data:${mime};base64,${buf.toString('base64')}`;
+  } catch { return undefined; }
+}
+
+function setDiskCover(filePath, mtimeMs, coverDataUrl) {
+  if (!coverDiskDir || !coverDiskIndex || !mtimeMs) return;
+  try {
+    const h = coverSha1(filePath);
+    const base = h + '_' + Math.floor(mtimeMs);
+    const old = coverDiskIndex.get(h);
+    if (old) {
+      if (old.startsWith(base + '.')) return; // 同版本已缓存
+      try { fs.unlinkSync(path.join(coverDiskDir, old)); } catch { }
+      coverDiskIndex.delete(h);
+    }
+    let fn;
+    if (!coverDataUrl) {
+      fn = base + '.none';
+      fs.writeFileSync(path.join(coverDiskDir, fn), '');
+    } else {
+      const m = /^data:image\/(jpeg|jpg|png|webp|gif);base64,(.+)$/s.exec(coverDataUrl);
+      if (!m) return;
+      fn = base + '.' + (m[1] === 'jpeg' ? 'jpg' : m[1]);
+      fs.writeFileSync(path.join(coverDiskDir, fn), Buffer.from(m[2], 'base64'));
+    }
+    coverDiskIndex.set(h, fn);
+    // 容量剪枝：超上限按缓存文件的时间戳从旧到新删到 2500
+    if (coverDiskIndex.size > COVER_DISK_MAX) {
+      const entries = [...coverDiskIndex.entries()].sort((a, b) => {
+        const ta = parseInt(a[1].split('_')[1], 10) || 0, tb = parseInt(b[1].split('_')[1], 10) || 0;
+        return ta - tb;
+      });
+      const excess = coverDiskIndex.size - 2500;
+      for (let i = 0; i < excess; i++) {
+        try { fs.unlinkSync(path.join(coverDiskDir, entries[i][1])); } catch { }
+        coverDiskIndex.delete(entries[i][0]);
+      }
+    }
+  } catch { }
+}
+
 /** V4.3.15：WAV LIST/INFO 标签直读。music-metadata 对 GBK 编码的 INAM/IART 解码为乱码
  * （Lavf/中文 Windows 写入惯例），自行扫 RIFF chunk 解码。
  * V4.3.16：UTF-8 优先（fatal 严格校验）——UTF-8 标签被按 GBK 解会得到"伪中文"垃圾；
@@ -200,6 +273,70 @@ function readWavInfo(filePath) {
     return null;
   } catch { return null; }
   finally { if (fd !== undefined) try { fs.closeSync(fd); } catch { } }
+}
+
+/* V4.3.20：music-metadata 解析失败时的 ffprobe/ffmpeg 兜底（实测场景：CMAF/fMP4 结构的 m4a，
+ * udta 内嵌 FullBox meta 让 mm 抛「FourCC contains invalid characters」，ffprobe 读取完全正常）。
+ * 仅 mp4 家族扩展名启用，避免给本来就坏的文件多一次进程开销。 */
+const { execFile } = require('child_process');
+
+function resolveTool(name) {
+  const prod = path.join(process.resourcesPath || '', 'engine', 'tools', name);
+  const devRoot = path.join(__dirname, '..', '..', 'engine', 'tools', name);
+  for (const p of [prod, devRoot]) { try { if (fs.existsSync(p)) return p; } catch { } }
+  return name; // 回退 PATH
+}
+
+function runTool(name, args, maxBuffer = 8 * 1024 * 1024, encoding = 'utf8') {
+  return new Promise((resolve, reject) => {
+    // encoding:'buffer' → stdout 为 Buffer（抽封面等二进制场景）；默认 utf8 字符串
+    execFile(resolveTool(name), args, { windowsHide: true, maxBuffer, timeout: 20000, encoding }, (err, stdout) => {
+      if (err) reject(err); else resolve(stdout);
+    });
+  });
+}
+
+const MP4_FAMILY = new Set(['.m4a', '.mp4', '.m4b', '.m4v', '.aac']);
+
+/** ffprobe 兜底：标签 + 格式参数（不含封面）；失败返回 null。 */
+async function ffprobeTags(filePath) {
+  const out = await runTool('ffprobe.exe', ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', filePath]);
+  const j = JSON.parse(out.toString('utf8'));
+  const tags = (j.format && j.format.tags) || {};
+  const audio = (j.streams || []).find((s) => s.codec_type === 'audio');
+  if (!audio) return null;
+  const picStream = (j.streams || []).find((s) => s.codec_type === 'video' && s.disposition && s.disposition.attached_pic === 1);
+  const year = parseInt(tags.date || tags.year || '', 10) || 0;
+  return {
+    title: tags.title || '', artist: tags.artist || '', album: tags.album || '',
+    albumArtist: tags.album_artist || '', genre: tags.genre || '', year,
+    track: tags.track || '', disc: tags.disc || '', composer: tags.composer || '',
+    comment: tags.comment || '', publisher: tags.publisher || '',
+    duration: +(j.format && j.format.duration) || 0,
+    codec: audio.codec_name || '',
+    sampleRate: +audio.sample_rate || 0,
+    bitsPerSample: +audio.bits_per_raw_sample || +audio.bits_per_sample || 0,
+    bitrate: +(j.format && j.format.bit_rate) || 0,
+    channels: +audio.channels || 0,
+    hasCover: !!picStream,
+  };
+}
+
+/** ffmpeg 兜底抽封面（attached_pic 流直出，不重编码）；无封面返回 null。 */
+async function ffprobeCover(filePath) {
+  const buf = await runTool('ffmpeg.exe',
+    ['-v', 'error', '-i', filePath, '-map', '0:v:0', '-frames:v', '1', '-c', 'copy', '-f', 'image2pipe', 'pipe:1'],
+    48 * 1024 * 1024, 'buffer'); // 二进制必须 Buffer，默认 utf8 字符串会把图片数据毁成乱码
+  if (!buf || !buf.length) return null;
+  // 魔数校验：JPEG(FF D8 FF)/PNG(89 50 4E 47) 才算数——输出是垃圾时返回 null，
+  // 防止损坏数据进缓存（实测现场：139 字节高熵数据被当 .jpg 落盘，列表显示裂图）
+  const isJpg = buf.length > 3 && buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF;
+  const isPng = buf.length > 4 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47;
+  if (!isJpg && !isPng) {
+    console.log('[cover-fallback] 非图片输出，已丢弃:', filePath, buf.length + 'B', buf.slice(0, 12).toString('hex'));
+    return null;
+  }
+  return `data:${isPng ? 'image/png' : 'image/jpeg'};base64,${buf.toString('base64')}`;
 }
 
 /** 读内嵌标签（标题/艺术家/专辑/时长/码率 + 封面 dataURL）。 */
@@ -274,6 +411,28 @@ async function readMeta(filePath) {
       cover
     };
   } catch (e) {
+    // V4.3.20：mp4 家族（CMAF/fMP4 等非典型结构）mm 抛错时走 ffprobe 兜底
+    if (MP4_FAMILY.has(path.extname(filePath).toLowerCase())) {
+      try {
+        const t = await ffprobeTags(filePath);
+        if (t) {
+          let cover = null;
+          if (t.hasCover) { try { cover = await ffprobeCover(filePath); } catch { } }
+          if (!cover) cover = findExternalCover(path.dirname(filePath)) || null;
+          const st = fs.statSync(filePath);
+          return {
+            ok: true,
+            title: t.title || path.basename(filePath, path.extname(filePath)),
+            artist: t.artist || '未知艺术家', album: t.album || '',
+            genre: t.genre, year: t.year, albumArtist: t.albumArtist,
+            track: t.track, disc: t.disc, composer: t.composer, comment: t.comment, publisher: t.publisher,
+            duration: t.duration, codec: t.codec, sampleRate: t.sampleRate,
+            bitsPerSample: t.bitsPerSample, bitrate: t.bitrate, channels: t.channels,
+            fileSize: st.size, mtimeMs: st.mtimeMs, rg: null, cover,
+          };
+        }
+      } catch { }
+    }
     return { ok: false, error: e.message, title: path.basename(filePath, path.extname(filePath)), artist: '未知艺术家', album: '', cover: null };
   }
 }
@@ -378,4 +537,4 @@ function readFileBuffer(filePath) {
   return fs.readFileSync(filePath);
 }
 
-module.exports = { scanFolders, readMeta, readMetaBatch, readLyrics, readFileBuffer, isAudio, getCachedCover, setCachedCover, readWavInfo, pickWavField, cleanWavTitle };
+module.exports = { scanFolders, readMeta, readMetaBatch, readLyrics, readFileBuffer, isAudio, getCachedCover, setCachedCover, getDiskCover, setDiskCover, initCoverDiskCache, readWavInfo, pickWavField, cleanWavTitle, ffprobeTags };

@@ -18,7 +18,7 @@
     mounted: false,
     view: 'songs',        // songs | albums | folders | favorites | stream | pl:<id> | spl:<id>
     albumKey: null,       // 专辑详情（albums 视图点入）
-    folderKey: null,      // 文件夹详情：{root, seg}（folders 视图点入）
+    folderPath: null,     // V4.3.20：文件夹逐级浏览——当前目录绝对路径（null = 媒体库根列表）
     libFolders: [],       // 媒体库根文件夹（lib:get 缓存）
     search: '',
     playlists: [],
@@ -162,7 +162,10 @@
   function srcFileOf(t) { return (t.cue && t.cue.src) || (t.iso && t.iso.src) || t.path; }
   function albumKeyOf(t) {
     var m = trackMeta(t);
-    return m.album || ('dir:' + (t.dir || '')); // 无专辑标签时按目录分组（同目录≈同专辑）
+    /* V4.3.21：键加艺人防跨艺人同名专辑串封面；专辑缺失时退回按文件——
+     * 旧逻辑「无专辑按目录分组」在下载/混装文件夹里把整目录的歌共用一张封面（迷你/队列张冠李戴现场） */
+    if (m.album) return m.album + '|' + (m.artist || '');
+    return 'file:' + t.path;
   }
   /* 取某曲目所在专辑的封面；cb(dataURL|null)。同专辑并发请求合并，只解析一次 */
   function albumCover(t, cb) {
@@ -192,24 +195,46 @@
   }
   /* ---------- 文件夹视图：按媒体库根目录下的一级子文件夹分组（根目录本身不外显） ---------- */
   function normP(p) { return String(p || '').replace(/\//g, '\\'); }
-  function folderGroupOf(t) {
-    var p = normP(t.path);
-    for (var i = 0; i < S.libFolders.length; i++) {
-      var root = normP(S.libFolders[i]).replace(/\\+$/, '');
-      if (root && p.toLowerCase().indexOf(root.toLowerCase() + '\\') === 0) {
-        var rel = p.slice(root.length + 1);
-        var seg = rel.indexOf('\\') >= 0 ? rel.split('\\')[0] : ''; // '' = 直接放在根目录的文件
-        return { root: root, seg: seg };
+  /* V4.3.20：文件夹逐级浏览（替代原 root+seg 两层拍平）。
+   * folderRoots()：媒体库根列表（含各根递归曲目数；根外目录兜底平铺）。
+   * folderChildren(dirPath)：dirPath 的直接子文件夹列表（count 为递归曲目数）。 */
+  function folderRoots() {
+    var rows = [];
+    var idx = {};
+    (S.libFolders || []).forEach(function (f) {
+      var root = normP(f).replace(/\\+$/, '');
+      if (!root) return;
+      idx[root.toLowerCase()] = rows.length;
+      rows.push({ name: root.split('\\').pop() || root, path: root, count: 0 });
+    });
+    var extra = {};
+    allTracks().forEach(function (t) {
+      var d = normP(t.dir || '');
+      if (!d) return;
+      var dl = d.toLowerCase();
+      var hit = false;
+      for (var k in idx) {
+        if (dl === k || dl.indexOf(k + '\\') === 0) { rows[idx[k]].count++; hit = true; break; }
       }
-    }
-    return { root: '', seg: normP(t.dir || '') }; // 不在任何根目录下：退化为按所在目录分组
+      if (!hit) { // 不在任何媒体库根下（极端兜底，正常扫描不会出现）
+        if (!extra[dl]) extra[dl] = { name: d.split('\\').pop() || d, path: d, count: 0 };
+        extra[dl].count++;
+      }
+    });
+    return rows.concat(Object.keys(extra).sort().map(function (k) { return extra[k]; }));
   }
-  function folderGroups() {
+  function folderChildren(dirPath) {
+    var base = normP(dirPath).replace(/\\+$/, '');
+    var baseL = base.toLowerCase();
     var map = {};
     allTracks().forEach(function (t) {
-      var g = folderGroupOf(t);
-      var key = (g.root + '\\' + g.seg).toLowerCase();
-      if (!map[key]) map[key] = { root: g.root, seg: g.seg, count: 0 };
+      var d = normP(t.dir || '');
+      if (d.toLowerCase().indexOf(baseL + '\\') !== 0) return;
+      var rel = d.slice(base.length + 1);
+      var seg = rel.split('\\')[0];
+      if (!seg) return;
+      var key = seg.toLowerCase();
+      if (!map[key]) map[key] = { name: seg, path: base + '\\' + seg, count: 0 };
       map[key].count++;
     });
     return Object.keys(map).sort().map(function (k) { return map[k]; });
@@ -286,12 +311,9 @@
       list = paths.map(function (p) { return byPath[p]; }).filter(Boolean);
     } else if (S.view === 'albums' && S.albumKey) {
       list = list.filter(function (t) { return (trackMeta(t).album || '未知专辑') === S.albumKey; });
-    } else if (S.view === 'folders' && S.folderKey) {
-      var fk = S.folderKey;
-      list = list.filter(function (t) {
-        var g = folderGroupOf(t);
-        return g.root === fk.root && g.seg === fk.seg;
-      });
+    } else if (S.view === 'folders' && S.folderPath) {
+      var fp = normP(S.folderPath).replace(/\\+$/, '').toLowerCase();
+      list = list.filter(function (t) { return normP(t.dir || '').toLowerCase() === fp; }); // 仅本层直属文件，子目录以文件夹行呈现
     }
     if (S.search) {
       var q = S.search.toLowerCase();
@@ -399,7 +421,10 @@
   AM.albumCover = albumCover;
   AM.srcFileOf = srcFileOf;
   AM.albumKeyOf = albumKeyOf;
-  AM.folderGroups = folderGroups;
+  AM.folderGroups = folderRoots;       // V4.3.20：旧名桥接新实现（媒体库根列表）
+  AM.folderRoots = folderRoots;
+  AM.folderChildren = folderChildren;
+  AM.normP = normP;
   AM.currentTracks = currentTracks;
   AM.songSortMode = songSortMode;
   AM.refreshPlaylists = refreshPlaylists;
@@ -409,4 +434,18 @@
   AM.prev = prev;
   AM.seek = seek;
   AM.bindProgDrag = bindProgDrag;
+
+  /* V4.3.19：切歌格式 OSD（新脑暴 E）——右下胶囊显示当前格式/输出链，3.2s 淡出 */
+  var fmtOsdTimer = null;
+  function showFmtOsd(text) {
+    if (!text) return;
+    var host = document.querySelector('.am-body') || document.body;
+    var d = document.getElementById('am-fmt-osd');
+    if (!d) { d = el('div'); d.id = 'am-fmt-osd'; host.appendChild(d); }
+    d.textContent = text;
+    d.classList.add('on');
+    clearTimeout(fmtOsdTimer);
+    fmtOsdTimer = setTimeout(function () { d.classList.remove('on'); }, 3200);
+  }
+  AM.showFmtOsd = showFmtOsd;
 })();

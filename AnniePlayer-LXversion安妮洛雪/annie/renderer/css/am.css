@@ -586,6 +586,12 @@ span.am-chip { cursor:pointer; display:inline-flex; align-items:center; }
 .am-cmt-row { padding: 10px 4px; border-bottom: 1px dashed rgba(128,128,128,.18); }
 .am-cmt-text { font-size: 13px; line-height: 1.6; color: inherit; word-break: break-word; }
 .am-cmt-meta { font-size: 11px; opacity: .5; margin-top: 4px; }
+/* V4.3.20：评论文字配色分场景——沉浸抽屉恒为深色半透明底，浅色主题下 inherit 会变深字看不清 → 强制白；
+ * 浅色迷你面板是浅底（#f6f4ef），反过来强制深字 */
+.am-imm-queue .am-cmt-text { color: #fff; }
+.am-imm-queue .am-cmt-meta { color: rgba(255,255,255,.55); opacity: 1; }
+#am-root.am-light.am-mini-on .am-cmt-text { color: var(--am-text); }
+#am-root.am-light.am-mini-on .am-cmt-meta { color: var(--am-text-3); opacity: 1; }
 
 /* ================= V4.1：AM 界面动效体系 =================
  * 原则：只动 transform/opacity（GPU 合成层，不触发布局）；
@@ -651,10 +657,18 @@ html[data-motion="off"] #am-root::before {
 .am-np-prog i { transition: width .25s linear, background .15s; }
 .am-imm-fill { transition: width .25s linear; }
 .am-mini-fill { transition: width .25s linear; }
-/* 音量条 hover 展开（Apple 风：元素滑开让位） */
-.am-vol input[type="range"] { width: 0; opacity: 0;
-  transition: width var(--dur-comp) var(--ease-out), opacity var(--dur-micro); }
-.am-vol:hover input[type="range"], .am-vol input[type="range"]:focus { width: 84px; opacity: 1; }
+/* V4.3.21：音量条 hover 展开重构——旧方案 width 0→84px 布局动画在顶栏拖拽区反复触发命中重测，
+ * hover 抖动抽搐；改为绝对定位浮层，只动 opacity/位移，不挤布局 */
+.am-vol { position: relative; }
+.am-vol input[type="range"] {
+  position: absolute; left: 32px; top: 50%; transform: translateY(-50%);
+  width: 96px; height: auto; padding: 9px 8px; /* 加大命中区：裸条只有 4px 高很难点 */
+  opacity: 0; pointer-events: none; z-index: 6;
+  background: var(--am-card, rgba(28,28,34,.92)); border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.3);
+  transition: opacity var(--dur-micro);
+}
+.am-vol:hover input[type="range"], .am-vol input[type="range"]:focus { opacity: 1; pointer-events: auto; }
 /* 行内迷你按钮/弹层项补齐按压反馈 */
 .am-mini-btn { transition: opacity .12s, color .12s, transform .1s; }
 .am-mini-btn:active { transform: scale(.88); }
@@ -752,6 +766,19 @@ html[data-motion="off"] #am-root::before {
   transition: opacity .18s ease, transform .18s ease, right .25s ease, background .12s ease, color .12s ease;
 }
 .am-backtop.on { opacity: 1; pointer-events: auto; transform: none; }
+/* V4.3.19：切歌格式 OSD（底部居中，避开右下角的设备切换提示与回顶部按钮） */
+#am-fmt-osd {
+  position: absolute; left: 50%; bottom: 72px; z-index: 9;
+  max-width: min(70%, 480px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 6px 13px; border-radius: 14px; font-size: 12px;
+  border: 1px solid var(--am-sep); background: var(--am-glass-2); color: var(--am-text-2);
+  backdrop-filter: var(--am-blur); -webkit-backdrop-filter: var(--am-blur);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .25);
+  opacity: 0; transform: translateX(-50%) translateY(8px); pointer-events: none;
+  transition: opacity .25s ease, transform .25s ease;
+}
+#am-fmt-osd.on { opacity: 1; transform: translateX(-50%); }
+#am-root.am-mini-on #am-fmt-osd, #am-root.am-imm-on #am-fmt-osd { bottom: 14px; }
 .am-backtop:hover { background: var(--am-accent); color: var(--am-accent-ink); border-color: transparent; }
 #am-root.am-lyr-on .am-backtop { right: 382px; }
 /* 迷你/沉浸模式下内容区被顶栏取代，索引栏隐藏 */

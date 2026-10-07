@@ -57,6 +57,7 @@ jobs:
             [FreeBox_tvbox桌面版]="https://github.com/kknifer7/FreeBox.git"
             [motrix-extension下载]="https://github.com/motrixapp/motrix-extension.git"
             [motrix-install-assistant下载]="https://github.com/motrixapp/motrix-install-assistant.git"
+            [Motrix2.0下载官方]="https://github.com/agalwood/Motrix.git"
             
             
             

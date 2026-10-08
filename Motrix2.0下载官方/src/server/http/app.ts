@@ -1,0 +1,271 @@
+import type { EventBus } from '@core/events/event-bus'
+import type { CapabilityHost } from '@core/plugin/capabilities/interface'
+import fastifyStatic from '@fastify/static'
+import websocket from '@fastify/websocket'
+import { Commands } from '@shared/protocol/commands'
+import {
+  assertTaskInspectorActivityArguments,
+  makeProtocolFailure,
+  makeProtocolSuccess,
+} from '@shared/protocol/errors'
+import { Events } from '@shared/protocol/events'
+import type {
+  CommandHandlerMap,
+  Handler,
+  QueryHandlerMap,
+} from '@shared/protocol/handler-types'
+import { Queries } from '@shared/protocol/queries'
+import { DirectoryPreferencesResultSchema } from '@shared/schemas/directory-preferences'
+import { downloadsSettingsResultSchema } from '@shared/schemas/downloads-settings'
+import { GeneralSettingsResultSchema } from '@shared/schemas/general-settings'
+import {
+  CreateServerDirectoryResultSchema,
+  ListServerDirectoriesResultSchema,
+  ListServerDirectoryLocationsResultSchema,
+  ValidateServerDirectoryResultSchema,
+  ValidateServerFileResultSchema,
+} from '@shared/schemas/server-directory'
+import { parseTaskInspectorActivitySnapshot } from '@shared/schemas/task-inspector-activity'
+import { torrentRpcBodyLimitSchema } from '@shared/schemas/torrent-request-limits'
+import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify'
+import { bindEventHeartbeat } from './event-heartbeat'
+import { bindEventBroadcaster } from './events'
+import { type OperatorAuthOptions, registerOperatorAuth } from './operator-auth'
+import { ServiceUnavailableError } from './service-unavailable-error'
+import {
+  type CommandRequest,
+  RPC_BODY_LIMIT_BYTES,
+  registerTorrentCommandRoutes,
+} from './torrent-command-routes'
+
+export { RPC_BODY_LIMIT_BYTES } from './torrent-command-routes'
+
+const directoryResultSchemas = {
+  [Commands.SaveDownloadsSettings]: downloadsSettingsResultSchema,
+  [Queries.GetDownloadsSettingsDraft]: downloadsSettingsResultSchema,
+  [Commands.MutateDirectoryPreferences]: DirectoryPreferencesResultSchema,
+  [Commands.SaveGeneralSettings]: GeneralSettingsResultSchema,
+  [Queries.GetGeneralSettingsDraft]: GeneralSettingsResultSchema,
+  [Queries.GetDirectoryPreferences]: DirectoryPreferencesResultSchema,
+  [Queries.ListServerDirectoryLocations]:
+    ListServerDirectoryLocationsResultSchema,
+  [Commands.CreateServerDirectory]: CreateServerDirectoryResultSchema,
+  [Queries.ListServerDirectories]: ListServerDirectoriesResultSchema,
+  [Queries.ValidateServerFile]: ValidateServerFileResultSchema,
+  [Queries.ValidateServerDirectory]: ValidateServerDirectoryResultSchema,
+}
+
+async function directoryRpc(
+  channel: string,
+  body: unknown,
+  handler: Handler
+): Promise<unknown> {
+  const schema =
+    directoryResultSchemas[channel as keyof typeof directoryResultSchemas]
+  const args =
+    typeof body === 'object' && body !== null && 'args' in body
+      ? body.args
+      : undefined
+  if (
+    !Array.isArray(args) ||
+    args.length !== 1 ||
+    Object.keys(body as object).some((key) => key !== 'args')
+  ) {
+    return { ok: false, error: { code: 'invalidPath' } }
+  }
+  try {
+    return schema.parse(await handler(args[0]))
+  } catch {
+    return {
+      ok: false,
+      error: {
+        code:
+          channel === Commands.CreateServerDirectory
+            ? 'creationOutcomeUnknown'
+            : 'unavailable',
+      },
+    }
+  }
+}
+
+export interface AppOptions {
+  /** Torrent-only RPC budget; defaults to 8 MiB, configurable from 2 to 64 MiB. */
+  torrentBodyLimitBytes?: number
+  commandHandlers?: CommandHandlerMap
+  queryHandlers?: QueryHandlerMap
+  /**
+   * When set, gates the control plane (`/rpc/*`, `/api/*`, `/rpc/events`) on the
+   * machine-owner operator token (Spec 9). Omitting it leaves the app open —
+   * only for unit tests / embedding; the server entry ALWAYS provides it.
+   */
+  operatorAuth?: OperatorAuthOptions
+  /**
+   * `bridge:*` command/query handlers (Spec 7b). Kept separate from the generic
+   * Command/Query maps because bridge channels have their own prefix + types.
+   * The route falls back to these. Passed by reference so the server can
+   * populate them AFTER the (non-fatal, later-bootstrapped) bridge comes up.
+   */
+  bridgeCommandHandlers?: Record<string, Handler>
+  bridgeQueryHandlers?: Record<string, Handler>
+  eventBus?: EventBus
+  pluginLogSource?: Pick<CapabilityHost, 'subscribeLog'>
+  rendererDir?: string
+  healthCheck?: () => { ok: boolean } | Promise<{ ok: boolean }>
+}
+
+export async function createApp(
+  opts: AppOptions = {}
+): Promise<FastifyInstance> {
+  const app = Fastify({
+    logger: false,
+    bodyLimit: RPC_BODY_LIMIT_BYTES,
+    requestTimeout: 120_000,
+  })
+  // Register the deny-by-default operator gate FIRST so its onRequest hook runs
+  // before every route (including /api/* added by the caller post-createApp and
+  // the /rpc/events WS upgrade).
+  const operatorSessions = opts.operatorAuth
+    ? registerOperatorAuth(app, opts.operatorAuth)
+    : undefined
+  if (!operatorSessions) {
+    app.get('/rpc/auth/status', async () => ({
+      authed: true,
+      mode: 'unrestricted',
+      canLogout: false,
+    }))
+  }
+  const commands = opts.commandHandlers ?? {}
+  const queries = opts.queryHandlers ?? {}
+  const bridgeCommands = opts.bridgeCommandHandlers ?? {}
+  const bridgeQueries = opts.bridgeQueryHandlers ?? {}
+
+  app.get('/healthz', async (_request, reply) => {
+    const health = opts.healthCheck ? await opts.healthCheck() : { ok: true }
+    return reply.code(health.ok ? 200 : 503).send(health)
+  })
+
+  const dispatchCommand = async (
+    channel: string,
+    req: CommandRequest,
+    reply: FastifyReply
+  ) => {
+    const handler =
+      commands[channel as keyof typeof commands] ?? bridgeCommands[channel]
+    if (!handler) return reply.code(404).send({ error: 'unknown channel' })
+    if (
+      channel === Commands.CreateServerDirectory ||
+      channel === Commands.MutateDirectoryPreferences ||
+      channel === Commands.SaveGeneralSettings ||
+      channel === Commands.SaveDownloadsSettings
+    ) {
+      return directoryRpc(channel, req.body, handler)
+    }
+    try {
+      return await handler(...(req.body?.args ?? []))
+    } catch (err) {
+      req.log.error({ err }, 'command handler failed')
+      return reply
+        .code(err instanceof ServiceUnavailableError ? 503 : 500)
+        .send({ error: (err as Error).message })
+    }
+  }
+
+  await registerTorrentCommandRoutes(
+    app,
+    dispatchCommand,
+    torrentRpcBodyLimitSchema.parse(opts.torrentBodyLimitBytes)
+  )
+  app.post<{ Params: { channel: string }; Body: { args?: unknown[] } }>(
+    '/rpc/command/:channel',
+    (req, reply) => dispatchCommand(req.params.channel, req, reply)
+  )
+
+  app.post<{ Params: { channel: string }; Body: { args?: unknown[] } }>(
+    '/rpc/query/:channel',
+    async (req, reply) => {
+      const usesSharedEnvelope =
+        req.params.channel === Queries.GetTaskInspectorActivity
+      const handler =
+        queries[req.params.channel as keyof typeof queries] ??
+        bridgeQueries[req.params.channel]
+      if (!handler) return reply.code(404).send({ error: 'unknown channel' })
+      if (
+        req.params.channel === Queries.ListServerDirectories ||
+        req.params.channel === Queries.ValidateServerDirectory ||
+        req.params.channel === Queries.ValidateServerFile ||
+        req.params.channel === Queries.GetDirectoryPreferences ||
+        req.params.channel === Queries.GetGeneralSettingsDraft ||
+        req.params.channel === Queries.GetDownloadsSettingsDraft ||
+        req.params.channel === Queries.ListServerDirectoryLocations
+      ) {
+        return directoryRpc(req.params.channel, req.body, handler)
+      }
+      try {
+        const args = req.body?.args
+        if (usesSharedEnvelope) {
+          assertTaskInspectorActivityArguments(args)
+        }
+        const value = await handler(...(args ?? []))
+        if (!usesSharedEnvelope) return value
+        const snapshot = parseTaskInspectorActivitySnapshot(value)
+        if (!snapshot) {
+          throw new Error('Invalid Task Inspector Activity snapshot')
+        }
+        return makeProtocolSuccess(snapshot)
+      } catch (err) {
+        req.log.error({ err }, 'query handler failed')
+        if (usesSharedEnvelope) {
+          return reply.code(200).send(makeProtocolFailure(err))
+        }
+        return reply
+          .code(err instanceof ServiceUnavailableError ? 503 : 500)
+          .send({ error: (err as Error).message })
+      }
+    }
+  )
+
+  if (opts.eventBus) {
+    const broadcaster = bindEventBroadcaster(opts.eventBus)
+    const unsubscribePluginLogs = opts.pluginLogSource?.subscribeLog(
+      (pluginId, entry) => {
+        broadcaster.broadcast(`${Events.PluginLog}:${pluginId}`, [entry])
+      }
+    )
+    if (unsubscribePluginLogs) {
+      app.addHook('onClose', async () => unsubscribePluginLogs())
+    }
+    await app.register(websocket)
+    app.get('/rpc/events', { websocket: true }, (socket, request) => {
+      const session = operatorSessions?.bindSocket(request, socket)
+      broadcaster.register(socket, session?.eligible)
+      const stopHeartbeat = bindEventHeartbeat(socket)
+      const cleanup = () => {
+        stopHeartbeat()
+        broadcaster.unregister(socket)
+        session?.dispose()
+      }
+      socket.on('close', cleanup)
+      socket.on('error', cleanup)
+    })
+  }
+
+  if (opts.rendererDir) {
+    await app.register(fastifyStatic, {
+      root: opts.rendererDir,
+      prefix: '/',
+      wildcard: false,
+    })
+    // SPA fallback: return index.html for any GET that isn't /rpc/* or /healthz.
+    app.setNotFoundHandler(async (req, reply) => {
+      const isGet = req.method === 'GET'
+      const isRpc = req.url.startsWith('/rpc/')
+      const isHealth = req.url === '/healthz'
+      if (isGet && !isRpc && !isHealth) {
+        return reply.sendFile('index.html')
+      }
+      return reply.code(404).send({ error: 'not found' })
+    })
+  }
+
+  return app
+}

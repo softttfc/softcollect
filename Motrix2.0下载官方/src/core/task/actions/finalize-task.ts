@@ -1,0 +1,1411 @@
+import path from 'node:path'
+import { newEngineTaskId } from '@core/lib/ids'
+import type { HookAuditLog } from '@core/plugin/hooks/audit-log'
+import type { HookOrchestrator } from '@core/plugin/hooks/hook-orchestrator'
+import type { StagedMetadataOp } from '@core/plugin/hooks/staged-effects'
+import { AppError, DownloadErrorCode, ErrorCode } from '@shared/errors'
+import { Events } from '@shared/protocol/events'
+import type {
+  BeforeFinalizeContextDTO,
+  PluginHookTask,
+} from '@shared/types/plugin-hooks'
+import type { DownloadTask, TaskFile } from '@shared/types/task'
+import { TaskStatus, TransitionPhase } from '@shared/types/task'
+import { isTorrentLike } from '@shared/types/task-actions'
+import {
+  TaskActivityAccuracy,
+  type TaskActivityRecorder,
+} from '@shared/types/task-activity'
+import type { TaskOccurrence } from '@shared/types/task-occurrence'
+import type Database from 'better-sqlite3'
+import type { AddTorrentParams } from '../../engine/engine-adapter'
+import { applyTerminalTransition } from '../apply-terminal-transition'
+import {
+  buildBtDirectOutputPaths,
+  buildFinalOutputFilePaths,
+  getBtDirectStorageLayout,
+  getBtPayloadPath,
+  getBtStorageLayout,
+  markBtDirectOutputFinalized,
+  parseBtFileLayout,
+} from '../bt-storage-layout'
+import { settleBtUpload } from '../bt-upload-settlement'
+import type { FinalNamePicker } from '../final-name-picker'
+import { resolvePublishedTargetPath } from '../finalize-target-name'
+import { fireAfterComplete, fireOnError } from '../hook-dispatch'
+import { normalizeTerminalRuntimeMetrics } from '../normalize-terminal-runtime-metrics'
+import type { OccurrenceDispatcher } from '../occurrences/occurrence-dispatcher'
+import {
+  applyCompletedTaskAfterRename,
+  applyTerminalStatusToTask,
+  completeTaskAfterRename,
+  pickPrimaryInstance,
+  setTaskTransitionPhase,
+  syncPrimaryInstanceIdentity,
+} from '../task-instance'
+import {
+  buildTerminalOccurrence,
+  commitTerminalTaskTransition,
+  getTaskOrWarn,
+  recordTaskTransitionOrWarn,
+  type TaskTransitionRecordInput,
+  terminalSnapshotFromTask,
+} from './shared'
+
+const finalizationsInFlight = new Set<string>()
+
+export interface FinalizeTaskDeps {
+  taskManager: {
+    getById(id: string): DownloadTask | undefined
+    getAll(): DownloadTask[]
+    set(id: string, task: DownloadTask): void
+    setReservedEngineTaskOwner(
+      id: string,
+      task: DownloadTask,
+      engineTaskId: string
+    ): void
+    reserveEngineTaskId(engineTaskId: string): void
+    releaseEngineTaskIdReservation(engineTaskId: string): boolean
+    retireEngineTaskIdReservation(engineTaskId: string): boolean
+    persist(task: DownloadTask): Promise<void>
+  }
+  /**
+   * Persist a task and (when non-null) its terminal occurrence in a single
+   * durable transaction — used INSTEAD OF `taskManager.persist` whenever a
+   * status transition qualifies for an occurrence (see
+   * `buildTerminalOccurrence`). Optional so tests that don't care about
+   * occurrences can omit it; absence degrades to plain `taskManager.persist`.
+   */
+  persistTaskWithOccurrence?: (
+    task: DownloadTask,
+    occurrence: TaskOccurrence | null
+  ) => Promise<void>
+  /** Delivers a just-committed terminal occurrence to in-process consumers.
+   *  Narrowed to `dispatch` so tests can supply a plain `{ dispatch }`
+   *  double. */
+  occurrenceDispatcher?: Pick<OccurrenceDispatcher, 'dispatch'>
+  /**
+   * Coalesced TaskUpdated publication (TaskUpdatePublisher.publish) for
+   * non-terminal states (Finalizing, Seeding) and its immediate variant
+   * (publishNow) for every path that lands in Completed/Error or must
+   * broadcast before throwing — the renderer learns about finalize-side
+   * failures only through these (no poll observes stopped rows).
+   */
+  publishTaskUpdate: () => void
+  publishTaskUpdateNow: () => void
+  adapter: {
+    removeDownloadResult(engineTaskId: string): Promise<void>
+    forceRemoveTask(engineTaskId: string): Promise<void>
+    getUploadLength(engineTaskId: string): Promise<number>
+    // Pull the live aria2 view of this gid. Used by finalizeHttp to refresh
+    // byte counters BEFORE removeDownloadResult retires the gid — fixes the
+    // super-tiny HTTP race where the download finished faster than the
+    // polling tick that would have observed totalLength/completedLength.
+    getTaskStatus(engineTaskId: string): Promise<DownloadTask | null>
+    // Snapshot the live file list (path + selected flag) BEFORE the gid is
+    // retired — aria2 drops the RequestGroup once forceRemove fires, so
+    // we cannot query selected after that point. Used to compute the
+    // unselected cleanup set in finalizeBt.
+    getTaskFiles(engineTaskId: string): Promise<TaskFile[]>
+    addTorrent(params: AddTorrentParams): Promise<string>
+  }
+  fs: {
+    renameAtomic(src: string, dst: string): Promise<void>
+    // Idempotent: ignores ENOENT so the unselected cleanup is safe to
+    // run even when aria2's own `bt-remove-unselected-file=true` already
+    // deleted the file (race-free overlap).
+    removePathRecursive(absPath: string): Promise<void>
+  }
+  torrentMetaStore: {
+    read(metaPath: string): Promise<Uint8Array>
+  }
+  /** Rebase persisted task_files after the staging payload is renamed. */
+  rebaseTaskFilePaths?: (
+    taskId: string,
+    sourceRoot: string,
+    finalRoot: string
+  ) => void
+  settings: {
+    get(): { bt: { seedTime: number; seedRatio: number } }
+  }
+  eventBus: {
+    emit(event: string, payload: unknown): void
+  }
+  activityRecorder: TaskActivityRecorder
+  log: {
+    info(ctx: Record<string, unknown>, msg: string): void
+    warn(ctx: Record<string, unknown>, msg: string): void
+    error(ctx: Record<string, unknown>, msg: string): void
+  }
+  // Optional plugin-hook plumbing (Plan C / T15). Same backward-compat
+  // contract as CreateTaskDeps: all three must be set for the chain to
+  // fire; absence is a clean no-op.
+  orchestrator?: HookOrchestrator
+  auditLog?: HookAuditLog
+  db?: Database.Database
+  recordTransition?: (input: TaskTransitionRecordInput) => void | Promise<void>
+  runTaskMutation?: <T>(
+    taskIds: readonly string[],
+    operation: () => Promise<T>
+  ) => Promise<T>
+  monotonicNow?: () => number
+  createEngineTaskId?: () => string
+  /** Production FS+journal+task transaction. Tests may omit for legacy IO. */
+  /**
+   * Re-deduplicates a final name that sanitization changed. Optional so tests
+   * that never publish an unsafe name can omit it.
+   */
+  finalNamePicker?: Pick<FinalNamePicker, 'pick'>
+  commitFinalizedArtifact?: (
+    input: FinalizeArtifactCommitRequest
+  ) => Promise<void>
+}
+
+export interface FinalizeArtifactCommitRequest {
+  task: DownloadTask
+  occurrence: TaskOccurrence | null
+  sourcePath: string
+  targetPath: string
+  replacement?: { pluginId: string; stagedPath: string }
+  metadataOps: readonly StagedMetadataOp[]
+  contributors: readonly string[]
+  fileRebase?: { sourceRoot: string; targetRoot: string }
+}
+
+export async function finalizeTask(
+  taskId: string,
+  deps: FinalizeTaskDeps
+): Promise<void> {
+  const finalize = () => finalizeTaskSerialized(taskId, deps)
+  await (deps.runTaskMutation
+    ? deps.runTaskMutation([taskId], finalize)
+    : finalize())
+}
+
+async function finalizeTaskSerialized(
+  taskId: string,
+  deps: FinalizeTaskDeps
+): Promise<void> {
+  const publishedTask = getTaskOrWarn(deps, taskId, 'finalizeTask')
+  if (!publishedTask) return
+  const task = structuredClone(publishedTask)
+
+  const alreadyOutputReady =
+    getBtDirectStorageLayout(task)?.finalized !== false &&
+    task.transitionPhase === TransitionPhase.Idle &&
+    task.diskPath === task.finalPath &&
+    (task.status === TaskStatus.Completed || task.status === TaskStatus.Seeding)
+  if (alreadyOutputReady || finalizationsInFlight.has(taskId)) {
+    deps.log.info(
+      {
+        taskId,
+        status: task.status,
+        transitionPhase: task.transitionPhase,
+        alreadyOutputReady,
+      },
+      'finalize_skipped'
+    )
+    return
+  }
+
+  finalizationsInFlight.add(taskId)
+  try {
+    deps.log.info(
+      { taskId, type: task.type, fromPhase: task.transitionPhase },
+      'finalize_started'
+    )
+
+    if (isTorrentLike(task)) {
+      await finalizeBt(task, deps)
+    } else {
+      await finalizeHttp(task, deps)
+    }
+  } catch (err) {
+    // The last durable snapshot, not the working candidate, decides whether
+    // this is an unfinished rename. Never demote an already committed output
+    // because a later notification or reseed operation failed.
+    const current = deps.taskManager.getById(taskId)
+    if (
+      current?.transitionPhase === TransitionPhase.Renaming &&
+      current.status !== TaskStatus.Error &&
+      (current.diskPath !== current.finalPath ||
+        getBtDirectStorageLayout(current)?.finalized === false)
+    ) {
+      try {
+        await failFinalize(structuredClone(current), deps, {
+          errorMessage: (err as Error).message,
+          errorDetailKey: 'task.error.detail.finalizeFailed',
+          errorDetailParams: { cause: (err as Error).message },
+          hookCode: ErrorCode.TaskFinalizeFailed,
+          errorCode: DownloadErrorCode.Unknown,
+        })
+      } catch (persistError) {
+        deps.log.error(
+          { taskId, err, persistError },
+          'finalize_failure_persistence_failed'
+        )
+      }
+    }
+    throw err
+  } finally {
+    finalizationsInFlight.delete(taskId)
+  }
+}
+
+async function finalizeHttp(
+  task: DownloadTask,
+  deps: FinalizeTaskDeps
+): Promise<void> {
+  const statusBeforeFinalize = task.status
+  Object.assign(task, applyTerminalTransition(task, TaskStatus.Finalizing))
+  setTaskTransitionPhase(task, TransitionPhase.Renaming)
+  syncCompletionMetrics(task)
+  syncPrimaryInstanceIdentity(task)
+  await persistTaskTransition(task, statusBeforeFinalize, deps)
+  deps.publishTaskUpdateNow()
+
+  // Plan C plugin-hook chain: beforeFinalize. Eligible plugins can request
+  // a different final filePath (e.g. ffmpeg-transcode plugin) and stage
+  // metadata that will be committed alongside the rename. Aborted chains
+  // skip the rename entirely and mark the task Error.
+  const finalizeOutcome = await runBeforeFinalize(task, deps)
+  if (finalizeOutcome.aborted) {
+    const cause = finalizeOutcome.reason
+    await failFinalize(task, deps, {
+      errorMessage: `plugin chain aborted: ${cause}`,
+      errorDetailKey: 'task.error.detail.pluginChainAborted',
+      errorDetailParams: { cause },
+      hookCode: 'PLUGIN_RUNTIME_FAULT',
+    })
+    return
+  }
+  // The final name can arrive from Content-Disposition or plugin hooks with
+  // characters that Windows or exFAT volumes cannot reopen; sanitize only the
+  // final component, and re-deduplicate it, before any rename or durable
+  // commit consumes it.
+  const desiredFinalPath = await resolvePublishedTargetPath(
+    finalizeOutcome.finalFilePath ?? task.finalPath,
+    deps.finalNamePicker
+  )
+  const renameSource = task.diskPath
+  if (!deps.commitFinalizedArtifact) {
+    await persistDesiredFinalPath(task, desiredFinalPath, deps)
+  }
+
+  // Refresh byte counters and piece length from aria2 BEFORE
+  // removeDownloadResult retires the gid. The polling loop only sees
+  // active/waiting tasks, so a
+  // super-tiny HTTP download that completes between two ticks never gets
+  // its totalLength/completedLength merged into our task — finalize would
+  // then persist `Completed` with `totalBytes=0`, leaving the UI showing
+  // `Size 0 / 0%`. Pull once here so syncCompletionMetrics has real
+  // numbers to seal. Best-effort: any failure (race with another retire,
+  // RPC error) is logged and we fall through with whatever we already had.
+  await refreshTaskBytesBeforeFinalize(task, deps)
+
+  // removeDownloadResult before rename so aria2 releases the file
+  // handle — on Windows an open handle causes a sharing violation.
+  await deps.adapter.removeDownloadResult(task.engineTaskId)
+
+  if (deps.commitFinalizedArtifact) {
+    try {
+      await commitHttpArtifactDurably(
+        task,
+        renameSource,
+        desiredFinalPath,
+        finalizeOutcome,
+        deps
+      )
+      return
+    } catch (e) {
+      const cause = (e as Error).message
+      const errorMessage = `Failed to commit finalized file: ${cause}`
+      await failFinalize(task, deps, {
+        errorMessage,
+        errorDetailKey: 'task.error.detail.renameFileFailed',
+        errorDetailParams: { cause },
+        hookCode: 'TASK_FINALIZE_RENAME_FAILED',
+      })
+      throw new AppError(ErrorCode.TaskFinalizeRenameFailed, errorMessage, e)
+    }
+  }
+
+  try {
+    await deps.fs.renameAtomic(renameSource, desiredFinalPath)
+  } catch (e) {
+    const cause = (e as Error).message
+    const errorMessage = `Failed to rename file: ${cause}`
+    await failFinalize(task, deps, {
+      errorMessage,
+      errorDetailKey: 'task.error.detail.renameFileFailed',
+      errorDetailParams: { cause },
+      hookCode: 'TASK_FINALIZE_RENAME_FAILED',
+    })
+    throw new AppError(ErrorCode.TaskFinalizeRenameFailed, errorMessage, e)
+  }
+  const completedAt = Date.now()
+
+  // task_files stores aria2's physical path while a direct download is in
+  // progress. Keep that durable structure aligned with the rename so restored
+  // completed tasks no longer point at the retired `.motrix` staging file.
+  // The Files query also projects a logical display name while downloading;
+  // this rebase fixes the underlying persisted path after completion.
+  try {
+    deps.rebaseTaskFilePaths?.(task.id, renameSource, desiredFinalPath)
+  } catch (err) {
+    deps.log.warn(
+      { err, taskId: task.id },
+      'finalize_http_task_file_path_rebase_failed'
+    )
+  }
+
+  // Commit staged plugin metadata now that rename succeeded. The SQLite
+  // tx body itself is empty here — the rename happened outside the tx
+  // (it's async IO; SQLite transactions must complete synchronously).
+  try {
+    finalizeOutcome.commit(() => {})
+  } catch (err) {
+    deps.log.warn(
+      { taskId: task.id, err: (err as Error).message },
+      'finalize_http_metadata_commit_failed'
+    )
+  }
+
+  task.finalPath = desiredFinalPath
+  const previousStatus = task.status
+  completeTaskAfterRename(
+    task,
+    desiredFinalPath,
+    completedAt,
+    deps.activityRecorder
+  )
+  syncCompletionMetrics(task)
+  await persistTaskTransition(task, previousStatus, deps, completedAt)
+
+  deps.publishTaskUpdateNow()
+  deps.log.info({ taskId: task.id }, 'finalize_http_completed')
+  fireAfterComplete(deps, task, 'finalize')
+}
+
+async function commitHttpArtifactDurably(
+  task: DownloadTask,
+  renameSource: string,
+  desiredFinalPath: string,
+  finalizeOutcome: BeforeFinalizeOutcomeCommit,
+  deps: FinalizeTaskDeps
+): Promise<void> {
+  const completedAt = Date.now()
+  const previousStatus = task.status
+  const completedTask = structuredClone(task)
+  completedTask.finalPath = desiredFinalPath
+  applyCompletedTaskAfterRename(completedTask, desiredFinalPath, completedAt)
+  syncCompletionMetrics(completedTask)
+  normalizeTerminalRuntimeMetrics(completedTask)
+  const occurrence = buildTerminalOccurrence(
+    terminalSnapshotFromTask(completedTask),
+    previousStatus,
+    'finalize',
+    completedAt
+  )
+  if (!occurrence)
+    throw new Error('HTTP finalize did not produce an occurrence')
+  await deps.commitFinalizedArtifact?.({
+    task: completedTask,
+    occurrence,
+    sourcePath: renameSource,
+    targetPath: desiredFinalPath,
+    replacement: finalizeOutcome.replacement,
+    metadataOps: finalizeOutcome.metadataOps,
+    contributors: finalizeOutcome.contributors,
+    fileRebase: {
+      sourceRoot: renameSource,
+      targetRoot: desiredFinalPath,
+    },
+  })
+  deps.activityRecorder.recordDownloadCompleted({
+    taskId: completedTask.id,
+    occurredAt: completedAt,
+  })
+  deps.taskManager.set(completedTask.id, structuredClone(completedTask))
+  await recordTaskTransitionOrWarn(completedTask, previousStatus, deps, {
+    occurredAt: completedAt,
+    accuracy: TaskActivityAccuracy.Exact,
+    occurrenceId: occurrence.occurrenceId,
+    failureMessage: FINALIZE_RECORD_FAILURE_MESSAGE,
+  })
+  await deps.occurrenceDispatcher?.dispatch(occurrence)
+  deps.eventBus.emit(Events.TaskFilesUpdated, { taskId: completedTask.id })
+  deps.publishTaskUpdateNow()
+  deps.log.info({ taskId: completedTask.id }, 'finalize_http_completed')
+}
+
+/**
+ * Sync byte counters to 100% completion at terminal-state transitions.
+ *
+ * aria2's `onDownloadComplete` / `onBtDownloadComplete` only fire after
+ * the file is fully on disk, but the polling tick that would carry the
+ * final `downloadedBytes === totalBytes` value can race the event —
+ * for fast downloads, finalize runs before the next poll and the task
+ * persists as Completed (or Seeding) at some sub-100% progress. Once
+ * `removeDownloadResult` retires the gid, those values become permanent
+ * and the UI shows e.g. "Completed · 87%" forever. Sync defensively at
+ * every Completed/Seeding hand-off.
+ *
+ * Chunked-encoding fallback: when `totalBytes` is still 0 but the file
+ * IS on disk (we got here via onDownloadComplete) and we have a non-zero
+ * `downloadedBytes`, treat the received bytes as the authoritative total.
+ * This covers HTTP responses that finished without ever carrying a
+ * Content-Length header. Without this fallback the UI would show
+ * `Size 0 / 0%` forever despite the file being valid on disk.
+ */
+function syncCompletionMetrics(task: DownloadTask): void {
+  if (task.totalBytes > 0) {
+    task.downloadedBytes = task.totalBytes
+    task.sizeWhenDone = task.totalBytes
+    task.progress = 1
+    return
+  }
+  if (task.downloadedBytes > 0) {
+    task.totalBytes = task.downloadedBytes
+    task.sizeWhenDone = task.downloadedBytes
+    task.progress = 1
+  }
+}
+
+/**
+ * Best-effort refresh of byte counters from aria2 just before the gid is
+ * retired. Only fills fields the caller still has at zero — anything the
+ * polling loop already wrote stays as-is (same "0 never overwrites
+ * non-zero" invariant nonZeroMerge enforces on the hot path).
+ *
+ * Failures (RPC error, gid already gone, stub adapter in tests) are
+ * swallowed: the caller's existing task state remains the source of
+ * truth and syncCompletionMetrics will still do what it can.
+ */
+async function refreshTaskBytesBeforeFinalize(
+  task: DownloadTask,
+  deps: FinalizeTaskDeps
+): Promise<void> {
+  try {
+    const refreshed = await deps.adapter.getTaskStatus(task.engineTaskId)
+    if (!refreshed) return
+    if (task.totalBytes === 0 && refreshed.totalBytes > 0) {
+      task.totalBytes = refreshed.totalBytes
+    }
+    if (task.downloadedBytes === 0 && refreshed.downloadedBytes > 0) {
+      task.downloadedBytes = refreshed.downloadedBytes
+    }
+    if (task.sizeWhenDone === 0 && refreshed.sizeWhenDone > 0) {
+      task.sizeWhenDone = refreshed.sizeWhenDone
+    }
+    if (task.pieceLength === 0 && refreshed.pieceLength > 0) {
+      task.pieceLength = refreshed.pieceLength
+    }
+  } catch (err) {
+    deps.log.warn(
+      { err, taskId: task.id, gid: task.engineTaskId },
+      'finalize_http_pre_refresh_failed'
+    )
+  }
+}
+
+async function finalizeBt(
+  task: DownloadTask,
+  deps: FinalizeTaskDeps
+): Promise<void> {
+  if (
+    task.transitionPhase === TransitionPhase.Reseeding &&
+    task.diskPath === task.finalPath
+  ) {
+    const detectedAt = Date.now()
+    deps.activityRecorder.recordDownloadCompleted({
+      taskId: task.id,
+      occurredAt: detectedAt,
+      accuracy: TaskActivityAccuracy.Recovered,
+    })
+    await finalizeBtAfterRename(task, deps, detectedAt, [])
+    return
+  }
+
+  const recovering = task.transitionPhase !== TransitionPhase.Idle
+  const previousStatus = task.status
+  Object.assign(task, applyTerminalTransition(task, TaskStatus.Finalizing))
+  setTaskTransitionPhase(task, TransitionPhase.Renaming)
+  syncPrimaryInstanceIdentity(task)
+  await persistTaskTransition(task, previousStatus, deps)
+  deps.publishTaskUpdate()
+
+  // Plan C plugin-hook chain: beforeFinalize. Same contract as the HTTP
+  // branch — eligible plugins can request a different finalPath; aborted
+  // chains skip the rename and mark Error.
+  const finalizeOutcome = await runBeforeFinalize(task, deps)
+  if (finalizeOutcome.aborted) {
+    const cause = finalizeOutcome.reason
+    await failFinalize(task, deps, {
+      errorMessage: `plugin chain aborted: ${cause}`,
+      errorDetailKey: 'task.error.detail.pluginChainAborted',
+      errorDetailParams: { cause },
+      hookCode: 'PLUGIN_RUNTIME_FAULT',
+    })
+    return
+  }
+  const desiredFinalPath = finalizeOutcome.finalFilePath ?? task.finalPath
+  if (
+    getBtDirectStorageLayout(task) &&
+    desiredFinalPath === task.diskPath &&
+    !finalizeOutcome.replacement
+  ) {
+    await finalizeBtInPlace(task, deps, finalizeOutcome, previousStatus)
+    return
+  }
+  // Same publication rule as HTTP. DurableFinalizeRuntime would sanitize the
+  // target anyway, but only here does the task row learn the name it lands
+  // under.
+  const publishedFinalPath = await resolvePublishedTargetPath(
+    desiredFinalPath,
+    deps.finalNamePicker
+  )
+  if (!deps.commitFinalizedArtifact) {
+    await persistDesiredFinalPath(task, publishedFinalPath, deps)
+  }
+  const storageLayout = getBtStorageLayout(task)
+  const stagingPayloadPath = getBtPayloadPath(task)
+  const renameSource = stagingPayloadPath ?? task.diskPath
+
+  // Settle the retiring gid's contribution INTO the baseline before we
+  // forceRemove it. Two reasons:
+  //   1. once forceRemove fires, the runtime row is gone and uploadLength
+  //      is no longer queryable;
+  //   2. the new gid that addTorrent returns will start its own
+  //      uploadLength at 0, so without an updated baseline the next
+  //      polling tick would clobber the prior session's bytes via
+  //      `mergeEngineTask` (uploadedBytes = baseline + currentGidUpload).
+  // Note: do NOT touch `task.uploadedBytes` directly with `+= upload`
+  // here — `task.uploadedBytes` is already the live display value
+  // (baseline + oldGid.uploadLength) so adding `upload` again would
+  // double-count. Sync it from the new baseline instead; the new gid
+  // contributes 0 at this point.
+  const upload = await deps.adapter.getUploadLength(task.engineTaskId)
+  settleBtUpload(task, upload, recovering)
+  await persistTaskState(task, deps)
+
+  // Snapshot unselected files BEFORE forceRemove. aria2 drops the
+  // RequestGroup once forceRemove fires, so `getTaskFiles` would return
+  // empty (or throw) afterwards. We use this snapshot post-rename to
+  // belt-and-braces clean any unselected files that aria2's own
+  // `--bt-remove-unselected-file=true` cleanup may have raced past
+  // (cleanup can run on a later event-loop tick than forceRemove
+  // returns; if rename happens in between, aria2 looks at the old
+  // staging location and silent-skips). All paths are absolute, rooted at the
+  // actual payload path; we relativize so we can re-apply under finalPath.
+  const unselectedRelPaths = await snapshotUnselectedRelPaths(
+    task,
+    deps,
+    renameSource
+  )
+
+  // Stop the active seeding task BEFORE rename + re-add. `removeDownloadResult`
+  // alone is insufficient: it only clears tasks already in stopped/error/
+  // removed state, so an active seeder would survive in aria2 and reappear
+  // as an orphan task on the next polling tick. forceRemove only requests a
+  // stop; result cleanup waits out that transition before the rename begins.
+  try {
+    await deps.adapter.forceRemoveTask(task.engineTaskId)
+  } catch (err) {
+    deps.log.warn(
+      { err, taskId: task.id, gid: task.engineTaskId },
+      'finalize_bt_force_remove_failed'
+    )
+  }
+  await deps.adapter.removeDownloadResult(task.engineTaskId)
+
+  const completedAt = Date.now()
+
+  if (deps.commitFinalizedArtifact) {
+    const renamedTask = structuredClone(task)
+    applyBtTaskAfterRename(renamedTask, publishedFinalPath)
+    try {
+      await deps.commitFinalizedArtifact({
+        task: renamedTask,
+        occurrence: null,
+        sourcePath: renameSource,
+        targetPath: publishedFinalPath,
+        replacement: finalizeOutcome.replacement,
+        metadataOps: finalizeOutcome.metadataOps,
+        contributors: finalizeOutcome.contributors,
+        fileRebase: {
+          sourceRoot: renameSource,
+          targetRoot: publishedFinalPath,
+        },
+      })
+      Object.assign(task, structuredClone(renamedTask))
+      deps.taskManager.set(task.id, structuredClone(task))
+      deps.eventBus.emit(Events.TaskFilesUpdated, { taskId: task.id })
+    } catch (e) {
+      const cause = (e as Error).message
+      const errorMessage = `Failed to commit finalized directory: ${cause}`
+      await failFinalize(task, deps, {
+        errorMessage,
+        errorDetailKey: 'task.error.detail.renameDirFailed',
+        errorDetailParams: { cause },
+        hookCode: 'TASK_FINALIZE_RENAME_FAILED',
+      })
+      throw new AppError(ErrorCode.TaskFinalizeRenameFailed, errorMessage, e)
+    }
+  } else {
+    try {
+      await deps.fs.renameAtomic(renameSource, publishedFinalPath)
+    } catch (e) {
+      const cause = (e as Error).message
+      const errorMessage = `Failed to rename directory: ${cause}`
+      await failFinalize(task, deps, {
+        errorMessage,
+        errorDetailKey: 'task.error.detail.renameDirFailed',
+        errorDetailParams: { cause },
+        hookCode: 'TASK_FINALIZE_RENAME_FAILED',
+      })
+      throw new AppError(ErrorCode.TaskFinalizeRenameFailed, errorMessage, e)
+    }
+    try {
+      deps.rebaseTaskFilePaths?.(task.id, renameSource, publishedFinalPath)
+    } catch (err) {
+      deps.log.warn(
+        { err, taskId: task.id },
+        'finalize_bt_task_file_path_rebase_failed'
+      )
+    }
+    try {
+      finalizeOutcome.commit(() => {})
+    } catch (err) {
+      deps.log.warn(
+        { taskId: task.id, err: (err as Error).message },
+        'finalize_bt_metadata_commit_failed'
+      )
+    }
+    applyBtTaskAfterRename(task, publishedFinalPath)
+    await persistTaskState(task, deps)
+  }
+
+  if (
+    storageLayout &&
+    !isSameOrDescendant(publishedFinalPath, storageLayout.workspacePath)
+  ) {
+    try {
+      await deps.fs.removePathRecursive(storageLayout.workspacePath)
+    } catch (err) {
+      deps.log.warn(
+        { err, taskId: task.id, workspacePath: storageLayout.workspacePath },
+        'finalize_bt_workspace_cleanup_failed'
+      )
+    }
+  }
+  deps.activityRecorder.recordDownloadCompleted({
+    taskId: task.id,
+    occurredAt: completedAt,
+  })
+  await finalizeBtAfterRename(task, deps, completedAt, unselectedRelPaths)
+}
+
+function applyBtTaskAfterRename(
+  task: DownloadTask,
+  desiredFinalPath: string
+): void {
+  task.finalPath = desiredFinalPath
+  task.diskPath = desiredFinalPath
+  markBtDirectOutputFinalized(task)
+  // The instance rows must stop pointing at the `.motrix` container or
+  // restore() resurrects it after a restart. Status is left alone here — the
+  // task still heads into reseed and its terminal state is decided below.
+  for (const inst of task.instances) {
+    inst.diskPath = desiredFinalPath
+  }
+  setTaskTransitionPhase(task, TransitionPhase.Reseeding)
+}
+
+async function finalizeBtAfterRename(
+  task: DownloadTask,
+  deps: FinalizeTaskDeps,
+  completedAt: number,
+  unselectedRelPaths: string[]
+): Promise<void> {
+  // Belt-and-braces cleanup: drop any unselected files that survived
+  // the rename. removePathRecursive is idempotent (ignores ENOENT) so
+  // overlap with aria2's own cleanup is harmless — whichever ran first
+  // wins, and the loser becomes a noop. Failures are logged but never
+  // fail the finalize: the user's selected files are intact and
+  // usable, partial leftovers are a hygiene issue, not data loss.
+  await cleanupUnselectedAfterRename(task, unselectedRelPaths, deps)
+
+  // Compute what the new gid still needs to seed. aria2's `seed-ratio`
+  // is per-gid (`uploadLength / completedLength`); the new gid's
+  // completedLength will be ~totalBytes immediately (file is on disk
+  // and `bt-seed-unverified` skips check), while uploadLength starts
+  // at 0. Without subtracting the prior sessions' contribution from
+  // the user's target ratio, the new gid would seed up to a *fresh*
+  // settings.seedRatio on top of what was already uploaded — pushing
+  // the task's lifetime ratio to roughly `priorRatio + settings.ratio`.
+  const { bt } = deps.settings.get()
+  const alreadyRatio =
+    task.totalBytes > 0 ? task.uploadedBytesBaseline / task.totalBytes : 0
+  const remainingRatio =
+    bt.seedRatio > 0 ? Math.max(0, bt.seedRatio - alreadyRatio) : 0
+  const ratioRequested = bt.seedRatio > 0
+  const ratioSatisfied = ratioRequested && remainingRatio === 0
+
+  // Nothing left to seed: skip the reseed entirely. The file is already
+  // on disk at finalPath; we just enter Completed. Avoids spinning up
+  // a new aria2 row that would be torn down on its first poll.
+  const shouldSkipReseed = ratioSatisfied
+  if (shouldSkipReseed) {
+    setTaskTransitionPhase(task, TransitionPhase.Idle)
+    const previousStatus = task.status
+    applyTerminalStatusToTask(task, TaskStatus.Completed, {}, completedAt)
+    syncCompletionMetrics(task)
+    await persistTaskTransition(task, previousStatus, deps, completedAt)
+    deps.publishTaskUpdateNow()
+    deps.log.info(
+      {
+        taskId: task.id,
+        alreadyRatio,
+        targetRatio: bt.seedRatio,
+        seedTime: bt.seedTime,
+      },
+      'finalize_bt_reseed_skipped'
+    )
+    fireAfterComplete(deps, task, 'finalize')
+    return
+  }
+
+  // Either enabled limit ends seeding. A zero ratio imposes no ratio limit;
+  // a zero time is translated by the adapter into an absent time condition.
+  const seedRatioForNewGid = ratioRequested ? remainingRatio : 0
+
+  const completeWithoutSeeding = async (error: unknown): Promise<void> => {
+    // Soft degradation: download succeeded; seeding didn't start.
+    // Mark Completed with a warning rather than Error — the user's
+    // file is intact and usable.
+    setTaskTransitionPhase(task, TransitionPhase.Idle)
+    const reason = (error as Error).message
+    const errorMessage =
+      error instanceof AppError &&
+      error.code === ErrorCode.TaskFinalizeMetaMissing
+        ? `Torrent metadata missing, seeding not started: ${reason}`
+        : `Download complete, but seeding failed to start: ${reason}`
+    const previousStatus = task.status
+    applyTerminalStatusToTask(
+      task,
+      TaskStatus.Completed,
+      { errorMessage },
+      completedAt
+    )
+    syncCompletionMetrics(task)
+    await persistTaskTransition(task, previousStatus, deps, completedAt)
+    deps.publishTaskUpdateNow()
+    deps.log.warn(
+      { taskId: task.id, err: reason },
+      'finalize_bt_seeding_skipped'
+    )
+    // Soft-Completed path: the file is on disk and usable, but seeding
+    // failed to start. Spec §10: afterComplete still fires because the
+    // task ended in TaskStatus.Completed. The errorMessage is informational.
+    fireAfterComplete(deps, task, 'finalize')
+  }
+
+  let bytes: Uint8Array
+  try {
+    bytes = await readTorrentMeta(task, deps)
+  } catch (error) {
+    await completeWithoutSeeding(error)
+    return
+  }
+
+  const newGid = newEngineTaskId(deps.createEngineTaskId, 'finalizeTask')
+  const previousStatus = task.status
+  const reseedCandidate = structuredClone(task)
+  reseedCandidate.engineTaskId = newGid
+  const reseedInstance = pickPrimaryInstance(reseedCandidate.instances)
+  if (reseedInstance) reseedInstance.uploadedBytes = 0
+  setTaskTransitionPhase(reseedCandidate, TransitionPhase.Idle)
+  Object.assign(
+    reseedCandidate,
+    applyTerminalTransition(reseedCandidate, TaskStatus.Seeding)
+  )
+  syncPrimaryInstanceIdentity(reseedCandidate)
+  syncCompletionMetrics(reseedCandidate)
+
+  deps.taskManager.reserveEngineTaskId(newGid)
+  try {
+    await deps.taskManager.persist(reseedCandidate)
+  } catch (error) {
+    deps.taskManager.releaseEngineTaskIdReservation(newGid)
+    throw error
+  }
+  // Keep the durable intent visible to autosave while the reservation shield
+  // prevents a concurrent poll from observing a half-committed reseed.
+  deps.taskManager.setReservedEngineTaskOwner(
+    reseedCandidate.id,
+    structuredClone(reseedCandidate),
+    newGid
+  )
+
+  const selectedFiles = task.bt?.selectedFiles?.length
+    ? task.bt.selectedFiles.map((index) => index + 1)
+    : undefined
+  try {
+    const storageLayout = getBtStorageLayout(task)
+    const directLayout = getBtDirectStorageLayout(task)
+    const parsedLayout =
+      storageLayout || directLayout?.torrentRootName
+        ? await parseBtFileLayout(bytes)
+        : null
+    const actualGid = await deps.adapter.addTorrent({
+      metadata: bytes,
+      // aria2 lays files out at `<dir>/<info.name>/...` (multi-file) or
+      // `<dir>/<info.name>` (single-file). The original task wrote into
+      // `<saveDir>/<finalName>.motrix/...`; after rename those files live
+      // under `<finalPath>/...`. Pointing aria2 at `task.finalPath` makes
+      // its `<dir>/<info.name>` lookup hit the existing on-disk layout.
+      saveDir: directLayout
+        ? buildBtDirectOutputPaths(
+            task.finalPath,
+            parsedLayout,
+            task.torrentMetaPath
+          ).saveDir
+        : storageLayout
+          ? path.dirname(task.finalPath)
+          : task.finalPath,
+      outputFilePaths:
+        directLayout && parsedLayout
+          ? buildBtDirectOutputPaths(
+              task.finalPath,
+              parsedLayout,
+              task.torrentMetaPath
+            ).outputFilePaths
+          : storageLayout && parsedLayout
+            ? buildFinalOutputFilePaths(
+                parsedLayout,
+                task.finalPath,
+                storageLayout
+              )
+            : undefined,
+      outputRoot: directLayout
+        ? buildBtDirectOutputPaths(
+            task.finalPath,
+            parsedLayout,
+            task.torrentMetaPath
+          ).outputRoot
+        : undefined,
+      selectedFiles,
+      seedTime: bt.seedTime,
+      seedRatio: seedRatioForNewGid,
+      btSeedUnverified: true,
+      pause: false,
+      isPrivate: task.bt?.isPrivate ?? false,
+      gid: newGid,
+    })
+    if (actualGid.toLowerCase() !== newGid.toLowerCase()) {
+      throw new Error(
+        `Engine returned gid ${actualGid} instead of reserved gid ${newGid}`
+      )
+    }
+  } catch (error) {
+    try {
+      await deps.adapter.forceRemoveTask(newGid)
+    } catch (cleanupError) {
+      deps.log.warn(
+        { err: cleanupError, taskId: task.id, gid: newGid },
+        'finalize_bt_reseed_force_remove_failed'
+      )
+    }
+
+    let cleanupConfirmed = false
+    try {
+      await deps.adapter.removeDownloadResult(newGid)
+      cleanupConfirmed = true
+    } catch (cleanupError) {
+      deps.log.error(
+        { err: cleanupError, taskId: task.id, gid: newGid },
+        'finalize_bt_reseed_result_cleanup_failed'
+      )
+    }
+
+    if (cleanupConfirmed) {
+      try {
+        await completeWithoutSeeding(error)
+        deps.taskManager.retireEngineTaskIdReservation(newGid)
+        return
+      } catch (completionError) {
+        // The pre-add durable reseed intent remains recoverable. Promote its
+        // owner before surfacing persistence failure so no reservation leaks.
+        deps.taskManager.set(
+          reseedCandidate.id,
+          structuredClone(reseedCandidate)
+        )
+        deps.publishTaskUpdateNow()
+        throw completionError
+      }
+    }
+
+    // Add outcome and cleanup are both uncertain. Claim the durable candidate
+    // under the same public ID, record a recovered transition, and retain it
+    // for authoritative polling/restart recovery.
+    deps.taskManager.set(reseedCandidate.id, structuredClone(reseedCandidate))
+    await recordTaskTransition(
+      reseedCandidate,
+      previousStatus,
+      deps,
+      completedAt,
+      TaskActivityAccuracy.Recovered
+    )
+    deps.publishTaskUpdateNow()
+    throw error
+  }
+
+  // The active candidate was durable before dispatch. Ordinary set claims the
+  // reservation synchronously; no post-add persistence gap remains.
+  deps.taskManager.set(reseedCandidate.id, structuredClone(reseedCandidate))
+  await recordTaskTransition(reseedCandidate, previousStatus, deps)
+
+  deps.publishTaskUpdate()
+  deps.log.info(
+    { taskId: task.id, newGid, seedRatio: seedRatioForNewGid },
+    'finalize_bt_completed'
+  )
+  // Seeding != Completed — afterComplete fires only when the task ends in
+  // TaskStatus.Completed (see spec §10). For BT, that transition happens
+  // later via stopSeedingTask or aria2's natural seed-time/ratio eviction.
+}
+
+/** Direct BT outputs keep their original engine identity through seeding. */
+async function finalizeBtInPlace(
+  task: DownloadTask,
+  deps: FinalizeTaskDeps,
+  outcome: BeforeFinalizeOutcomeCommit,
+  statusBeforeFinalize: TaskStatus
+): Promise<void> {
+  const live = await deps.adapter.getTaskStatus(task.engineTaskId)
+  if (live) {
+    task.totalBytes = Math.max(task.totalBytes, live.totalBytes)
+    task.downloadedBytes = Math.max(task.downloadedBytes, live.downloadedBytes)
+    task.sizeWhenDone = Math.max(task.sizeWhenDone, live.sizeWhenDone)
+    task.uploadedBytes = task.uploadedBytesBaseline + live.uploadedBytes
+  }
+  if (live?.status === TaskStatus.Error)
+    throw new AppError(
+      ErrorCode.TaskFinalizeFailed,
+      live.errorMessage ?? 'Engine task failed'
+    )
+  if (!live) {
+    // The old engine identity was lost before completion committed. Retain
+    // its last observed upload contribution before assigning a fresh GID.
+    settleBtUpload(
+      task,
+      Math.max(0, task.uploadedBytes - task.uploadedBytesBaseline),
+      false
+    )
+  }
+  const unselected = live ? await snapshotUnselectedRelPaths(task, deps) : []
+  await cleanupUnselectedAfterRename(task, unselected, deps)
+  const completedAt = Date.now()
+  const previousStatus = task.status
+  const nextStatus = !live
+    ? TaskStatus.Finalizing
+    : live.status === TaskStatus.Seeding ||
+        live?.status === TaskStatus.Downloading
+      ? TaskStatus.Seeding
+      : live?.status === TaskStatus.Paused
+        ? TaskStatus.Paused
+        : TaskStatus.Completed
+  markBtDirectOutputFinalized(task)
+  setTaskTransitionPhase(
+    task,
+    live ? TransitionPhase.Idle : TransitionPhase.Reseeding
+  )
+  Object.assign(
+    task,
+    applyTerminalTransition(task, nextStatus, {}, completedAt)
+  )
+  syncPrimaryInstanceIdentity(task)
+  syncCompletionMetrics(task)
+  normalizeTerminalRuntimeMetrics(task)
+
+  const occurrence = buildTerminalOccurrence(
+    terminalSnapshotFromTask(task),
+    previousStatus,
+    'finalize',
+    completedAt
+  )
+  if (deps.commitFinalizedArtifact && outcome.metadataOps.length > 0) {
+    await deps.commitFinalizedArtifact({
+      task,
+      occurrence,
+      sourcePath: task.diskPath,
+      targetPath: task.finalPath,
+      metadataOps: outcome.metadataOps,
+      contributors: outcome.contributors,
+    })
+    deps.taskManager.set(task.id, structuredClone(task))
+    await recordTaskTransition(task, previousStatus, deps, completedAt)
+    if (occurrence) await deps.occurrenceDispatcher?.dispatch(occurrence)
+  } else {
+    outcome.commit(() => {})
+    await persistTaskTransition(task, previousStatus, deps, completedAt)
+  }
+  deps.activityRecorder.recordDownloadCompleted({
+    taskId: task.id,
+    occurredAt: completedAt,
+  })
+  deps.publishTaskUpdateNow()
+  if (!live) {
+    await finalizeBtAfterRename(task, deps, completedAt, [])
+    return
+  }
+  if (nextStatus === TaskStatus.Completed) {
+    await deps.adapter.removeDownloadResult(task.engineTaskId)
+    if (statusBeforeFinalize !== TaskStatus.Completed)
+      fireAfterComplete(deps, task, 'finalize')
+  }
+}
+
+/**
+ * The shared "finalize failed" terminal sequence: mark the detached
+ * candidate Error, sync its instance rows, commit through the
+ * occurrence-aware transition path, notify, and fire the onError hook
+ * chain. Call sites keep their own epilogue (return vs `throw new
+ * AppError`). The TaskUpdated emit is unconditional: polling has no
+ * tellStopped path and the desktop shell's poll-tick emit is gated on
+ * active/waiting deltas, so a finalize-failure Error published without
+ * an emit stays invisible to the renderer indefinitely.
+ */
+async function failFinalize(
+  task: DownloadTask,
+  deps: FinalizeTaskDeps,
+  fail: {
+    errorMessage: string
+    errorDetailKey: string
+    errorDetailParams: Record<string, string>
+    hookCode: string
+    errorCode?: DownloadErrorCode
+  }
+): Promise<void> {
+  const previousStatus = task.status
+  applyTerminalStatusToTask(task, TaskStatus.Error, {
+    errorCode: fail.errorCode,
+    errorMessage: fail.errorMessage,
+    errorDetailKey: fail.errorDetailKey,
+    errorDetailParams: fail.errorDetailParams,
+  })
+  await persistTaskTransition(task, previousStatus, deps)
+  deps.publishTaskUpdateNow()
+  fireOnError(
+    deps,
+    task,
+    { code: fail.hookCode, message: fail.errorMessage },
+    'finalize'
+  )
+}
+
+async function persistTaskTransition(
+  task: DownloadTask,
+  previousStatus: TaskStatus,
+  deps: FinalizeTaskDeps,
+  occurredAt = Date.now()
+): Promise<void> {
+  // finalize works on a detached candidate, so normalize before the durable
+  // barrier and publication. In particular, HTTP completion must not clone
+  // the final polling sample's ETA/speeds/connections into Completed.
+  normalizeTerminalRuntimeMetrics(task)
+
+  // cause: 'finalize' — every status change this function commits is part
+  // of the finalize pipeline (rename, plugin-chain abort, reseed-skip
+  // completion, soft-completed-without-seeding).
+  await commitTerminalTaskTransition(task, previousStatus, deps, {
+    cause: 'finalize',
+    callerName: 'persistTaskTransition',
+    recordFailureMessage: FINALIZE_RECORD_FAILURE_MESSAGE,
+    accuracy: TaskActivityAccuracy.Exact,
+    occurredAt,
+    persistPlain: (t) => persistTaskState(t, deps),
+  })
+}
+
+const FINALIZE_RECORD_FAILURE_MESSAGE =
+  'finalize Activity transition recording failed'
+
+async function recordTaskTransition(
+  task: DownloadTask,
+  previousStatus: TaskStatus,
+  deps: FinalizeTaskDeps,
+  occurredAt = Date.now(),
+  accuracy: TaskActivityAccuracy = TaskActivityAccuracy.Exact
+): Promise<void> {
+  await recordTaskTransitionOrWarn(task, previousStatus, deps, {
+    occurredAt,
+    accuracy,
+    failureMessage: FINALIZE_RECORD_FAILURE_MESSAGE,
+  })
+}
+
+async function readTorrentMeta(
+  task: DownloadTask,
+  deps: FinalizeTaskDeps
+): Promise<Uint8Array> {
+  if (!task.torrentMetaPath) {
+    throw new AppError(
+      ErrorCode.TaskFinalizeMetaMissing,
+      'Torrent metadata path not set'
+    )
+  }
+  try {
+    return await deps.torrentMetaStore.read(task.torrentMetaPath)
+  } catch (e) {
+    throw new AppError(
+      ErrorCode.TaskFinalizeMetaMissing,
+      `Torrent metadata is missing at ${task.torrentMetaPath}`,
+      e
+    )
+  }
+}
+
+async function persistDesiredFinalPath(
+  task: DownloadTask,
+  desiredFinalPath: string,
+  deps: FinalizeTaskDeps
+): Promise<void> {
+  if (desiredFinalPath === task.finalPath) return
+  task.finalPath = desiredFinalPath
+  await persistTaskState(task, deps)
+}
+
+async function persistTaskState(
+  task: DownloadTask,
+  deps: FinalizeTaskDeps
+): Promise<void> {
+  await deps.taskManager.persist(task)
+  // Keep the working candidate detached from TaskManager: finalize has
+  // multiple awaited phases, and mutating a published object would leak a
+  // pre-durable status/path into readers when a later barrier rejects.
+  deps.taskManager.set(task.id, structuredClone(task))
+}
+
+/**
+ * Capture relative paths of unselected files while the gid is still alive.
+ * Returns paths relative to the supplied source root so the caller can
+ * re-rebase them under `task.finalPath` after rename. Empty result for tasks that
+ * downloaded all files (no select-file used) — `getTaskFiles` reports
+ * every file as `selected: true` in that case.
+ *
+ * Failures are swallowed: a missing snapshot just means our cleanup is
+ * skipped and we fall back to aria2's own `--bt-remove-unselected-file`
+ * behavior. Never blocks finalize.
+ */
+async function snapshotUnselectedRelPaths(
+  task: DownloadTask,
+  deps: FinalizeTaskDeps,
+  sourceRoot = task.diskPath
+): Promise<string[]> {
+  try {
+    const files = await deps.adapter.getTaskFiles(task.engineTaskId)
+    const unselected: string[] = []
+    for (const f of files) {
+      if (f.selected) continue
+      // aria2 reports absolute paths under the task's `dir`. Relativize
+      // so the caller can apply the same rel-path under finalPath.
+      const rel = path.relative(sourceRoot, f.path)
+      // Defensive: if aria2 ever returns a path outside diskPath
+      // (shouldn't, but escape '..' would let us walk into the user's
+      // filesystem), skip it.
+      if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) {
+        deps.log.warn(
+          { taskId: task.id, filePath: f.path, diskPath: sourceRoot },
+          'finalize_bt_unselected_path_outside_disk_path'
+        )
+        continue
+      }
+      unselected.push(rel)
+    }
+    return unselected
+  } catch (err) {
+    deps.log.warn(
+      { err, taskId: task.id, gid: task.engineTaskId },
+      'finalize_bt_unselected_snapshot_failed'
+    )
+    return []
+  }
+}
+
+function isSameOrDescendant(candidate: string, parent: string): boolean {
+  const relative = path.relative(parent, candidate)
+  return (
+    relative === '' ||
+    (!relative.startsWith('..') && !path.isAbsolute(relative))
+  )
+}
+
+/**
+ * Remove unselected files under finalPath. Idempotent — overlapping
+ * with aria2's own cleanup is fine. Errors are logged but never
+ * thrown: cleanup is hygiene, not correctness, and the user's
+ * selected files are already safe at finalPath.
+ */
+async function cleanupUnselectedAfterRename(
+  task: DownloadTask,
+  relPaths: string[],
+  deps: FinalizeTaskDeps
+): Promise<void> {
+  let removed = 0
+  for (const rel of relPaths) {
+    if (rel === '' || rel === '.') continue
+    const target = path.join(task.finalPath, rel)
+    try {
+      await deps.fs.removePathRecursive(target)
+      removed += 1
+    } catch (err) {
+      deps.log.warn(
+        { err, taskId: task.id, target },
+        'finalize_bt_unselected_remove_failed'
+      )
+    }
+  }
+  if (relPaths.length > 0) {
+    deps.log.info(
+      { taskId: task.id, requested: relPaths.length, removed },
+      'finalize_bt_unselected_cleanup_done'
+    )
+  }
+}
+
+// ─── Plan C plugin-hook helpers (T15) ─────────────────────────
+
+interface BeforeFinalizeOutcomeAborted {
+  aborted: true
+  reason: string
+}
+
+interface BeforeFinalizeOutcomeCommit {
+  aborted: false
+  finalFilePath?: string
+  replacement?: { pluginId: string; stagedPath: string }
+  metadataOps: readonly StagedMetadataOp[]
+  contributors: readonly string[]
+  /**
+   * Runs the staged metadata commit (if a db handle is wired) wrapping the
+   * supplied sync callback inside the same SQLite transaction. When no db
+   * handle is wired, behaves as a passthrough: the callback runs and the
+   * (empty) staged store is silently discarded.
+   */
+  commit: (cb: () => void) => void
+}
+
+type BeforeFinalizeOutcome =
+  | BeforeFinalizeOutcomeAborted
+  | BeforeFinalizeOutcomeCommit
+
+const NOOP_COMMIT_OUTCOME: BeforeFinalizeOutcomeCommit = {
+  aborted: false,
+  metadataOps: [],
+  contributors: [],
+  commit: (cb) => cb(),
+}
+
+/**
+ * Runs the beforeFinalize chain when the orchestrator is wired. Returns a
+ * commit thunk so the caller (finalizeHttp / finalizeBt) decides exactly
+ * where staged metadata flushes relative to the rename — keeping the
+ * SQLite transaction's tx body synchronous.
+ */
+async function runBeforeFinalize(
+  task: DownloadTask,
+  deps: FinalizeTaskDeps
+): Promise<BeforeFinalizeOutcome> {
+  if (!deps.orchestrator) return NOOP_COMMIT_OUTCOME
+  const ctxDto: BeforeFinalizeContextDTO = {
+    schemaVersion: 1,
+    invocationId: `finalize:${task.id}`,
+    taskId: task.id,
+    sourceUrl: task.uris?.[0] ?? '',
+    createdBy: 'user',
+    requestedAt: task.createdAt ?? Date.now(),
+    task: toPluginTaskSnapshot(task),
+    inputFilePath: task.diskPath,
+    filePath: task.finalPath,
+    targetFilePath: task.finalPath,
+  }
+  const result = await deps.orchestrator.runBeforeFinalize(ctxDto, task.id)
+  if (result.aborted) {
+    await deps.auditLog?.log({
+      type: 'chain.abort',
+      hook: 'beforeFinalize',
+      taskId: task.id,
+      reason: result.reason,
+    })
+    return { aborted: true, reason: result.reason }
+  }
+  await deps.auditLog?.log({
+    type: 'chain.commit',
+    hook: 'beforeFinalize',
+    taskId: task.id,
+    finalFilePath: result.final.filePath,
+  })
+  const db = deps.db
+  const staged = result.staged
+  return {
+    aborted: false,
+    finalFilePath: result.finalFilePath,
+    replacement: result.replacement,
+    metadataOps:
+      typeof result.staged.allMetadataOps === 'function'
+        ? result.staged.allMetadataOps()
+        : [],
+    contributors: [
+      ...new Set([
+        ...(result.replacement ? [result.replacement.pluginId] : []),
+        ...(typeof result.staged.allMetadataOps === 'function'
+          ? result.staged
+              .allMetadataOps()
+              .map((operation) => operation.pluginId)
+          : []),
+      ]),
+    ].sort(),
+    commit: (cb: () => void) => {
+      if (db) {
+        staged.commitMetadata(db, task.id, cb)
+      } else {
+        cb()
+      }
+    },
+  }
+}
+
+function toPluginTaskSnapshot(task: DownloadTask): PluginHookTask {
+  return {
+    schemaVersion: 1,
+    id: task.id,
+    name: task.name,
+    type: task.type,
+    kind: task.kind,
+    status: task.status,
+    filePath: task.diskPath,
+    saveDir: task.saveDir,
+    filename: task.filename,
+    progress: Math.max(0, Math.min(100, task.progress * 100)),
+    totalBytes: task.totalBytes,
+    downloadedBytes: task.downloadedBytes,
+    uploadedBytes: task.uploadedBytes,
+    sizeWhenDone: task.sizeWhenDone,
+    fileCount: task.fileCount,
+    createdAt: task.createdAt,
+    updatedAt: task.updatedAt,
+    finishedAt: task.finishedAt,
+    category: task.category,
+    infoHash: task.infoHash,
+    error: task.errorMessage
+      ? {
+          code: task.errorCode ?? 'TASK_ERROR',
+          message: task.errorMessage,
+          detailKey: task.errorDetailKey,
+          detailParams: task.errorDetailParams,
+        }
+      : null,
+  }
+}

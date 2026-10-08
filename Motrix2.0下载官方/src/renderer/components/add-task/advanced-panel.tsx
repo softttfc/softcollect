@@ -1,0 +1,279 @@
+import { ChevronRightIcon, HelpIcon } from '@renderer/components/icons'
+import { Button } from '@renderer/components/ui/button'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@renderer/components/ui/collapsible'
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+} from '@renderer/components/ui/form'
+import { Input } from '@renderer/components/ui/input'
+import { Textarea } from '@renderer/components/ui/textarea'
+import { useByteFormat } from '@renderer/hooks/use-byte-format'
+import { cn } from '@renderer/lib/utils'
+import { EXTERNAL_URLS } from '@shared/external-urls'
+import type { AddTaskFormValues } from '@shared/schemas/add-task'
+import { type ReactNode, useLayoutEffect, useState } from 'react'
+import { useFormContext, useWatch } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
+import { useAddTaskLayoutChange } from './add-task-layout-context'
+
+export function AdvancedPanel() {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const onLayoutChange = useAddTaskLayoutChange()
+  const tab = useWatch<AddTaskFormValues, 'tab'>({ name: 'tab' })
+
+  useLayoutEffect(() => {
+    onLayoutChange?.(open)
+  }, [onLayoutChange, open])
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="-ms-2 h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-transparent dark:hover:bg-transparent"
+          />
+        }
+      >
+        <ChevronRightIcon
+          className={cn(
+            'h-3.5 w-3.5 transition-transform duration-150',
+            open && 'rotate-90'
+          )}
+          aria-hidden="true"
+        />
+        {t('task.add.advanced')}
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-2 ms-1.5 space-y-2 border-s-2 border-border ps-3">
+        {tab === 'links' ? <LinksAdvancedFields /> : <TorrentAdvancedFields />}
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
+function LinksAdvancedFields() {
+  const { t } = useTranslation()
+  const { control } = useFormContext<AddTaskFormValues>()
+  return (
+    <>
+      <DenseField
+        control={control}
+        name="filename"
+        label={t('task.add.filename')}
+        placeholder={t('task.add.filenameAuto')}
+      />
+      <DenseField
+        control={control}
+        name="split"
+        label={t('task.add.split')}
+        type="number"
+        min={1}
+        max={128}
+      />
+      <DenseField
+        control={control}
+        name="userAgent"
+        label={t('task.add.userAgent')}
+        multiline
+      />
+      <DenseField
+        control={control}
+        name="referer"
+        label={t('task.add.referer')}
+      />
+      <DenseField
+        control={control}
+        name="cookie"
+        label={t('task.add.cookie')}
+        multiline
+      />
+      <DenseField
+        control={control}
+        name="authorization"
+        label={t('task.add.authorization')}
+      />
+      <DenseField
+        control={control}
+        name="allProxy"
+        label={
+          <>
+            {t('task.add.allProxy')}
+            <a
+              href={EXTERNAL_URLS.motrix.manual.advancedProxy}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <HelpIcon className="size-4 hover:text-foreground" />
+            </a>
+          </>
+        }
+        placeholder="[http://][USER:PASSWORD@]HOST[:PORT]"
+      />
+    </>
+  )
+}
+
+function TorrentAdvancedFields() {
+  const { unitSystem, formatByteUnit } = useByteFormat()
+  const scale = unitSystem === 'binary' ? 1024 : 1000
+  const unit = formatByteUnit(unitSystem === 'binary' ? 'KiB' : 'KB', true)
+  const { t } = useTranslation()
+  const { control } = useFormContext<AddTaskFormValues>()
+  return (
+    <>
+      <DenseField
+        control={control}
+        name="dlLimit"
+        label={
+          <>
+            {t('task.add.dlLimit')} ({unit})
+          </>
+        }
+        type="number"
+        min={0}
+        scale={scale}
+        step="any"
+        placeholder={t('task.add.unlimited')}
+      />
+      <DenseField
+        control={control}
+        name="ulLimit"
+        label={
+          <>
+            {t('task.add.ulLimit')} ({unit})
+          </>
+        }
+        type="number"
+        min={0}
+        scale={scale}
+        step="any"
+        placeholder={t('task.add.unlimited')}
+      />
+      <DenseField
+        control={control}
+        name="seedRatio"
+        label={t('task.add.seedRatio')}
+        type="number"
+        min={0}
+        step="0.1"
+        placeholder={t('task.add.unlimited')}
+      />
+    </>
+  )
+}
+
+interface DenseFieldProps {
+  // biome-ignore lint/suspicious/noExplicitAny: RHF Control generic is too narrow
+  control: any
+  name: string
+  // Accepts any ReactNode so callers can compose e.g. `<>UA <CircleQuestionMark/></>`
+  // for inline help affordances. Accessibility is handled by FormLabel's
+  // htmlFor ↔ FormControl's id wiring in shadcn/ui's form primitive.
+  label: ReactNode
+  type?: string
+  placeholder?: string
+  min?: number
+  max?: number
+  step?: string
+  multiline?: boolean
+  scale?: number
+}
+
+function DenseField({
+  control,
+  name,
+  label,
+  type,
+  placeholder,
+  min,
+  max,
+  step,
+  multiline,
+  scale = 1,
+}: DenseFieldProps) {
+  const [draft, setDraft] = useState<{ text: string; scale: number } | null>(
+    null
+  )
+  return (
+    <FormField
+      control={control}
+      name={name as never}
+      render={({ field }) => (
+        <FormItem
+          className={cn(
+            'grid grid-cols-[5rem_1fr] gap-3 space-y-0',
+            multiline ? 'items-start' : 'items-center'
+          )}
+        >
+          <FormLabel
+            className={cn(
+              'text-xs font-normal text-muted-foreground',
+              multiline && 'pt-1.5'
+            )}
+          >
+            {label}
+          </FormLabel>
+          <FormControl>
+            {multiline ? (
+              <Textarea
+                {...field}
+                placeholder={placeholder}
+                value={typeof field.value === 'string' ? field.value : ''}
+                onChange={(e) => field.onChange(e.target.value)}
+                rows={2}
+                className="min-h-14 max-h-18 resize-y py-1.5 font-mono text-xs leading-snug"
+              />
+            ) : (
+              <Input
+                {...field}
+                type={type}
+                min={min}
+                max={max}
+                step={step}
+                placeholder={placeholder}
+                value={
+                  draft?.scale === scale
+                    ? draft.text
+                    : typeof field.value === 'number'
+                      ? field.value / scale
+                      : typeof field.value === 'string'
+                        ? field.value
+                        : ''
+                }
+                onChange={(e) => {
+                  if (type === 'number') {
+                    const v = e.target.value
+                    if (scale !== 1) setDraft({ text: v, scale })
+                    field.onChange(
+                      v === ''
+                        ? undefined
+                        : scale === 1
+                          ? Number(v)
+                          : Math.round(Number(v) * scale)
+                    )
+                  } else {
+                    field.onChange(e.target.value)
+                  }
+                }}
+                onBlur={() => {
+                  setDraft(null)
+                  field.onBlur()
+                }}
+                className="h-8 text-xs"
+              />
+            )}
+          </FormControl>
+        </FormItem>
+      )}
+    />
+  )
+}

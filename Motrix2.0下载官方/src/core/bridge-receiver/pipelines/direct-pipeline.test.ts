@@ -1,0 +1,125 @@
+import { taskCreateRequestSchema } from '@shared/schemas/add-task'
+import { describe, expect, it, vi } from 'vitest'
+import type { AdaptedDirect } from '../submit-download-adapter'
+import { DirectPipeline } from './direct-pipeline'
+
+function buildAdapted(): AdaptedDirect {
+  return {
+    taskId: 't1',
+    saveDir: '/tmp/save',
+    finalName: 'x.mp4',
+    kind: 'direct',
+    primaryUrl: 'http://example.com/x.mp4',
+    sanitizedHeaders: { 'X-Custom': 'v' },
+    cookies: [
+      {
+        name: 'session',
+        value: 'synthetic-cookie',
+        domain: 'example.com',
+        path: '/',
+        secure: false,
+      },
+    ],
+    pageUrl: 'http://example.com/page',
+    sourceMeta: {
+      kind: 'direct',
+      extensionId: 'e',
+      browser: 'chromium',
+      sessionKey: 'chromium:e',
+      pageUrl: 'http://example.com/page',
+      pageTitle: 't',
+      qualityLabel: 'q',
+      durationSec: null,
+      submittedAt: 1,
+    },
+  }
+}
+
+describe('DirectPipeline.dispatch', () => {
+  it('calls createTask with HTTP type, headers, cookies, referer, source meta', async () => {
+    const createTask = vi.fn(async () => ({
+      gid: 'gid-1',
+      taskId: 'task-abc',
+    })) as any
+    const removeTask = vi.fn(async () => {}) as any
+    const pipeline = new DirectPipeline({ createTask, removeTask })
+    const result = await pipeline.dispatch(buildAdapted())
+
+    // MDXP taskId is the stable DownloadTask.id, not the aria2 gid —
+    // the gid can rotate when a task swaps instances (magnet metadata
+    // → bt_download), so leaking gid as the public id would break ext
+    // round-trips after instance swaps.
+    expect(result).toEqual({ taskId: 'task-abc' })
+    // The engine request must satisfy the REAL taskCreateRequestSchema. The
+    // previous shape buried uris under payload.uris; that fails the schema at
+    // runtime in handleCreateTask, but the mocked createTask here never
+    // validated it, so the test was green while production rejected every
+    // direct submit. Validate against the schema so the shape can't regress.
+    const req = createTask.mock.calls[0]?.[0]
+    expect(taskCreateRequestSchema.safeParse(req).success).toBe(true)
+    // Headers ride on req.headers (→ params.headers), the single
+    // plugin-mutable path, so a beforeCreate plugin can override them.
+    expect(req).toMatchObject({
+      type: 'http',
+      uris: ['http://example.com/x.mp4'],
+      saveDir: '/tmp/save',
+      filename: 'x.mp4',
+      headers: [
+        { name: 'X-Custom', value: 'v' },
+        { name: 'Referer', value: 'http://example.com/page' },
+      ],
+    })
+    expect(req).not.toHaveProperty('payload')
+    // Match the manual Add Task path: omitting a per-task override lets aria2
+    // inherit the application's configured split/connection values.
+    expect(req).not.toHaveProperty('connections')
+    const opts = (createTask.mock.calls[0]?.[2] ?? {}) as Record<
+      string,
+      unknown
+    >
+    expect(opts).toMatchObject({
+      source: 'bridge',
+      sourceMeta: { kind: 'direct', sessionKey: 'chromium:e' },
+      cookies: buildAdapted().cookies,
+    })
+    // Metadata discovery and plugins see the same headers as the engine.
+    expect(opts).not.toHaveProperty('extraEngineOptions')
+  })
+
+  it('leaves filename discovery enabled while preserving an isolated empty cookie jar', async () => {
+    const createTask = vi.fn(
+      async (_req: unknown, _deps: unknown, _opts: unknown) => ({
+        gid: 'gid',
+        taskId: 'task',
+      })
+    )
+    const pipeline = new DirectPipeline({ createTask, removeTask: vi.fn() })
+    await pipeline.dispatch({
+      ...buildAdapted(),
+      discoverFilename: true,
+      cookies: [],
+      sanitizedHeaders: { referer: 'https://original.example/page' },
+    })
+    const [request, , options] = createTask.mock.calls[0]!
+    expect(taskCreateRequestSchema.safeParse(request).success).toBe(true)
+    expect(request).not.toHaveProperty('filename')
+    expect(request).toMatchObject({
+      headers: [{ name: 'referer', value: 'https://original.example/page' }],
+    })
+    expect(options).toHaveProperty('cookies', [])
+    expect(options).not.toHaveProperty('extraEngineOptions')
+  })
+})
+
+describe('DirectPipeline.cancel', () => {
+  it('delegates to removeTask using the public taskId', async () => {
+    const createTask = vi.fn(async () => ({
+      gid: 'gid-1',
+      taskId: 'task-abc',
+    })) as any
+    const removeTask = vi.fn(async () => {}) as any
+    const pipeline = new DirectPipeline({ createTask, removeTask })
+    await pipeline.cancel('task-abc')
+    expect(removeTask).toHaveBeenCalledWith('task-abc')
+  })
+})

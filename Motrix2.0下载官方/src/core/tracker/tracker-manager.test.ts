@@ -1,0 +1,1234 @@
+import { Events } from '@shared/protocol/events'
+import type { TrackerSyncStatus } from '@shared/schemas/tracker-sync'
+import type { CuratedTrackerList } from '@shared/types/tracker'
+import type { Mock } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { TrackerManager } from './tracker-manager'
+import { TrackerStore } from './tracker-store'
+
+function createMockRpcClient() {
+  return {
+    changeGlobalOption: vi.fn().mockResolvedValue('OK'),
+    changeOption: vi.fn().mockResolvedValue('OK'),
+    pause: vi.fn().mockResolvedValue('gid1'),
+    unpause: vi.fn().mockResolvedValue('gid1'),
+    tellStatus: vi.fn().mockResolvedValue({ status: 'active' }),
+  }
+}
+
+function createMockEventBus() {
+  type Listener = (...args: unknown[]) => void
+  const listeners = new Map<string, Set<Listener>>()
+
+  return {
+    emit: vi.fn((channel: string, ...args: unknown[]) => {
+      for (const listener of listeners.get(channel) ?? []) {
+        listener(...args)
+      }
+    }),
+    on: vi.fn((channel: string, listener: Listener) => {
+      const channelListeners = listeners.get(channel) ?? new Set<Listener>()
+      channelListeners.add(listener)
+      listeners.set(channel, channelListeners)
+    }),
+    off: vi.fn((channel: string, listener: Listener) => {
+      listeners.get(channel)?.delete(listener)
+    }),
+    removeAll: vi.fn(() => listeners.clear()),
+  }
+}
+
+function createMockSettingsManager() {
+  return {
+    get: vi.fn().mockReturnValue({
+      onboarding: { disclaimerAccepted: true },
+      tracker: {
+        autoSync: false,
+        syncIntervalHours: 12,
+        sources: [
+          {
+            id: 's1',
+            label: 'S1',
+            url: 'http://example/list',
+            enabled: true,
+            builtin: false,
+            cdn: false,
+          },
+        ],
+        sourcesEnabled: true,
+        probeEnabled: true,
+        probeTimeoutMs: 5000,
+        healthyThresholdMs: 3000,
+        minSuccessRate: 0.5,
+        maxTrackerCount: 50,
+        blacklistEnabled: false,
+        blacklistSources: [],
+      },
+    }),
+    getProxy: vi.fn().mockReturnValue({
+      enabled: false,
+      protocol: 'http',
+      host: '',
+      port: 8080,
+      user: '',
+      password: '',
+      bypass: [],
+      scopes: { download: false, updateApp: false, updateTrackers: false },
+    }),
+  }
+}
+
+function createMockSyncer() {
+  return {
+    fetch: vi.fn().mockResolvedValue({
+      trackers: ['udp://a.com:1337', 'http://b.com/ann', 'udp://c.com:80'],
+      sourceStatus: {
+        s1: {
+          ok: true,
+          count: 3,
+          elapsedMs: 100,
+          urls: ['udp://a.com:1337', 'http://b.com/ann', 'udp://c.com:80'],
+        },
+      },
+    }),
+  }
+}
+
+function createMockProber() {
+  return {
+    probe: vi.fn().mockResolvedValue([
+      {
+        url: 'udp://a.com:1337',
+        protocol: 'udp',
+        status: 'healthy',
+        lastProbeMs: 20,
+        lastProbeAt: Date.now(),
+        successCount: 1,
+        failCount: 0,
+        successRate: 1.0,
+      },
+      {
+        url: 'http://b.com/ann',
+        protocol: 'http',
+        status: 'unreachable',
+        lastProbeMs: null,
+        lastProbeAt: Date.now(),
+        successCount: 0,
+        failCount: 1,
+        successRate: 0,
+      },
+      {
+        url: 'udp://c.com:80',
+        protocol: 'udp',
+        status: 'healthy',
+        lastProbeMs: 50,
+        lastProbeAt: Date.now(),
+        successCount: 1,
+        failCount: 0,
+        successRate: 1.0,
+      },
+    ]),
+  }
+}
+
+function createMockStore() {
+  const data: CuratedTrackerList = {
+    effective: [],
+    blacklist: [],
+    healthMap: {},
+    sourceMap: {},
+    lastSyncAt: null,
+    lastProbeAt: null,
+  }
+  return {
+    load: vi.fn().mockResolvedValue(data),
+    save: vi.fn().mockResolvedValue(undefined),
+    mergeHealth: vi.fn((existing, fresh) =>
+      new TrackerStore('/unused').mergeHealth(existing, fresh)
+    ),
+  }
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((onResolve) => {
+    resolve = onResolve
+  })
+  return { promise, resolve }
+}
+
+describe('TrackerManager', () => {
+  let rpc: ReturnType<typeof createMockRpcClient>
+  let eventBus: ReturnType<typeof createMockEventBus>
+  let settings: ReturnType<typeof createMockSettingsManager>
+  let syncer: ReturnType<typeof createMockSyncer>
+  let prober: ReturnType<typeof createMockProber>
+  let store: ReturnType<typeof createMockStore>
+  let manager: TrackerManager
+
+  beforeEach(() => {
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    vi.useFakeTimers()
+    rpc = createMockRpcClient()
+    eventBus = createMockEventBus()
+    settings = createMockSettingsManager()
+    syncer = createMockSyncer()
+    prober = createMockProber()
+    store = createMockStore()
+    manager = new TrackerManager(
+      settings as never,
+      rpc as never,
+      eventBus as never,
+      syncer as never,
+      prober as never,
+      store as never
+    )
+    eventBus.emit(Events.EngineRecovered)
+  })
+
+  afterEach(() => {
+    manager.dispose()
+    vi.useRealTimers()
+  })
+
+  it('syncAndCurate fetches, probes, curates, and writes to aria2', async () => {
+    const result = await manager.syncAndCurate()
+
+    expect(syncer.fetch).toHaveBeenCalledOnce()
+    expect(prober.probe).toHaveBeenCalledOnce()
+    expect(store.save).toHaveBeenCalled()
+    expect(rpc.changeGlobalOption).toHaveBeenCalledOnce()
+
+    const opts = rpc.changeGlobalOption.mock.calls[0][0]
+    expect(opts['bt-tracker']).toContain('udp://a.com:1337')
+    expect(opts['bt-tracker']).toContain('udp://c.com:80')
+    expect(opts['bt-tracker']).toContain('http://b.com/ann') // A single timeout only lowers rank.
+
+    expect(result.totalFetched).toBe(3)
+    expect(result.totalHealthy).toBe(3)
+    expect(result.totalCurated).toBe(3)
+  })
+
+  it('publishes queryable sync stages for automatic and manual callers', async () => {
+    const fetched = deferred<Awaited<ReturnType<typeof syncer.fetch>>>()
+    const fetchResult = await syncer.fetch()
+    syncer.fetch.mockReturnValueOnce(fetched.promise)
+    const states: TrackerSyncStatus[] = []
+    eventBus.on(Events.TrackerSyncStatusChanged, () => {
+      states.push(manager.getSyncStatus())
+    })
+    expect(manager.getSyncStatus()).toBe('idle')
+    const operation = manager.syncAndCurate()
+    expect(manager.getSyncStatus()).toBe('fetching')
+    expect(manager.syncAndCurate()).toBe(operation)
+    fetched.resolve(fetchResult)
+    await operation
+    expect(states).toEqual(['fetching', 'probing', 'applying', 'idle'])
+    expect(manager.getSyncStatus()).toBe('idle')
+  })
+
+  it.each(['fetch', 'probe', 'save'] as const)(
+    'publishes failure when %s rejects and clears it on retry',
+    async (stage) => {
+      const operation = {
+        fetch: syncer.fetch,
+        probe: prober.probe,
+        save: store.save,
+        apply: rpc.changeGlobalOption,
+      }[stage]
+      operation.mockRejectedValueOnce(new Error('offline'))
+      await expect(manager.syncAndCurate()).rejects.toThrow('offline')
+      expect(manager.getSyncStatus()).toBe('failed')
+      await manager.syncAndCurate()
+      expect(manager.getSyncStatus()).toBe('idle')
+    }
+  )
+
+  it('reports incomplete source fetches even when the sync promise resolves', async () => {
+    syncer.fetch.mockResolvedValueOnce({
+      trackers: [],
+      sourceStatus: { s1: { ok: false, count: 0, elapsedMs: 0 } },
+    })
+    await manager.syncAndCurate()
+    expect(manager.getSyncStatus()).toBe('failed')
+  })
+
+  it('does not publish a late failure after disposal', async () => {
+    const fetched = deferred<Awaited<ReturnType<typeof syncer.fetch>>>()
+    syncer.fetch.mockReturnValueOnce(fetched.promise)
+    const operation = manager.syncAndCurate()
+    await vi.advanceTimersByTimeAsync(0)
+    manager.dispose()
+    eventBus.emit.mockClear()
+    fetched.resolve({ trackers: [], sourceStatus: {} })
+    await expect(operation).rejects.toThrow('TrackerManager is disposed')
+    expect(eventBus.emit).not.toHaveBeenCalled()
+  })
+
+  describe('applySyncScheduleChange', () => {
+    beforeEach(async () => {
+      await manager.init()
+      eventBus.emit(Events.EngineRecovered)
+    })
+    const withTracker = (over: {
+      autoSync: boolean
+      syncIntervalHours?: number
+    }) => {
+      const cfg = settings.get().tracker
+      settings.get.mockReturnValue({
+        ...settings.get(),
+        tracker: { ...cfg, syncIntervalHours: cfg.syncIntervalHours, ...over },
+      })
+    }
+
+    it('arms the periodic sync timer when autoSync is on', async () => {
+      withTracker({ autoSync: true, syncIntervalHours: 1 })
+      manager.applySyncScheduleChange()
+      expect(syncer.fetch).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(3_600_000)
+      expect(syncer.fetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('stops the timer when autoSync is turned off at runtime', async () => {
+      withTracker({ autoSync: true, syncIntervalHours: 1 })
+      manager.applySyncScheduleChange()
+      withTracker({ autoSync: false })
+      manager.applySyncScheduleChange()
+      await vi.advanceTimersByTimeAsync(7_200_000)
+      expect(syncer.fetch).not.toHaveBeenCalled()
+    })
+
+    it('re-arms with the new interval', async () => {
+      withTracker({ autoSync: true, syncIntervalHours: 12 })
+      manager.applySyncScheduleChange()
+      withTracker({ autoSync: true, syncIntervalHours: 1 })
+      manager.applySyncScheduleChange()
+      await vi.advanceTimersByTimeAsync(3_600_000)
+      expect(syncer.fetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('waits for persisted consent before starting the three-second delay', async () => {
+      withTracker({ autoSync: true })
+      settings.get.mockReturnValue({
+        ...settings.get(),
+        onboarding: { disclaimerAccepted: false },
+      })
+      manager.applySyncScheduleChange()
+      await vi.advanceTimersByTimeAsync(12 * 3600_000)
+      expect(syncer.fetch).not.toHaveBeenCalled()
+
+      settings.get.mockReturnValue({
+        ...settings.get(),
+        onboarding: { disclaimerAccepted: true },
+      })
+      manager.applySyncScheduleChange()
+      await vi.advanceTimersByTimeAsync(2_999)
+      expect(syncer.fetch).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(1)
+      expect(syncer.fetch).toHaveBeenCalledOnce()
+    })
+
+    it('maintains sources while the engine is offline and applies on recovery', async () => {
+      eventBus.emit(Events.EngineDisconnected)
+      rpc.changeGlobalOption.mockClear()
+      withTracker({ autoSync: true })
+      manager.applySyncScheduleChange()
+      await vi.advanceTimersByTimeAsync(3_000)
+      expect(syncer.fetch).toHaveBeenCalledOnce()
+      expect(rpc.changeGlobalOption).not.toHaveBeenCalled()
+      expect(manager.getCuratedList().pendingEngineApply).toBe(true)
+      eventBus.emit(Events.EngineRecovered)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(rpc.changeGlobalOption).toHaveBeenCalledOnce()
+      expect(manager.getCuratedList().pendingEngineApply).toBe(false)
+    })
+
+    it('deduplicates recent successful startup checks', async () => {
+      const cached = await store.load()
+      store.load.mockResolvedValue({
+        ...cached,
+        effective: ['udp://cached:80'],
+        sourceMap: { 'udp://cached:80': ['s1'] },
+        lastSyncAt: Date.now() - 20 * 60_000,
+      })
+      withTracker({ autoSync: true, syncIntervalHours: 1 })
+      await manager.init()
+      expect(manager.getCuratedList().effective).toEqual(['udp://cached:80'])
+      await vi.advanceTimersByTimeAsync(40 * 60_000 - 1)
+      expect(syncer.fetch).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(1)
+      expect(syncer.fetch).toHaveBeenCalledOnce()
+      await vi.advanceTimersByTimeAsync(3600_000)
+      expect(syncer.fetch).toHaveBeenCalledTimes(2)
+    })
+
+    it('refreshes an expired cache after three seconds', async () => {
+      const cached = await store.load()
+      store.load.mockResolvedValue({
+        ...cached,
+        effective: ['udp://cached:80'],
+        sourceMap: { 'udp://cached:80': ['s1'] },
+        lastSyncAt: Date.now() - 13 * 3600_000,
+      })
+      withTracker({ autoSync: true })
+      await manager.init()
+      await vi.advanceTimersByTimeAsync(3_000)
+      expect(syncer.fetch).toHaveBeenCalledOnce()
+    })
+
+    it('shares an in-flight sync and does not overlap automatic fetches', async () => {
+      withTracker({ autoSync: true, syncIntervalHours: 1 })
+      const fetched = deferred<Awaited<ReturnType<typeof syncer.fetch>>>()
+      syncer.fetch.mockReturnValueOnce(fetched.promise)
+      manager.applySyncScheduleChange()
+      await vi.advanceTimersByTimeAsync(3_000)
+      const manual = manager.syncAndCurate()
+      await vi.advanceTimersByTimeAsync(2 * 3600_000)
+      expect(syncer.fetch).toHaveBeenCalledOnce()
+      fetched.resolve({
+        trackers: [],
+        sourceStatus: { s1: { ok: true, urls: [], count: 0, elapsedMs: 0 } },
+      })
+      await manual
+      await vi.advanceTimersByTimeAsync(3_000)
+      expect(syncer.fetch).toHaveBeenCalledOnce()
+      await vi.advanceTimersByTimeAsync(3600_000 - 3_000)
+      expect(syncer.fetch).toHaveBeenCalledTimes(2)
+    })
+
+    it('backs off for five minutes after an unexpected failure', async () => {
+      withTracker({ autoSync: true, syncIntervalHours: 1 })
+      syncer.fetch.mockRejectedValueOnce(new Error('offline'))
+      manager.applySyncScheduleChange()
+      await vi.advanceTimersByTimeAsync(3_000)
+      expect(syncer.fetch).toHaveBeenCalledOnce()
+      await vi.advanceTimersByTimeAsync(3_000)
+      expect(syncer.fetch).toHaveBeenCalledOnce()
+      await vi.advanceTimersByTimeAsync(5 * 60_000 - 3_000)
+      expect(syncer.fetch).toHaveBeenCalledTimes(2)
+    })
+
+    it('cancels the pending initial sync on shutdown', async () => {
+      withTracker({ autoSync: true })
+      manager.applySyncScheduleChange()
+      await manager.stopAndDrain()
+      await vi.advanceTimersByTimeAsync(3_000)
+      expect(syncer.fetch).not.toHaveBeenCalled()
+    })
+
+    it('does not publish or re-arm when dispose wins a blocked init', async () => {
+      const loaded = deferred<CuratedTrackerList>()
+      store.load.mockReturnValueOnce(loaded.promise)
+      const cfg = settings.get().tracker
+      settings.get.mockReturnValue({
+        tracker: {
+          ...cfg,
+          autoSync: true,
+          syncIntervalHours: 1,
+          sourcesEnabled: true,
+        },
+      })
+      const initializing = manager.init()
+      await Promise.resolve()
+
+      manager.dispose()
+      const appliedBeforeShutdown = rpc.changeGlobalOption.mock.calls.length
+      loaded.resolve({
+        effective: ['udp://cached-tracker'],
+        blacklist: [],
+        healthMap: {},
+        sourceMap: {},
+        lastSyncAt: 1,
+        lastProbeAt: 1,
+      })
+      await initializing
+      await vi.advanceTimersByTimeAsync(3_600_000)
+
+      expect(rpc.changeGlobalOption).toHaveBeenCalledTimes(
+        appliedBeforeShutdown
+      )
+      expect(syncer.fetch).not.toHaveBeenCalled()
+    })
+  })
+
+  it('preserves the last global success and retries only failed sources', async () => {
+    settings.get().tracker.sources.push({
+      ...settings.get().tracker.sources[0],
+      id: 's2',
+      url: 'http://example/second',
+    })
+    syncer.fetch.mockResolvedValueOnce({
+      trackers: ['udp://a:80', 'udp://b:80'],
+      sourceStatus: {
+        s1: { ok: true, count: 1, urls: ['udp://a:80'] },
+        s2: { ok: true, count: 1, urls: ['udp://b:80'] },
+      },
+    })
+    await manager.syncAndCurate()
+    const successAt = manager.getCuratedList().lastSyncAt
+    await vi.advanceTimersByTimeAsync(1000)
+    syncer.fetch.mockResolvedValueOnce({
+      trackers: [],
+      sourceStatus: {
+        s1: { ok: true, count: 0, urls: [] },
+        s2: { ok: false, count: 0, failure: 'network' },
+      },
+    })
+    await manager.syncAndCurate()
+    expect(manager.getCuratedList()).toMatchObject({
+      effective: ['udp://b:80'],
+      lastSyncAt: successAt,
+      history: [
+        expect.objectContaining({ outcome: 'partial' }),
+        expect.anything(),
+      ],
+    })
+    syncer.fetch.mockResolvedValueOnce({
+      trackers: ['udp://c:80'],
+      sourceStatus: { s2: { ok: true, count: 1, urls: ['udp://c:80'] } },
+    })
+    await manager.syncAndCurate('retry')
+    expect(
+      syncer.fetch.mock.lastCall?.[0].map((s: { id: string }) => s.id)
+    ).toEqual(['s2'])
+    expect(manager.getCuratedList().effective).toEqual(['udp://c:80'])
+  })
+
+  it('cannot restore a source disabled while its request is in flight', async () => {
+    const pending = deferred<Awaited<ReturnType<typeof syncer.fetch>>>()
+    syncer.fetch.mockReturnValueOnce(pending.promise)
+    const run = manager.syncAndCurate()
+    await vi.advanceTimersByTimeAsync(0)
+    settings.get().tracker.sources[0].enabled = false
+    await manager.applySelectionChange()
+    pending.resolve({
+      trackers: ['udp://late:80'],
+      sourceStatus: {
+        s1: { ok: true, urls: ['udp://late:80'], count: 1, elapsedMs: 0 },
+      },
+    })
+    await run
+    expect(manager.getCuratedList().effective).toEqual([])
+    expect(rpc.changeGlobalOption).toHaveBeenLastCalledWith({
+      'bt-tracker': '',
+      'bt-exclude-tracker': '',
+    })
+  })
+
+  it('records a pending apply when the engine rejects updated defaults', async () => {
+    rpc.changeGlobalOption.mockRejectedValueOnce(new Error('offline'))
+    await manager.syncAndCurate()
+    expect(manager.getCuratedList().pendingEngineApply).toBe(true)
+    expect(manager.getSyncStatus()).toBe('idle')
+    await manager.init()
+    await vi.advanceTimersByTimeAsync(0)
+    eventBus.emit(Events.EngineRecovered)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(manager.getCuratedList().pendingEngineApply).toBe(false)
+  })
+
+  it('filters blacklisted additions before sending them to the engine without pausing tasks', async () => {
+    settings.get().tracker.blacklistEnabled = true
+    settings.get().tracker.blacklistSources.push({
+      ...settings.get().tracker.sources[0],
+      id: 'b1',
+      url: 'http://example/blacklist',
+    })
+    syncer.fetch
+      .mockResolvedValueOnce({
+        trackers: ['udp://a:80', 'udp://b:80'],
+        sourceStatus: {
+          s1: { ok: true, count: 2, urls: ['udp://a:80', 'udp://b:80'] },
+        },
+      })
+      .mockResolvedValueOnce({
+        trackers: ['udp://b:80'],
+        sourceStatus: { b1: { ok: true, count: 1, urls: ['udp://b:80'] } },
+      })
+    await manager.syncAndCurate()
+    expect(rpc.changeGlobalOption.mock.lastCall?.[0]['bt-tracker']).toBe(
+      'udp://a:80'
+    )
+    expect(rpc.pause).not.toHaveBeenCalled()
+    expect(rpc.changeOption).not.toHaveBeenCalled()
+  })
+
+  it('keeps the sync single-flight through final persistence and suppresses shutdown publication', async () => {
+    const finalSave = deferred<void>()
+    let saves = 0
+    store.save.mockImplementation(() =>
+      ++saves === 3 ? finalSave.promise : Promise.resolve()
+    )
+    const run = manager.syncAndCurate()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(saves).toBe(3)
+    expect(manager.syncAndCurate()).toBe(run)
+    const drain = manager.stopAndDrain()
+    eventBus.emit.mockClear()
+    finalSave.resolve()
+    await drain
+    expect(eventBus.emit).not.toHaveBeenCalled()
+  })
+
+  it('emits TrackerListUpdated after sync', async () => {
+    await manager.syncAndCurate()
+    expect(eventBus.emit).toHaveBeenCalledWith(
+      'event:trackerListUpdated',
+      expect.objectContaining({ count: 3 })
+    )
+  })
+
+  it('passes proxy to syncer.fetch when updateTrackers scope is on', async () => {
+    settings.getProxy.mockReturnValue({
+      enabled: true,
+      protocol: 'http',
+      host: 'p.example.com',
+      port: 8080,
+      user: '',
+      password: '',
+      bypass: [],
+      scopes: { download: false, updateApp: false, updateTrackers: true },
+    })
+    await manager.syncAndCurate()
+    expect(syncer.fetch).toHaveBeenCalledWith(
+      expect.anything(),
+      { server: 'http://p.example.com:8080' },
+      expect.any(Object),
+      expect.any(AbortSignal)
+    )
+  })
+
+  it('passes undefined proxy when updateTrackers scope is off', async () => {
+    await manager.syncAndCurate()
+    expect(syncer.fetch).toHaveBeenCalledWith(
+      expect.anything(),
+      undefined,
+      expect.any(Object),
+      expect.any(AbortSignal)
+    )
+  })
+
+  it('uses the resolved HTTP bridge for SOCKS5 tracker fetches', async () => {
+    settings.getProxy.mockReturnValue({
+      enabled: true,
+      protocol: 'socks5',
+      host: 'p.example.com',
+      port: 1080,
+      user: '',
+      password: '',
+      bypass: [],
+      scopes: { download: false, updateApp: false, updateTrackers: true },
+    })
+    const resolveProxyUrl = vi.fn().mockResolvedValue('http://127.0.0.1:43123')
+    const bridgedManager = new TrackerManager(
+      settings as never,
+      rpc as never,
+      eventBus as never,
+      syncer as never,
+      prober as never,
+      store as never,
+      undefined,
+      resolveProxyUrl
+    )
+
+    await bridgedManager.syncAndCurate()
+    bridgedManager.dispose()
+
+    expect(resolveProxyUrl).toHaveBeenCalledWith(settings.getProxy())
+    expect(syncer.fetch).toHaveBeenCalledWith(
+      expect.anything(),
+      { server: 'http://127.0.0.1:43123' },
+      expect.any(Object),
+      expect.any(AbortSignal)
+    )
+  })
+
+  it('invalidateProxyCache is callable without throwing', () => {
+    expect(() => manager.invalidateProxyCache()).not.toThrow()
+  })
+
+  it('skips source fetch when sourcesEnabled is false and writes empty bt-tracker', async () => {
+    settings.get.mockReturnValue({
+      tracker: {
+        autoSync: false,
+        syncIntervalHours: 12,
+        sources: [
+          {
+            id: 's1',
+            label: 'S1',
+            url: 'http://example/list',
+            builtin: false,
+            enabled: true,
+            cdn: false,
+          },
+        ],
+        sourcesEnabled: false,
+        probeEnabled: true,
+        probeTimeoutMs: 5000,
+        healthyThresholdMs: 3000,
+        minSuccessRate: 0.5,
+        maxTrackerCount: 50,
+        blacklistEnabled: false,
+        blacklistSources: [],
+      },
+    })
+
+    await manager.syncAndCurate()
+
+    expect(syncer.fetch).not.toHaveBeenCalled()
+    expect(prober.probe).not.toHaveBeenCalled()
+    expect(rpc.changeGlobalOption).toHaveBeenCalledWith(
+      expect.objectContaining({ 'bt-tracker': '' })
+    )
+  })
+
+  it('builds sourceMap from per-source urls in SourceFetchStatus', async () => {
+    syncer.fetch.mockResolvedValue({
+      trackers: ['udp://a:80', 'udp://b:80'],
+      sourceStatus: {
+        s1: {
+          ok: true,
+          count: 2,
+          elapsedMs: 5,
+          urls: ['udp://a:80', 'udp://b:80'],
+        },
+      },
+    })
+    prober.probe.mockResolvedValue([
+      {
+        url: 'udp://a:80',
+        protocol: 'udp',
+        status: 'healthy',
+        lastProbeMs: 10,
+        lastProbeAt: Date.now(),
+        successCount: 1,
+        failCount: 0,
+        successRate: 1.0,
+      },
+      {
+        url: 'udp://b:80',
+        protocol: 'udp',
+        status: 'healthy',
+        lastProbeMs: 20,
+        lastProbeAt: Date.now(),
+        successCount: 1,
+        failCount: 0,
+        successRate: 1.0,
+      },
+    ])
+
+    await manager.syncAndCurate()
+
+    expect(store.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceMap: { 'udp://a:80': ['s1'], 'udp://b:80': ['s1'] },
+      })
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Helpers for the new-method tests
+// ---------------------------------------------------------------------------
+
+interface RpcOverrides {
+  status?: string
+  getOption?: Record<string, string>
+}
+
+function makeRpcMock(overrides: RpcOverrides = {}) {
+  return {
+    changeGlobalOption: vi.fn().mockResolvedValue('OK'),
+    changeOption: vi.fn().mockResolvedValue('OK'),
+    pause: vi.fn().mockResolvedValue('gid-1'),
+    unpause: vi.fn().mockResolvedValue('gid-1'),
+    tellStatus: vi
+      .fn()
+      .mockResolvedValue({ status: overrides.status ?? 'active' }),
+    getOption: vi
+      .fn()
+      .mockResolvedValue(overrides.getOption ?? { 'bt-tracker': '' }),
+  }
+}
+
+interface ManagerOverrides {
+  curatedEffective?: string[]
+}
+
+function makeManager(
+  rpc: ReturnType<typeof makeRpcMock>,
+  overrides: ManagerOverrides = {}
+) {
+  const settings = createMockSettingsManager()
+  const eventBus = createMockEventBus()
+  const syncer = createMockSyncer()
+  const prober = createMockProber()
+
+  // Build a store that seeds the curated effective list immediately on load
+  const effectiveTrackers = overrides.curatedEffective ?? []
+  const store = {
+    load: vi.fn().mockResolvedValue({
+      effective: effectiveTrackers,
+      blacklist: [],
+      healthMap: {},
+      sourceMap: Object.fromEntries(
+        effectiveTrackers.map((url) => [url, ['s1']])
+      ),
+      lastSyncAt: Date.now(),
+      lastProbeAt: null,
+    }),
+    save: vi.fn().mockResolvedValue(undefined),
+    mergeHealth: vi
+      .fn()
+      .mockImplementation((_existing: unknown, fresh: { url: string }[]) => {
+        const map: Record<string, unknown> = {}
+        for (const h of fresh) map[h.url] = h
+        return map
+      }),
+  }
+  const taskActions = {
+    pauseTask: vi.fn(async () => undefined),
+    resumeTask: vi.fn(async () => undefined),
+  }
+
+  const mgr = new TrackerManager(
+    settings as never,
+    rpc as never,
+    eventBus as never,
+    syncer as never,
+    prober as never,
+    store as never,
+    taskActions
+  )
+  eventBus.emit(Events.EngineRecovered)
+  // Eagerly initialise so curated.effective is populated from the store mock
+  return { manager: mgr, initPromise: mgr.init(), taskActions }
+}
+
+describe('TrackerManager.setBtTracker', () => {
+  it('pauses and resumes an active task through public-id actions', async () => {
+    const rpc = makeRpcMock({ status: 'active' })
+    const { manager, initPromise, taskActions } = makeManager(rpc)
+    await initPromise
+    await manager.setBtTracker('task-1', 'gid-1', [
+      'http://a.example/announce',
+      'udp://b.example:80',
+    ])
+    expect(taskActions.pauseTask).toHaveBeenCalledWith('task-1')
+    expect(rpc.changeOption).toHaveBeenCalledWith('gid-1', {
+      'bt-tracker': 'http://a.example/announce,udp://b.example:80',
+    })
+    expect(taskActions.resumeTask).toHaveBeenCalledWith('task-1')
+    expect(rpc.pause).not.toHaveBeenCalled()
+    expect(rpc.unpause).not.toHaveBeenCalled()
+  })
+
+  it('does not invoke public pause/resume actions when status is paused', async () => {
+    const rpc = makeRpcMock({ status: 'paused' })
+    const { manager, initPromise, taskActions } = makeManager(rpc)
+    await initPromise
+    await manager.setBtTracker('task-1', 'gid-1', ['http://a'])
+    expect(taskActions.pauseTask).not.toHaveBeenCalled()
+    expect(taskActions.resumeTask).not.toHaveBeenCalled()
+    expect(rpc.changeOption).toHaveBeenCalled()
+  })
+
+  it('resumes through the public-id action when changeOption rejects', async () => {
+    const rpc = makeRpcMock({ status: 'active' })
+    rpc.changeOption.mockRejectedValue(new Error('engine rejected option'))
+    const { manager, initPromise, taskActions } = makeManager(rpc)
+    await initPromise
+
+    await expect(
+      manager.setBtTracker('task-1', 'gid-1', ['http://a'])
+    ).rejects.toThrow('engine rejected option')
+
+    expect(taskActions.pauseTask).toHaveBeenCalledWith('task-1')
+    expect(taskActions.resumeTask).toHaveBeenCalledWith('task-1')
+  })
+
+  it('resumes after dispose wins while the public pause action is pending', async () => {
+    const pauseStarted = deferred<void>()
+    const allowPause = deferred<void>()
+    const rpc = makeRpcMock({ status: 'active' })
+    const { manager, initPromise, taskActions } = makeManager(rpc)
+    taskActions.pauseTask.mockImplementation(async () => {
+      pauseStarted.resolve()
+      await allowPause.promise
+    })
+    await initPromise
+
+    const setting = manager.setBtTracker('task-1', 'gid-1', ['http://a'])
+    await pauseStarted.promise
+    manager.dispose()
+    allowPause.resolve()
+
+    await expect(setting).rejects.toThrow('TrackerManager is disposed')
+    expect(rpc.changeOption).not.toHaveBeenCalled()
+    expect(taskActions.resumeTask).toHaveBeenCalledWith('task-1')
+  })
+
+  it('resumes after dispose wins while changeOption is pending', async () => {
+    const changeStarted = deferred<void>()
+    const allowChange = deferred<void>()
+    const rpc = makeRpcMock({ status: 'active' })
+    rpc.changeOption.mockImplementation(async () => {
+      changeStarted.resolve()
+      await allowChange.promise
+      return 'OK'
+    })
+    const { manager, initPromise, taskActions } = makeManager(rpc)
+    await initPromise
+
+    const setting = manager.setBtTracker('task-1', 'gid-1', ['http://a'])
+    await changeStarted.promise
+    manager.dispose()
+    allowChange.resolve()
+
+    await expect(setting).rejects.toThrow('TrackerManager is disposed')
+    expect(taskActions.pauseTask).toHaveBeenCalledWith('task-1')
+    expect(taskActions.resumeTask).toHaveBeenCalledWith('task-1')
+  })
+
+  it('stopAndDrain gates new changes and waits for resume compensation', async () => {
+    const changeStarted = deferred<void>()
+    const allowChange = deferred<void>()
+    const resumeStarted = deferred<void>()
+    const allowResume = deferred<void>()
+    const rpc = makeRpcMock({ status: 'active' })
+    rpc.changeOption.mockImplementation(async () => {
+      changeStarted.resolve()
+      await allowChange.promise
+      return 'OK'
+    })
+    const { manager, initPromise, taskActions } = makeManager(rpc)
+    taskActions.resumeTask.mockImplementation(async () => {
+      resumeStarted.resolve()
+      await allowResume.promise
+    })
+    await initPromise
+
+    const setting = manager.setBtTracker('task-1', 'gid-1', ['http://a'])
+    await changeStarted.promise
+    const draining = manager.stopAndDrain()
+
+    await expect(
+      manager.setBtTracker('task-2', 'gid-2', ['http://b'])
+    ).rejects.toThrow('TrackerManager is disposed')
+    allowChange.resolve()
+    await resumeStarted.promise
+
+    let drained = false
+    void draining.then(() => {
+      drained = true
+    })
+    await Promise.resolve()
+    expect(drained).toBe(false)
+
+    allowResume.resolve()
+    await expect(setting).rejects.toThrow('TrackerManager is disposed')
+    await draining
+
+    expect(taskActions.resumeTask).toHaveBeenCalledWith('task-1')
+    expect(drained).toBe(true)
+  })
+
+  it('writes empty bt-tracker for empty list', async () => {
+    const rpc = makeRpcMock({ status: 'paused' })
+    const { manager, initPromise } = makeManager(rpc)
+    await initPromise
+    await manager.setBtTracker('task-1', 'gid-1', [])
+    expect(rpc.changeOption).toHaveBeenCalledWith('gid-1', {
+      'bt-tracker': '',
+    })
+  })
+})
+
+describe('TrackerManager.syncBtTracker', () => {
+  it('additively merges global into effective and writes back', async () => {
+    const rpc = makeRpcMock({
+      status: 'paused',
+      getOption: { 'bt-tracker': 'http://a.example/,http://b.example/' },
+    })
+    const { manager, initPromise } = makeManager(rpc, {
+      curatedEffective: ['http://b.example/', 'http://c.example/'],
+    })
+    await initPromise
+    await manager.syncBtTracker('task-1', 'gid-1', false)
+    const optsArg = (rpc.changeOption as Mock).mock.calls[0][1]
+    const trackers = (optsArg['bt-tracker'] as string).split(',')
+    expect(new Set(trackers)).toEqual(
+      new Set(['http://a.example/', 'http://b.example/', 'http://c.example/'])
+    )
+  })
+
+  it('is a no-op for private torrents', async () => {
+    const rpc = makeRpcMock({ status: 'paused' })
+    const { manager, initPromise } = makeManager(rpc, {
+      curatedEffective: ['http://x'],
+    })
+    await initPromise
+    await manager.syncBtTracker('task-1', 'gid-1', true)
+    expect(rpc.changeOption).not.toHaveBeenCalled()
+  })
+})
+
+describe('TrackerManager.applySourcesChange', () => {
+  it('clears bt-tracker when disabled', async () => {
+    const rpc = makeRpcMock()
+    const { manager, initPromise } = makeManager(rpc)
+    await initPromise
+    await manager.applySourcesChange(false)
+    expect(rpc.changeGlobalOption).toHaveBeenCalledWith({
+      'bt-tracker': '',
+      'bt-exclude-tracker': '',
+    })
+  })
+
+  it('triggers syncAndCurate when enabled', async () => {
+    const rpc = makeRpcMock()
+    const { manager, initPromise } = makeManager(rpc)
+    await initPromise
+    const spy = vi.spyOn(manager, 'syncAndCurate').mockResolvedValue({
+      totalFetched: 0,
+      totalHealthy: 0,
+      totalCurated: 0,
+      syncResult: { trackers: [], sourceStatus: {} },
+    })
+    await manager.applySourcesChange(true)
+    expect(spy).toHaveBeenCalled()
+  })
+})
+
+describe('TrackerManager.applyBlacklistChange', () => {
+  it('clears bt-exclude-tracker when disabled', async () => {
+    const rpc = makeRpcMock()
+    const { manager, initPromise } = makeManager(rpc)
+    await initPromise
+    await manager.applyBlacklistChange(false)
+    expect(rpc.changeGlobalOption).toHaveBeenCalledWith({
+      'bt-tracker': '',
+      'bt-exclude-tracker': '',
+    })
+  })
+
+  it('triggers syncAndCurate when enabled', async () => {
+    const rpc = makeRpcMock()
+    const { manager, initPromise } = makeManager(rpc)
+    await initPromise
+    const spy = vi.spyOn(manager, 'syncAndCurate').mockResolvedValue({
+      totalFetched: 0,
+      totalHealthy: 0,
+      totalCurated: 0,
+      syncResult: { trackers: [], sourceStatus: {} },
+    })
+    await manager.applyBlacklistChange(true)
+    expect(spy).toHaveBeenCalled()
+  })
+})
+
+describe('TrackerManager engine-ready cache push', () => {
+  function makeStoreWithCurated(cached: CuratedTrackerList) {
+    return {
+      load: vi.fn().mockResolvedValue(cached),
+      save: vi.fn().mockResolvedValue(undefined),
+      mergeHealth: vi
+        .fn()
+        .mockImplementation((_existing: unknown, fresh: { url: string }[]) => {
+          const map: Record<string, unknown> = {}
+          for (const h of fresh) map[h.url] = h
+          return map
+        }),
+    }
+  }
+
+  function makeSettingsWithFlags(opts: {
+    sourcesEnabled: boolean
+    blacklistEnabled: boolean
+  }) {
+    const base = createMockSettingsManager()
+    base.get.mockReturnValue({
+      tracker: {
+        autoSync: false,
+        syncIntervalHours: 12,
+        sources: [
+          {
+            id: 's1',
+            label: 'S1',
+            url: 'http://example/list',
+            enabled: true,
+            builtin: false,
+            cdn: false,
+          },
+        ],
+        sourcesEnabled: opts.sourcesEnabled,
+        probeEnabled: true,
+        probeTimeoutMs: 5000,
+        healthyThresholdMs: 3000,
+        minSuccessRate: 0.5,
+        maxTrackerCount: 50,
+        blacklistEnabled: opts.blacklistEnabled,
+        blacklistSources: [
+          {
+            id: 'b1',
+            label: 'B1',
+            url: 'http://example/blocked',
+            enabled: true,
+            builtin: false,
+            cdn: false,
+          },
+        ],
+      },
+    })
+    return base
+  }
+
+  function makeCached(
+    effective: string[],
+    blacklist: string[] = []
+  ): CuratedTrackerList {
+    return {
+      effective,
+      blacklist,
+      healthMap: {},
+      sourceMap: Object.fromEntries([
+        ...effective.map((url) => [url, ['s1']]),
+        ...blacklist.map((url) => [url, ['b1']]),
+      ]),
+      lastSyncAt: Date.now(),
+      lastProbeAt: 1,
+    }
+  }
+
+  function makeHarness(
+    cached: CuratedTrackerList,
+    flags = { sourcesEnabled: true, blacklistEnabled: false }
+  ) {
+    const rpc = makeRpcMock()
+    const eventBus = createMockEventBus()
+    const store = makeStoreWithCurated(cached)
+    const mgr = new TrackerManager(
+      makeSettingsWithFlags(flags) as never,
+      rpc as never,
+      eventBus as never,
+      createMockSyncer() as never,
+      createMockProber() as never,
+      store as never
+    )
+    return { mgr, rpc, eventBus, store }
+  }
+
+  it('waits for engine ready before pushing cached effective and blacklist', async () => {
+    const { mgr, rpc, eventBus } = makeHarness(
+      makeCached(['udp://cached-tracker:80'], ['udp://cached-bad:80']),
+      { sourcesEnabled: true, blacklistEnabled: true }
+    )
+    await mgr.init()
+    expect(rpc.changeGlobalOption).not.toHaveBeenCalled()
+
+    eventBus.emit(Events.EngineRecovered)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(rpc.changeGlobalOption).toHaveBeenCalledWith({
+      'bt-tracker': 'udp://cached-tracker:80',
+      'bt-exclude-tracker': '',
+    })
+    mgr.dispose()
+  })
+
+  it('pushes after init when engine ready arrives while cache is loading', async () => {
+    const cached = makeCached(['udp://cached-tracker:80'])
+    const loaded = deferred<CuratedTrackerList>()
+    const { mgr, rpc, eventBus, store } = makeHarness(cached)
+    store.load.mockReturnValueOnce(loaded.promise)
+
+    const initializing = mgr.init()
+    eventBus.emit(Events.EngineRecovered)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(rpc.changeGlobalOption).not.toHaveBeenCalled()
+
+    loaded.resolve(cached)
+    await initializing
+    expect(rpc.changeGlobalOption).toHaveBeenCalledWith({
+      'bt-tracker': 'udp://cached-tracker:80',
+      'bt-exclude-tracker': '',
+    })
+    mgr.dispose()
+  })
+
+  it('reapplies cached state after an engine reconnect', async () => {
+    const { mgr, rpc, eventBus } = makeHarness(
+      makeCached(['udp://cached-tracker:80'])
+    )
+    await mgr.init()
+
+    eventBus.emit(Events.EngineRecovered)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    eventBus.emit(Events.EngineDisconnected)
+    eventBus.emit(Events.EngineRecovered)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(rpc.changeGlobalOption).toHaveBeenCalledTimes(2)
+    mgr.dispose()
+  })
+
+  it('does not push after disposal', async () => {
+    const { mgr, rpc, eventBus } = makeHarness(
+      makeCached(['udp://cached-tracker:80'])
+    )
+    await mgr.init()
+    mgr.dispose()
+
+    eventBus.emit(Events.EngineRecovered)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(rpc.changeGlobalOption).not.toHaveBeenCalled()
+    expect(eventBus.off).toHaveBeenCalledWith(
+      Events.EngineRecovered,
+      expect.any(Function)
+    )
+  })
+
+  it('waits for an accepted cache push during shutdown', async () => {
+    const pushStarted = deferred<void>()
+    const allowPush = deferred<void>()
+    const { mgr, rpc, eventBus } = makeHarness(
+      makeCached(['udp://cached-tracker:80'])
+    )
+    rpc.changeGlobalOption.mockImplementation(async () => {
+      pushStarted.resolve()
+      await allowPush.promise
+      return 'OK'
+    })
+    await mgr.init()
+    eventBus.emit(Events.EngineRecovered)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await pushStarted.promise
+
+    const draining = mgr.stopAndDrain()
+    let drained = false
+    void draining.then(() => {
+      drained = true
+    })
+    await Promise.resolve()
+    expect(drained).toBe(false)
+
+    allowPush.resolve()
+    await draining
+    expect(drained).toBe(true)
+  })
+
+  it('clears stale defaults when both subsystems are disabled', async () => {
+    const { mgr, rpc, eventBus } = makeHarness(
+      makeCached(['udp://x'], ['udp://y']),
+      { sourcesEnabled: false, blacklistEnabled: false }
+    )
+    await mgr.init()
+    eventBus.emit(Events.EngineRecovered)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(rpc.changeGlobalOption).toHaveBeenCalledWith({
+      'bt-tracker': '',
+      'bt-exclude-tracker': '',
+    })
+    mgr.dispose()
+  })
+})

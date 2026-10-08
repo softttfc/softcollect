@@ -1,0 +1,2989 @@
+{
+  "operatorUnlock": {
+    "title": "解锁 Motrix",
+    "help": "此服务器需要管理员令牌。请在主机上设置 MOTRIX_OPERATOR_TOKEN，或读取 <dataDir>/operator-token 中的令牌，然后粘贴到下方。",
+    "placeholder": "管理员令牌",
+    "error": "管理员令牌无效。请核对主机上的 MOTRIX_OPERATOR_TOKEN 或 <dataDir>/operator-token 后重试。",
+    "submit": "解锁"
+  },
+  "operatorAdmin": {
+    "help": "用法：\n  motrix-admin pairing pending [--json]\n  motrix-admin pairing approve <配对码> [--json]\n  motrix-admin pairing deny <配对码> [--json]\n\n此命令仅通过容器内的本机回环地址与正在运行的 Motrix 服务器通信。",
+    "errorPrefix": "motrix-admin：{{message}}",
+    "usageHint": "运行 `motrix-admin --help` 查看用法。",
+    "pending": {
+      "none": "没有待处理的配对请求。",
+      "row": "{{userCode}}  {{clientName}}  {{clientVersion}}  剩余 {{ttl}}",
+      "ttl": "{{minutes}} 分 {{seconds}} 秒"
+    },
+    "decision": {
+      "approve": "已允许 {{clientName}}（{{clientVersion}}）使用配对码 {{userCode}}。",
+      "deny": "已拒绝 {{clientName}}（{{clientVersion}}）使用配对码 {{userCode}}。"
+    },
+    "errors": {
+      "usage": {
+        "jsonRepeated": "--json 只能指定一次。",
+        "unknownOption": "未知的命令行选项。",
+        "pairingCommandRequired": "需要使用 pairing 命令。",
+        "pairingOperationRequired": "需要使用 pairing pending、pairing approve 配对码或 pairing deny 配对码。",
+        "pairingCodeInvalid": "配对码必须包含 8 个 ASCII 字符，且不能使用 I、O、0 或 1。",
+        "portInvalid": "PORT 必须是 1 到 65535 之间的整数。"
+      },
+      "credential": {
+        "tokenHeaderInvalid": "MOTRIX_OPERATOR_TOKEN 不能用于 HTTP 请求头。",
+        "dataDirNotAbsolute": "MOTRIX_DATA_DIR 必须是绝对路径。",
+        "unavailable": "管理员凭据不可用。请设置 MOTRIX_OPERATOR_TOKEN，或确保数据目录中存在 operator-token 文件。",
+        "notFile": "管理员凭据路径不是普通文件。",
+        "unreadable": "无法读取管理员凭据。",
+        "invalid": "管理员凭据文件无效。",
+        "rejected": "Motrix 拒绝了管理员凭据。"
+      },
+      "server": {
+        "responseUnreadable": "无法读取 Motrix 返回的响应。",
+        "responseOversized": "Motrix 返回的响应过大。",
+        "responseInvalidJson": "Motrix 返回了无效的 JSON 响应。",
+        "rpcHttp": "Motrix 配对 RPC 请求失败，HTTP 状态码为 {{status}}。",
+        "approvalUnavailable": "正在运行的 Motrix 服务器不支持配对审批。",
+        "pendingResponseInvalid": "Motrix 返回了无效的待处理配对响应。",
+        "decisionOutcomeUnknown": "配对决定的结果未知。请先运行 pairing pending，再决定是否重试。",
+        "decisionResponseInvalid": "Motrix 返回了无效的配对决定响应。",
+        "requestNoLongerPending": "配对请求已不再处于待处理状态。",
+        "noMatchingRequest": "没有待处理的配对请求与 {{userCode}} 匹配。",
+        "ambiguousRequest": "有多个待处理的配对请求与 {{userCode}} 匹配，因此未执行任何决定。",
+        "unexpected": "motrix-admin 遇到意外故障。"
+      },
+      "unavailable": {
+        "loopback": "无法通过容器内的本机回环地址连接正在运行的 Motrix 服务器。",
+        "approvalNotReady": "正在运行的 Motrix 服务器尚未准备好配对审批。"
+      }
+    }
+  },
+  "common": {
+    "clearSearch": "清除搜索",
+    "download": "下载",
+    "cancel": "取消",
+    "save": "保存",
+    "close": "关闭",
+    "loading": "加载中…",
+    "name": "名称：",
+    "error": "错误",
+    "remove": "移除",
+    "collapse": "收起",
+    "apply": "应用",
+    "confirm": "确认",
+    "status": {
+      "finalizing": "收尾中…"
+    },
+    "reset": "重置",
+    "retry": "重试",
+    "showPassword": "显示密码",
+    "hidePassword": "隐藏密码"
+  },
+  "quit": {
+    "confirm": {
+      "message_other": "还有 {{count}} 个下载正在进行。",
+      "detail": "现在退出会暂停下载。确定要退出吗？",
+      "quitButton": "退出",
+      "dontAskAgain": "不再询问"
+    }
+  },
+  "nav": {
+    "dashboard": "仪表板",
+    "downloads": "下载",
+    "completed": "已完成",
+    "trackers": "Trackers",
+    "plugins": "插件",
+    "notifications": "通知",
+    "settings": "设置"
+  },
+  "chrome": {
+    "minimize": "最小化",
+    "maximize": "最大化",
+    "restore": "还原",
+    "close": "关闭",
+    "toggleSidebar": "切换边栏",
+    "newTask": "新建任务",
+    "sidebarTitle": "侧边栏",
+    "sidebarDescription": "应用导航。"
+  },
+  "tray": {
+    "newTask": "新建任务",
+    "newTorrentTask": "新建种子任务",
+    "openTorrentFile": "打开种子文件",
+    "showMotrix": "显示 Motrix",
+    "manual": "使用手册",
+    "checkUpdates": "检查更新",
+    "preferences": "设置",
+    "quit": "退出"
+  },
+  "panel": {
+    "connection": {
+      "polling": "定时刷新中",
+      "reconnecting": "正在重连服务器…",
+      "unavailable": "无法连接服务器",
+      "originMismatch": "访问地址不匹配"
+    },
+    "dashboard": {
+      "title": "仪表板",
+      "engine": {
+        "title": "引擎",
+        "features": "特性",
+        "startFailed": "aria2 启动失败",
+        "state": {
+          "ready": "就绪",
+          "starting": "启动中…",
+          "reconnecting": "重连中…",
+          "failed": "失败",
+          "disconnected": "未连接",
+          "stopped": "已停止"
+        },
+        "name": "Aria2",
+        "version": "版本",
+        "rpcPort": "RPC 端口",
+        "listenPort": "监听端口",
+        "diagnostics": {
+          "title": "引擎诊断",
+          "description": "检查引擎、识别占用 Motrix RPC 端口的进程，并安全恢复引擎。",
+          "open": "诊断",
+          "checking": "正在检查引擎…",
+          "runAgain": "重新检查",
+          "loadFailed": "无法运行引擎诊断。",
+          "currentStatus": "当前状态",
+          "lastChecked": "检查于 {{time}}",
+          "checks": {
+            "binary": "引擎",
+            "features": "功能",
+            "rpc": "RPC 端口",
+            "process": "进程",
+            "communication": "连接"
+          },
+          "binary": {
+            "available": "{{name}} {{version}}",
+            "unavailable": "{{name}} 缺失或无法启动。"
+          },
+          "features": {
+            "none": "未报告",
+            "unavailable": "无法获取"
+          },
+          "rpc": {
+            "listening": "{{port}}（监听中）",
+            "available": "{{port}}（空闲）",
+            "occupied": "{{port}}（已占用）"
+          },
+          "process": {
+            "none": "无端口冲突",
+            "unidentified": "无法识别，不会终止",
+            "current_app": "PID {{pid}}（{{name}}），Motrix 管理",
+            "verified_orphan": "PID {{pid}}（{{name}}），已验证的 Motrix 残留进程，可安全终止",
+            "external_aria2": "PID {{pid}}（{{name}}），归属未验证，不会终止",
+            "other": "PID {{pid}}（{{name}}），归属未验证，不会终止",
+            "unknown": "PID {{pid}}，无法识别，不会终止"
+          },
+          "communication": {
+            "ready": "Motrix 可以正常连接 aria2。"
+          },
+          "reason": {
+            "port_in_use": "Motrix RPC 端口被占用，aria2 无法启动。",
+            "binary_unavailable": "内置 aria2 可执行文件缺失或不可用。",
+            "spawn_failed": "无法创建 aria2 引擎进程。",
+            "rpc_unavailable": "aria2 引擎已启动，但未能接受 Motrix 的 RPC 连接。",
+            "unexpected_exit": "aria2 引擎意外退出。",
+            "health_check_failed": "aria2 引擎已停止响应 Motrix。",
+            "unknown": "aria2 引擎因未知原因启动失败。"
+          },
+          "recommendation": {
+            "title": "建议的恢复方式",
+            "retry": "端口当前空闲，可以在不更改设置的情况下重试 aria2。",
+            "force_terminate": "已确认该进程由 Motrix 启动。强制终止 PID {{pid}} 后，在 Motrix RPC 端口 {{rpcPort}} 重新启动 aria2。",
+            "switch_port": "无法安全终止占用进程。仅在必要时改用端口 {{port}}，或自行关闭冲突进程。"
+          },
+          "technicalDetails": "技术详情",
+          "retry": "重试",
+          "restart": "重启引擎",
+          "switchPort": "改用端口 {{port}}",
+          "forceRecover": "强制终止并恢复",
+          "recovered": "aria2 引擎已恢复可用。",
+          "recoveredOnPort": "aria2 引擎已在 RPC 端口 {{port}} 恢复。",
+          "recoveryFailed": "引擎恢复失败，请重新诊断以获取最新状态。",
+          "fallback": {
+            "available": "Motrix 默认端口 {{port}} 当前空闲，可以立即恢复。",
+            "verifiedOrphan": "Motrix 默认端口 {{port}} 被已验证的 Motrix 遗留 aria2 进程（PID {{pid}}）占用，可以在恢复前安全终止。",
+            "blocked": "Motrix 默认端口 {{port}} 被 PID {{pid}}（{{name}}）占用，但无法确认进程归属，因此不会将其终止。",
+            "unidentified": "无法识别占用 Motrix 默认端口 {{port}} 的进程，将继续使用当前端口。",
+            "restore": "恢复 Motrix 默认端口 {{port}}",
+            "restoring": "正在恢复 Motrix 默认端口 {{port}}…",
+            "restoredDefault": "已恢复 Motrix 默认 RPC 端口 {{port}}。",
+            "confirm": {
+              "title": "终止遗留进程并恢复端口 {{port}}？",
+              "description": "PID {{pid}} 已验证为 Motrix 遗留的 aria2 进程。该进程将被终止，默认端口 {{port}} 会保存到设置中，随后重启 aria2。",
+              "action": "终止并恢复端口 {{port}}"
+            }
+          },
+          "confirmForce": {
+            "title": "强制终止残留的 aria2 进程？",
+            "description": "PID {{pid}} 与 Motrix 内置可执行文件、私有 RPC 密钥和数据路径一致。该进程会被立即终止，随后 aria2 将在 Motrix RPC 端口重新启动。",
+            "action": "强制终止并恢复"
+          },
+          "details": "诊断详情",
+          "versionUnknown": "版本信息不可用",
+          "copy": "复制诊断信息",
+          "copied": "已复制",
+          "copyFailed": "无法复制诊断信息，请重试。",
+          "refreshFailed": "未能刷新诊断信息，以下为上次成功检查的结果。",
+          "summary": {
+            "ready": "下载引擎运行正常",
+            "starting": "下载引擎正在启动",
+            "restarting": "下载引擎正在恢复",
+            "stopped": "下载引擎已停止",
+            "port_in_use": "引擎控制端口被占用",
+            "binary_unavailable": "下载引擎不可用",
+            "spawn_failed": "下载引擎无法启动",
+            "rpc_unavailable": "引擎控制连接不可用",
+            "unexpected_exit": "下载引擎意外退出",
+            "health_check_failed": "下载引擎停止响应",
+            "unknown": "下载引擎不可用"
+          },
+          "impact": {
+            "failed": "暂时无法控制下载，任务状态可能尚未更新。",
+            "connecting": "引擎就绪后，即可开始或管理下载。",
+            "stopped": "启动引擎以开始或管理下载。"
+          },
+          "runtime": {
+            "process": "进程",
+            "running": "运行中",
+            "notRunning": "未运行",
+            "connection": "连接",
+            "connected": "已连接",
+            "connecting": "正在连接…",
+            "disconnected": "未连接",
+            "unavailable": "不可用",
+            "connectionStatus": "{{transport}}（{{status}}）"
+          },
+          "port": {
+            "available": "{{port}}（空闲）",
+            "listening": "{{port}}（监听中）",
+            "occupied": "{{port}}（已占用）"
+          },
+          "motrixEngine": "aria2 Motrix",
+          "transport": {
+            "websocket": "WebSocket"
+          }
+        }
+      },
+      "speed": {
+        "up": "上传",
+        "down": "下载",
+        "peak": "峰值 {{value}}",
+        "offline": "离线"
+      },
+      "speedUp": {
+        "title": "上传速度"
+      },
+      "speedDown": {
+        "title": "下载速度"
+      },
+      "active": {
+        "title": "活跃任务",
+        "downloading": "下载中",
+        "seeding": "做种",
+        "waiting": "等待",
+        "error": "错误",
+        "engineOffline": "引擎离线"
+      },
+      "transfer": {
+        "title": "传输",
+        "rangeLabel": "传输范围",
+        "scope": {
+          "today": "今日",
+          "allTime": "累计"
+        },
+        "download": "下载",
+        "upload": "上传",
+        "sinceTime": "自 {{time}} 起",
+        "sinceDate": "自 {{date}} 起",
+        "empty": {
+          "today": "今天尚无传输记录。",
+          "allTime": "尚无传输记录。"
+        },
+        "loading": "正在加载传输数据",
+        "unavailable": "无法获取传输数据",
+        "retry": "重试",
+        "updated": "更新于 {{time}}",
+        "outOfDate": "数据可能已过期",
+        "totalLabel": "{{scope}}传输总量：{{value}}"
+      },
+      "activity": {
+        "title": "活动",
+        "loading": "正在加载活动数据",
+        "unavailable": "无法获取活动数据",
+        "retry": "重试",
+        "stale": "活动数据可能已过期",
+        "coverageDegraded": "自 {{time}} 起活动记录可能不完整",
+        "rangeSummary": "{{weeks}} 周下载活动，{{start}} 至 {{end}}",
+        "completedIntensity": "颜色深度表示已完成的下载任务数",
+        "less": "少",
+        "more": "多",
+        "weekday": {
+          "sun": "周日",
+          "mon": "周一",
+          "tue": "周二",
+          "wed": "周三",
+          "thu": "周四",
+          "fri": "周五",
+          "sat": "周六"
+        },
+        "tooltip": {
+          "completed": "完成 {{count}} 个",
+          "submitted": "提交 {{count}} 个",
+          "recovered": "包含在恢复时检测到的完成任务",
+          "recoveredCount": "恢复识别 {{count}} 个",
+          "untracked": "尚未开始记录",
+          "noData": "暂无活动数据",
+          "noDataOnDate": "{{date}}暂无活动数据",
+          "completedOnDate": "{{date}}完成 {{count}} 个",
+          "partial": "从 {{time}} 开始记录",
+          "partialShort": "当日记录不完整",
+          "coverage": "自 {{time}} 起记录可能不完整",
+          "coverageShort": "数据可能不完整",
+          "today": "今天，仍在更新"
+        }
+      },
+      "tasks": {
+        "title": "任务",
+        "viewLabel": "任务视图",
+        "view": {
+          "active": "活跃",
+          "failed": "失败",
+          "recent": "最近"
+        },
+        "newTask": "新建任务",
+        "more": "另有 {{count}} 项",
+        "loading": "正在加载任务",
+        "unavailable": "无法获取任务",
+        "retry": "重试",
+        "empty": {
+          "active": "暂无活跃任务",
+          "failed": "暂无失败任务",
+          "recent": "暂无完成记录"
+        },
+        "offline": "引擎离线",
+        "metric": {
+          "fetching": "获取中",
+          "ready": "已就绪",
+          "finalizing": "收尾中",
+          "queued": "排队中",
+          "paused": "已暂停"
+        },
+        "secondary": {
+          "metadata": "正在获取元数据",
+          "chooseFiles": "等待选择文件",
+          "finalizing": "正在完成下载",
+          "waiting": "等待开始",
+          "eta": "预计剩余 {{time}}",
+          "ratio": "分享率 {{ratio}}",
+          "saved": "已保存 {{percent}}%",
+          "offline": "离线（显示上次进度）",
+          "completed": "完成于 {{time}}",
+          "failed": "失败：{{reason}}",
+          "technicalDetail": "技术详情：{{detail}}"
+        },
+        "progressLabel": "{{name}} 的进度"
+      },
+      "configure": {
+        "action": "配置",
+        "addTile": "添加",
+        "addTitle": "添加卡片",
+        "apply": "应用",
+        "cancel": "取消",
+        "reset": "重置",
+        "drag": "拖拽卡片",
+        "removeTile": "移除卡片",
+        "resizeTile": "调整卡片大小",
+        "sizeGroup": "卡片尺寸",
+        "size": "{{width}} × {{height}}",
+        "currentSize": "当前尺寸：{{width}} × {{height}}",
+        "invalidCapacity": "没有足够空间容纳此尺寸",
+        "availabilityHints": {
+          "space": "缩小或移除其他卡片",
+          "bounds": "将卡片移离边缘后重试",
+          "unsupported": "请选择支持的尺寸"
+        },
+        "sizeLabels": {
+          "compact": "紧凑",
+          "wide": "横向",
+          "tall": "纵向",
+          "large": "大尺寸",
+          "fullWidth": "全宽",
+          "fullHeight": "全高"
+        },
+        "sizeUnavailable": {
+          "unsupported": "不支持",
+          "outOfBounds": "超出布局范围",
+          "insufficientSpace": "空间不足"
+        },
+        "presets": {
+          "action": "预设",
+          "custom": "自定义",
+          "undo": "撤销上次预设",
+          "balanced": {
+            "title": "均衡"
+          },
+          "taskFocus": {
+            "title": "任务优先"
+          },
+          "speedFocus": {
+            "title": "速度优先"
+          },
+          "compact": {
+            "title": "紧凑"
+          }
+        },
+        "saveFailed": "布局保存失败，请重试。",
+        "expandHint": "扩大窗口后可配置仪表板布局。"
+      },
+      "errors": {
+        "tileFailed": "{{tile}}：渲染出错",
+        "retry": "重试"
+      },
+      "speedLimit": {
+        "title": "限速",
+        "unlimited": "不限速",
+        "smart": "自动模式",
+        "settings": "限速设置",
+        "turtle": {
+          "off": "常规模式",
+          "on": "低速模式",
+          "auto": "自动模式"
+        },
+        "tooltip": {
+          "off": "使用常规速度上限",
+          "on": "立即使用低速上限",
+          "auto": "根据时间和网络带宽自动调整速度"
+        },
+        "reason": {
+          "base": "常规上限",
+          "turtle": "低速模式",
+          "schedule": "定时规则",
+          "videoApp": "视频应用",
+          "adaptive": "带宽预留"
+        }
+      },
+      "nat": {
+        "title": "NAT",
+        "compact": {
+          "state": {
+            "active": "已映射",
+            "settingUp": "映射中",
+            "failed": "映射",
+            "off": "未启用"
+          },
+          "caption": {
+            "active_other": "{{count}} 个端口",
+            "settingUp": "连接中…",
+            "failed": "暂不可用",
+            "off": "BT / DHT",
+            "waiting": "加载中…"
+          }
+        },
+        "internalIp": "本机 IP",
+        "gatewayIp": "路由器",
+        "caption": {
+          "off": "BT 端口映射已关闭",
+          "settingUp": "正在连接路由器…",
+          "failed": "自动映射暂不可用",
+          "waiting": "正在获取网络状态…"
+        },
+        "mappingDetails": "端口映射",
+        "mappingPurpose": {
+          "bt-listen": "BitTorrent",
+          "dht-listen": "DHT"
+        },
+        "portMapping": "内部端口 {{internal}} 到外部端口 {{external}}",
+        "noMappings": "暂无端口映射",
+        "state": {
+          "active": "已激活",
+          "settingUp": "初始化中",
+          "failed": "失败",
+          "off": "已关闭"
+        },
+        "retrying": "重试中 {{attempt}}/{{max}}",
+        "type": "类型",
+        "externalIp": "外网 IP",
+        "mappings": "映射",
+        "mappingsValue_other": "{{count}} 个",
+        "health": "健康",
+        "healthScore": {
+          "good": "良好",
+          "fair": "一般",
+          "poor": "较差",
+          "unknown": "—"
+        },
+        "natType": {
+          "open": "开放",
+          "fullcone": "完全锥型",
+          "restricted": "受限锥型",
+          "port-restricted": "端口受限",
+          "symmetric": "对称型",
+          "blocked": "阻断",
+          "unknown": "未知"
+        },
+        "lastCheck": "上次检测",
+        "lastCheckNever": "从未",
+        "actions": {
+          "group": "NAT 控制",
+          "enable": "启用 NAT",
+          "disable": "禁用 NAT",
+          "remap": "强制重映射",
+          "diagnose": "运行诊断",
+          "troubleshoot": "查看 NAT 排障手册",
+          "short": {
+            "enable": "启用",
+            "disable": "禁用",
+            "remap": "重映射",
+            "diagnose": "诊断",
+            "help": "帮助"
+          },
+          "settings": "NAT 设置"
+        },
+        "rateLimited": "操作过于频繁，请稍后再试",
+        "none": "—"
+      }
+    },
+    "completed": {
+      "title": "已完成",
+      "desc": "已完成的下载任务"
+    },
+    "trackers": {
+      "title": "Trackers",
+      "desc": "管理 Tracker 健康与订阅源",
+      "tab": {
+        "effective": "生效",
+        "blacklist": "黑名单"
+      },
+      "searchPlaceholder": "按 URL 过滤…",
+      "syncNow": "立即同步"
+    },
+    "downloads": {
+      "title": "下载",
+      "heading": {
+        "all": "全部下载",
+        "active": "进行中的下载",
+        "completed": "已完成的下载",
+        "error": "失败的下载"
+      },
+      "status": {
+        "queued": "排队中",
+        "fetchingMetadata": "获取信息中",
+        "metadataReady": "等待选择文件",
+        "downloading": "下载中",
+        "finalizing": "收尾中",
+        "seeding": "做种中",
+        "paused": "已暂停",
+        "completed": "已完成",
+        "error": "错误"
+      },
+      "column": {
+        "name": "名称",
+        "size": "大小",
+        "progress": "进度",
+        "down": "下载速度",
+        "up": "上传速度",
+        "eta": "剩余时间",
+        "connections": "连接",
+        "status": "状态",
+        "createdAt": "创建时间",
+        "finishedAt": "完成时间"
+      },
+      "columnHeader": {
+        "down": "下载速度",
+        "up": "上传速度"
+      },
+      "timestamp": {
+        "notRecorded": "未记录",
+        "notCompleted": "尚未完成",
+        "relativeDateTime": "{{date}} {{time}}"
+      },
+      "sort": {
+        "down": "下载速度",
+        "up": "上传速度",
+        "asc": "{{column}}：升序",
+        "desc": "{{column}}：降序",
+        "sortAscending": "按{{column}}升序排列",
+        "sortDescending": "按{{column}}降序排列",
+        "reset": "恢复默认顺序"
+      },
+      "empty": {
+        "noTasks": "暂无下载任务",
+        "noTasksCta": "点击 + 添加一个",
+        "noMatchFilter": "没有任务匹配此筛选",
+        "noMatchSearch": "没有任务匹配「{{query}}」",
+        "clearSearch": "清除搜索",
+        "unavailable": "任务暂不可用",
+        "motion": {
+          "open": "调节玻璃动效",
+          "title": "玻璃动效",
+          "description": "开发预览",
+          "enabled": "动效总开关",
+          "enabledDesc": "与外观设置中的“减少动画”同步，更改后立即保存。",
+          "systemReducedMotion": "系统已开启“减少动态效果”，动效暂不可用。",
+          "saveFailed": "无法保存动画设置，请重试。",
+          "loadFade": "加载渐显",
+          "breathing": "呼吸灯",
+          "pointerFollow": "跟随指针",
+          "positionConstraint": "重力位置限制",
+          "horizontalSpeed": "横向移动速度"
+        }
+      },
+      "stats": {
+        "downSpeed": "下载速度",
+        "upSpeed": "上传速度",
+        "engineOk": "引擎就绪",
+        "engineStarting": "引擎启动中",
+        "engineOffline": "引擎离线",
+        "natActive": "NAT 已映射",
+        "natActiveDesc": "帮助其他 BT 用户连接到你。",
+        "natSettingUp": "NAT 映射中",
+        "natRetrying": "自动重试（{{attempt}}/{{max}}）",
+        "natMapping": "NAT 映射",
+        "natUnavailable": "自动映射未建立",
+        "natUnavailableDesc": "普通下载不受影响，BT 连接可能受限。",
+        "natRetry": "重试",
+        "natDisable": "关闭端口映射",
+        "natSettings": "网络设置",
+        "natHelp": "优化网络"
+      },
+      "tab": {
+        "all": "全部",
+        "active": "进行中",
+        "completed": "已完成",
+        "error": "错误"
+      },
+      "inspector": {
+        "overview": {
+          "transfer": "传输",
+          "progress": "进度",
+          "network": "网络",
+          "general": "常规",
+          "createdAt": "创建时间",
+          "finishedAt": "完成时间",
+          "downSpeed": "下载速度",
+          "upSpeed": "上传速度",
+          "eta": "剩余时间",
+          "downloaded": "已下载",
+          "totalSize": "大小",
+          "percent": "百分比",
+          "peers": "节点",
+          "seeds": "做种节点",
+          "ratio": "分享率",
+          "type": "类型",
+          "infoHash": "InfoHash",
+          "private": "私有",
+          "connections": "连接",
+          "uploaded": "累计上传",
+          "seedingTime": "做种时长",
+          "seedingRecordedSince": "自 {{date}} 起记录。不计暂停和离线时间；此前的做种记录不可用。",
+          "seedingUnavailable": "此任务尚无做种时长记录。"
+        },
+        "activity": {
+          "transferTitle": {
+            "session": "会话传输",
+            "lifetime": "生命周期传输"
+          },
+          "download": "下载",
+          "upload": "上传",
+          "loading": "正在加载活动记录…",
+          "collecting": "正在收集传输数据…",
+          "noSessionHistory": "本次应用会话未记录传输数据。",
+          "lifetimeEmpty": "生命周期历史暂不可用。",
+          "noTraffic": "当前没有网络流量。",
+          "unavailable": "生命周期活动暂不可用。",
+          "coverageGap": "活动追踪曾中断。",
+          "retry": "重试",
+          "notAvailable": "不可用",
+          "stale": {
+            "short": "数据可能已过期。",
+            "message": "数据可能已过期。上次更新：{{time}}。"
+          },
+          "range": {
+            "label": "传输时间范围",
+            "session": "会话(60 秒)",
+            "lifetime": "生命周期",
+            "latest": "最近 60 秒",
+            "adaptive_other": "自适应分辨率 {{count}} 个样本"
+          },
+          "timeline": {
+            "title": "任务历史",
+            "current": "当前 {{status}}",
+            "cluster_other": "+{{count}} 个事件",
+            "repeated": "{{label}} ×{{count}}",
+            "truncated_other": "更早历史已截断 {{count}} 个事件",
+            "truncatedAt": "最早截断时间：{{time}}",
+            "timeRange": "{{start}}–{{end}}",
+            "detailTitle": "{{label}}详情",
+            "destination": "{{event}} {{status}}",
+            "previous": "显示更早的时间线事件",
+            "next": "显示更晚的时间线事件",
+            "event": {
+              "added": "已添加",
+              "started": "已开始",
+              "paused": "已暂停",
+              "resumed": "已恢复",
+              "stage_changed": "阶段已变化",
+              "completed": "已完成",
+              "failed": "失败",
+              "observed_state": "状态已恢复"
+            },
+            "status": {
+              "queued": "已排队",
+              "fetching_metadata": "正在获取元数据",
+              "metadata_ready": "元数据已就绪",
+              "downloading": "正在下载",
+              "finalizing": "正在完成",
+              "seeding": "正在做种",
+              "paused": "已暂停",
+              "completed": "已完成",
+              "error": "失败",
+              "removed": "已移除"
+            }
+          },
+          "summary": {
+            "title": "当前摘要",
+            "average": "平均",
+            "averageExpanded": "平均下载速度",
+            "peak": "峰值",
+            "peakExpanded": "下载峰值速度",
+            "active": "活跃",
+            "activeExpanded": "活跃传输时长"
+          },
+          "chart": {
+            "accessibleSummary": "{{range}}，从 {{start}} 到 {{end}}。最新下载 {{download}}，上传 {{upload}}。生命周期平均下载 {{average}}，下载峰值 {{peak}}，活跃 {{activeDuration}}。{{sampleLabel}}。{{state}}",
+            "activeSeconds_other": "{{count}} 秒",
+            "sampleCount_other": "{{count}} 个样本",
+            "noDataQualityIssues": "没有追踪警告。"
+          }
+        },
+        "pieces": {
+          "mapLabel": "下载分片图",
+          "legend": {
+            "done": "已下载",
+            "active": "下载中",
+            "endgame": "收尾阶段",
+            "pending": "未开始"
+          },
+          "empty": "无分片数据",
+          "pieceLength": "每片大小",
+          "totalPieces": "总片数"
+        },
+        "peers": {
+          "summary_other": "{{count}} 个节点（{{seeders}} 个做种）",
+          "empty": "暂无连接节点",
+          "col": {
+            "country": "地区",
+            "endpoint": "IP：端口",
+            "client": "客户端",
+            "down": "↓",
+            "up": "↑",
+            "progress": "%",
+            "flags": "状态",
+            "flagsHint": "D = 节点正在向我们发送数据；U = 我们正在向节点发送数据；S = 对端是做种者。下划线表示该状态未激活。"
+          }
+        },
+        "multi": {
+          "totals": "汇总",
+          "liveSpeed": "实时速度",
+          "statusDist": "状态分布",
+          "totalSize": "总大小",
+          "downloaded": "已下载",
+          "avgProgress": "平均进度",
+          "combinedDown": "合计 ↓",
+          "combinedUp": "合计 ↑",
+          "longestEta": "最长剩余时间"
+        },
+        "tab": {
+          "overview": "概览",
+          "files": "文件",
+          "pieces": "分片",
+          "peers": "节点",
+          "trackers": "Trackers",
+          "activity": "活动"
+        },
+        "placeholder": {
+          "files": "文件列表",
+          "peers": "节点列表",
+          "trackers": "Trackers 列表"
+        },
+        "trackers": {
+          "summary_other": "{{count}} 个 tracker",
+          "driftSuffix_other": "{{count}} 个不在全局列表",
+          "privateBanner": "私有种子 — 不会合并全局 trackers。",
+          "empty": "暂无 trackers",
+          "loadFailed": "加载 trackers 失败：{{reason}}",
+          "action": {
+            "edit": "编辑",
+            "save": "保存",
+            "cancel": "取消",
+            "sync": "同步",
+            "delete": "删除 tracker"
+          },
+          "syncPrivateDisabled": "私有种子不支持同步全局 trackers。",
+          "saveFailed": "更新 trackers 失败：{{reason}}",
+          "syncFailed": "同步 trackers 失败：{{reason}}",
+          "deleteFailed": "删除 tracker 失败：{{reason}}",
+          "invalidLines_other": "已跳过 {{count}} 行非法输入",
+          "editPlaceholder": "一行一个 URL。仅支持 http(s)/udp/ws(s)。",
+          "editHint": "保存后将整体覆盖任务的 effective bt-tracker；torrent 自带的 announce-list 不受影响。",
+          "preview": {
+            "title": "更新任务 Trackers",
+            "description": "确认补充 Tracker 的变更。种子自带和手动添加的地址会保留。",
+            "reconnect": "此任务将短暂暂停并重新连接，随后自动恢复。",
+            "added": "新增 {{count}} 个",
+            "removed": "移除 {{count}} 个",
+            "retained": "保留 {{count}} 个现有补充 Tracker，种子自带的 announce 分组保持不变。",
+            "excluded": "你已移除的 {{count}} 个 Tracker 不会被自动重新加入。",
+            "apply": "应用更新",
+            "changesPending": "待更新 {{count}} 项"
+          }
+        }
+      },
+      "action": {
+        "pause": "暂停",
+        "queueMoveFailed": "无法调整等待队列。",
+        "queueTaskStarted": "任务已不在等待队列中。",
+        "queueMoveHint": "队列位置决定等待任务的启动顺序，列排序单独保存。",
+        "queueBoundary": "所选任务已到达队列边界",
+        "queueMoved": "已调整等待队列",
+        "moveQueueDown": "在队列中下移",
+        "moveQueueUp": "在队列中上移",
+        "resume": "继续",
+        "retry": "重试",
+        "openFolder": "打开文件夹",
+        "copyUrl": "复制链接",
+        "copyUrls": "复制多个链接",
+        "copyPath": "复制文件路径",
+        "copied": "已复制到剪贴板",
+        "copyFailed": "无法复制到剪贴板，请重试。",
+        "selectFilesFailed": "无法打开文件选择。",
+        "copyUrlFailed": "复制失败：无法加载任务链接详情，请重试。",
+        "selectFiles": "选择文件",
+        "remove": "移除…",
+        "removeConfirmWithFiles": "同时从磁盘删除下载的文件",
+        "cancel": "取消",
+        "batchPartial": "{{ok}} 成功，{{failed}} 失败",
+        "singleTaskFailed": "{{name}}：{{reason}}",
+        "stopSeeding": "停止做种",
+        "reseed": "重新做种",
+        "retryWithDialog": "编辑后重试…（Alt+Click）",
+        "finalizingTooltip": "任务正在收尾，请稍候",
+        "pauseTooltipBatch": "暂停所选中的 {{n}} / {{total}}",
+        "resumeTooltipBatch": "继续所选中的 {{n}} / {{total}}",
+        "retryTooltipBatch": "重试所选中的 {{n}} / {{total}}",
+        "reseedTooltipBatch": "重新做种所选中的 {{n}} / {{total}}",
+        "stopSeedingTooltipBatch": "停止做种所选中的 {{n}} / {{total}}",
+        "removeTooltipBatch": "移除所选中的 {{n}} / {{total}}",
+        "removeWithFilesShift": "按住 Shift 同时删除文件",
+        "removeFilesEstimate": "将从磁盘删除 {{bytes}}",
+        "removeSingleTitle": "移除任务「{{name}}」？",
+        "removeAll_paused_Title": "移除 {{count}} 个已暂停任务？",
+        "removeAll_seeding_Title": "移除 {{count}} 个做种中任务？",
+        "removeAll_completed_Title": "移除 {{count}} 个已完成任务？",
+        "removeAll_error_Title": "移除 {{count}} 个失败任务？",
+        "removeAll_downloading_Title": "移除 {{count}} 个进行中任务？",
+        "removeMixedTitle": "移除 {{count}} 个任务？",
+        "openFile": "打开文件",
+        "openFileFailed": "无法打开文件",
+        "chooseFiles": "选择下载文件…",
+        "queueOrder": "调整下载顺序",
+        "moveQueueTop": "移至队列最前",
+        "moveQueueBottom": "移至队列最后",
+        "copyError": "复制错误信息",
+        "errorReport": "{{name}}\n任务 ID：{{id}}\n{{details}}"
+      },
+      "titleCount": "{{shown}} 项 · 共 {{total}}",
+      "type": {
+        "http": "HTTP",
+        "magnet": "磁力",
+        "bt": "BitTorrent",
+        "ftp": "FTP",
+        "metalink": "Metalink"
+      },
+      "search": {
+        "placeholder": "搜索下载任务",
+        "activeTypeFilters": "类型筛选：{{types}}",
+        "filters": "筛选",
+        "resetFilters": "重置筛选",
+        "clearQuery": "清除搜索",
+        "activeQuery": "搜索：{{query}}",
+        "scopeLabel": "类型",
+        "clear": "清除",
+        "empty": "无匹配任务",
+        "emptyHint": "试试清除类型范围或换个关键词"
+      },
+      "stale": {
+        "banner": "任务列表可能已过期，正在重新连接…"
+      },
+      "view": {
+        "title": "列表显示",
+        "columns": "显示列",
+        "resetColumns": "恢复默认列布局",
+        "sortBy": "排序方式",
+        "ascending": "升序",
+        "descending": "降序",
+        "showInspector": "显示详情",
+        "hideInspector": "隐藏详情",
+        "inspector": "任务详情",
+        "resizeInspector": "调整详情高度",
+        "selectToInspect": "选择任务以查看详情。",
+        "resizeColumn": "调整{{column}}列宽",
+        "taskActions": "更多"
+      },
+      "speedLimit": {
+        "title": "速度模式",
+        "currentMode": "速度模式：{{mode}}",
+        "uploadLimit": "上传上限：{{speed}}",
+        "downloadLimit": "下载上限：{{speed}}",
+        "saveFailed": "无法切换速度模式，请重试。"
+      },
+      "media": {
+        "preparing": "准备中",
+        "decrypting": "解密中",
+        "assembling": "拼接中",
+        "muxing": "合并中",
+        "renaming": "保存中",
+        "stage": "当前阶段",
+        "downloadProgress": "下载进度",
+        "muxProgress": "合并进度",
+        "parts": "分片",
+        "partsFormat": "{{completed}} / {{total}} 个分片",
+        "downloadSize": "下载总量",
+        "outputSize": "成品大小",
+        "downloadEta": "下载剩余时间",
+        "avgDownloadProgress": "平均下载进度",
+        "processingTasks": "处理中任务"
+      },
+      "completionShutdown": {
+        "more": "更多下载操作",
+        "enable": "全部下载完成后关机",
+        "disable": "取消下载完成后关机",
+        "waiting": "等待全部下载完成",
+        "countdown": "将在 {{seconds}} 秒后关机",
+        "detail": "仅本次有效。暂停或失败的任务会阻止关机，做种将在关机时结束。",
+        "unavailable": "当前环境不支持自动关机，或未获得系统权限。",
+        "failed": "无法完成关机准备或请求关机，未强制关闭电脑。",
+        "preparing": "正在准备关机…",
+        "requested": "已请求系统关机"
+      }
+    }
+  },
+  "task": {
+    "add": {
+      "title": "新建任务",
+      "links": "链接",
+      "torrent": "种子",
+      "urlPlaceholder": "输入 URL、磁力链接或 BT 哈希值…",
+      "dropTorrent": "拖拽 .torrent 文件到此处，或点击选择",
+      "clearSelection": "清除选择",
+      "createFailed": "创建下载任务失败。",
+      "createFailedWithReason": "创建下载任务失败：{{reason}}",
+      "createFailedByPlugin": "创建任务失败：插件「{{pluginId}}」中断了任务创建（{{detail}}）。可在「设置 → 插件」中停用该插件后重试。",
+      "createFailedPathTooLong": "创建任务失败：目标路径长 {{length}} 个字符，超出 Windows 上限 {{limit}}。请改用更短的保存目录或文件名。",
+      "parseFailed": "解析种子文件失败。",
+      "urlsCount_other": "{{count}} 个 URL",
+      "urlsWithInvalid": "{{valid}} 个有效，{{invalid}} 个无效",
+      "validUrlCount": "{{count}} 个有效",
+      "invalidUrlCount": "{{count}} 个无效",
+      "urlsLabel": "链接",
+      "advanced": "高级",
+      "filename": "文件名",
+      "filenameAuto": "自动",
+      "split": "连接数",
+      "userAgent": "User-Agent",
+      "referer": "Referer",
+      "cookie": "Cookie",
+      "authorization": "Authorization",
+      "allProxy": "代理",
+      "dlLimit": "下载限速",
+      "ulLimit": "上传限速",
+      "seedRatio": "分享率",
+      "unlimited": "无限制",
+      "browse": "浏览",
+      "pickPathTitle": "选择保存目录",
+      "pickPathCustom": "自定义路径",
+      "saveTo": "保存到",
+      "saveDirEmpty": "选择文件夹…",
+      "changeSaveDir": "更改保存目录",
+      "created": "任务已添加",
+      "batchCreated": "已添加 {{count}} 个任务",
+      "createdCopy": "独立副本已添加",
+      "createdPartial": "已添加 {{ok}} 个，{{failed}} 个失败",
+      "torrentQueueProgress": "种子 {{current}} / {{total}}",
+      "downloadAndContinue": "下载并继续",
+      "downloadAllTorrents": "全部下载（{{count}}）",
+      "skipTorrent": "跳过",
+      "queueAdvanceFailed": "无法打开下一个种子。",
+      "duplicate": {
+        "title": "此种子已经存在",
+        "active-info-hash": "「{{name}}」正在运行。aria2 无法同时运行两个内容相同的种子任务。",
+        "selection-mismatch": "「{{name}}」使用了相同保存目录，但文件选择不同。Motrix 不会覆盖它，也不会静默创建重命名副本。",
+        "existing-files": "目标位置已经存在「{{name}}」，但对应任务记录不可用。Motrix 不会覆盖这些文件。",
+        "filesOnDisk": "种子文件",
+        "showExisting": "查看已有任务",
+        "createCopy": "创建独立副本"
+      },
+      "adding": "添加中…",
+      "interpretedMagnet": "已识别磁力链接",
+      "interpretedInfoHash": "已将 BT 哈希值转换为磁力链接",
+      "unsupportedCurl": "无法准确导入此 cURL 命令。请复制 URL，或使用受支持选项的 Bash GET 命令。",
+      "invalidJson": "请输入 JSON 格式的 URL 字符串或 URL 字符串数组。",
+      "interpretedJson": "已从 JSON 导入链接",
+      "sourceLine": "第 {{line}} 行",
+      "sourceCorrections": {
+        "useCanonicalUrl": "使用此展开后的地址",
+        "usePathSeparators": "将反斜杠作为路径分隔符",
+        "encodeLiteralCharacters": "按字面字符编码"
+      },
+      "sourceErrors": {
+        "missingScheme": "请补全 URL 协议，例如 https://。",
+        "invalidHost": "URL 缺少主机名，或主机名无效。",
+        "invalidPort": "URL 端口无效。",
+        "controlCharacter": "请移除 URL 中的控制字符。",
+        "invalidUnicode": "URL 包含无效的 Unicode 字符。",
+        "ambiguousBackslash": "反斜杠使主机或路径存在歧义，请选择其含义。",
+        "invalidPercentEncoding": "百分号后必须紧跟两位十六进制数字。",
+        "credentialsInUrl": "请使用认证字段，不要在 URL 中嵌入凭据。",
+        "unsupportedProtocol": "此下载不支持该 URL 协议。",
+        "urlTooLong": "URL 超过 16 KiB 长度限制。",
+        "tooManySources": "输入的链接数量或文本大小超过限制。",
+        "ambiguousStructure": "解析器会改变此地址，请核对展开后的 URL。",
+        "unescapedCharacter": "请明确编码空格和保留字符。",
+        "invalidMagnet": "磁力链接的 xt 参数需要包含受支持的 BT 哈希值。",
+        "mixedProtocols": "同一下载的镜像地址必须属于相同协议族。",
+        "unsupportedInput": "未能导入此输入格式，请粘贴 URL 或受支持的 JSON、Bash cURL 内容。",
+        "unsupportedRequestOptions": "FTP 下载不能应用 HTTP 请求头。"
+      },
+      "interpretedCurl": "已解析 cURL 命令",
+      "filterBy": {
+        "video": "视频",
+        "audio": "音频",
+        "image": "图片",
+        "doc": "文档"
+      },
+      "errors": {
+        "urlsRequired": "至少需要一个 URL",
+        "saveDirRequired": "必须指定保存目录",
+        "noFilesSelected": "请至少选择一个文件",
+        "missingSource": "需要种子文件或 magnet 链接"
+      },
+      "selectionTimeout": {
+        "started": "选择文件已超时，开始下载 {{name}} 的全部文件",
+        "failed": "无法自动开始下载 {{name}}，请打开任务详情，选择文件后重试。"
+      },
+      "undoCorrection": "撤销 URL 修正",
+      "submissionUnconfirmed": "结果尚未确认。再次提交时会先核对原请求，避免重复创建任务。"
+    },
+    "detail": {
+      "peers": "节点：{{count}}",
+      "seeds": "做种节点：{{count}}"
+    },
+    "torrent": {
+      "column": {
+        "name": "文件名",
+        "type": "文件类型",
+        "size": "大小"
+      },
+      "fileSelected_other": "已选择 {{count}} 个文件",
+      "selectAll": "全选",
+      "video": "视频",
+      "audio": "音频",
+      "image": "图片",
+      "doc": "文档"
+    },
+    "remove": {
+      "title": "移除任务？",
+      "description": "「{{name}}」将从下载列表中移除。",
+      "deleteFilesLabel": "同时删除已下载的文件",
+      "confirm": "移除",
+      "cancel": "取消",
+      "orphanToast": "任务已移除。文件保留在 {{path}}。",
+      "notAvailableDuringFinalize": "请等待任务完成收尾。"
+    },
+    "recovery": {
+      "toast": "已恢复 {{count}} 个中断的任务。点击查看。",
+      "finalizeRenameFailed": "无法重命名文件。下载文件保留在 .motrix 后缀下。",
+      "reseedFailed": "下载已完成，但做种启动失败。",
+      "metaMissing": "Torrent 元数据丢失，无法开始做种。",
+      "startup": {
+        "torrentMetaMissing": "无法恢复此 BT 任务：.torrent 元数据文件丢失。请删除任务并重新添加。",
+        "reAddFailed": "无法恢复此任务：引擎拒绝重新添加请求。请删除任务并手动重新添加。",
+        "dirtyMetadata": "无法恢复此任务：缺少恢复所需的标识信息。",
+        "resumeCheckpointMissing": "已保留部分文件，但续传检查点已丢失。请安全地重新下载或重新添加任务。",
+        "resumeCredentialsRequired": "已保留部分文件，但此下载需要无法自动重放的请求凭据。",
+        "resumePathInvalid": "由于保存的输出路径无效，已保留部分文件且未自动恢复。",
+        "resumeSourceChanged": "远端文件在下载开始后发生变化，已保留部分文件且未继续写入。",
+        "resumeRangeUnsupported": "服务器不支持安全的范围续传，已保留部分文件且未继续写入。",
+        "resumeValidationFailed": "Motrix 无法确认远端文件是否未发生变化，已保留部分文件且未继续写入。",
+        "mediaInterrupted": "媒体下载因应用重启而中断，无法恢复。请重新添加以重试。"
+      }
+    },
+    "error": {
+      "detail": {
+        "finalizeFailed": "无法完成下载收尾：{{cause}}",
+        "recoveryFailed": "无法恢复下载：{{cause}}",
+        "recoveryOutputConflict": "临时文件和最终文件同时存在，已保留两者以供人工检查",
+        "filesMissing": "应用重启后文件缺失",
+        "renameFileFailed": "重命名文件失败：{{cause}}",
+        "renameDirFailed": "重命名目录失败：{{cause}}",
+        "pluginChainAborted": "插件链已中止：{{cause}}",
+        "magnetCleanupQuarantined": "磁力链接元数据清理被隔离",
+        "muxFailed": "混流下载的媒体文件失败",
+        "pathTooLong": "路径长度 {{length}} 个字符，Windows 上限为 {{limit}} 个字符"
+      },
+      "reason": {
+        "unknown": "下载失败",
+        "notFound": "文件不存在",
+        "unauthorized": "需要授权",
+        "networkError": "网络连接失败",
+        "timeout": "下载超时",
+        "diskFull": "磁盘空间不足",
+        "fileWriteError": "无法写入文件",
+        "pathTooLong": "文件路径超出 Windows 长度上限",
+        "checksumMismatch": "文件校验失败",
+        "tooManyRedirects": "重定向次数过多",
+        "serverError": "服务器返回错误",
+        "btMetadataFailed": "无法获取种子元数据",
+        "btTrackerError": "无法连接 Tracker",
+        "generic": "下载失败"
+      },
+      "hint": {
+        "diskFull": "清理磁盘空间或更改保存目录后重试",
+        "unauthorized": "检查账号权限或访问凭据后重试",
+        "networkError": "检查网络连接后重试",
+        "timeout": "检查网络连接速度和稳定性后重试",
+        "fileWriteError": "检查文件夹权限和磁盘空间后重试",
+        "pathTooLong": "缩短保存目录或文件名后重试",
+        "checksumMismatch": "下载的文件可能已损坏，请重新下载以校验",
+        "tooManyRedirects": "该链接可能已失效，请尝试更换下载链接",
+        "btMetadataFailed": "检查磁力链接或添加更多 Tracker 后重试"
+      }
+    }
+  },
+  "settings": {
+    "title": "设置",
+    "desc": "配置 Motrix",
+    "cards": {
+      "general": {
+        "title": "通用",
+        "desc": "启动、默认保存目录、系统集成"
+      },
+      "bittorrent": {
+        "title": "BitTorrent",
+        "desc": "DHT、监听端口、Trackers、Peer 地理"
+      },
+      "appearance": {
+        "title": "外观",
+        "desc": "主题、语言、托盘图标"
+      },
+      "advanced": {
+        "title": "高级",
+        "desc": "RPC、SQLite 持久化"
+      },
+      "about": {
+        "title": "关于",
+        "desc": "版本、更新、源代码与文档"
+      },
+      "downloads": {
+        "title": "下载",
+        "desc": "并发、带宽限制、网络可靠性"
+      },
+      "network": {
+        "title": "网络",
+        "desc": "代理、DNS 与 NAT/UPnP"
+      },
+      "integration": {
+        "title": "集成",
+        "desc": "浏览器扩展、命令行工具、操作系统集成"
+      }
+    },
+    "general": {
+      "launchAtStartup": "登录时启动",
+      "launchAtStartupDesc": "登录时自动启动 Motrix。",
+      "linuxAutostartDesc": "请在桌面环境中设置登录启动。",
+      "linuxAutostartGuide": "查看设置指南",
+      "showMainWindowAtLogin": "登录时显示窗口",
+      "showMainWindowAtLoginDesc": "选择“{{mode}}”时不显示。",
+      "defaultSaveDir": "默认下载目录",
+      "defaultSaveDirDesc": "新建下载默认保存到此目录，可按任务覆盖。",
+      "inAppNotifications": "应用内通知",
+      "inAppNotificationsDesc": "选择要显示的下载通知。应用故障提醒始终开启。",
+      "notifyInAppOnComplete": "显示下载完成通知",
+      "notifyInAppOnError": "显示下载失败通知",
+      "notificationBadgeStyle": "未读角标",
+      "notificationBadgeCount": "数量",
+      "notificationBadgeDot": "圆点",
+      "notificationBadgeHidden": "隐藏",
+      "systemNotifications": "系统通知",
+      "notifyOnComplete": "下载完成通知",
+      "notifyOnCompleteDesc": "任务完成时弹出系统通知。",
+      "autofillClipboardLinks": "新建任务时自动填入剪贴板链接",
+      "autofillClipboardLinksDesc": "打开新建任务时，若剪贴板中是链接则自动填入空白的 URL 输入框。",
+      "notifyOnError": "下载失败时通知",
+      "notifyOnErrorDesc": "当窗口处于后台时，下载失败会弹出系统通知。",
+      "warnBeforeQuit": "退出前确认",
+      "warnBeforeQuitDesc": "有下载进行时，退出前提醒。",
+      "notificationBadgeDesc": "显示在通知中心图标上。",
+      "notificationOff": "不通知",
+      "notificationSystem": "系统通知",
+      "notificationInApp": "应用内通知",
+      "notificationBoth": "两个都通知",
+      "startupAndQuitting": "启动与退出",
+      "runMode": "应用显示位置",
+      "runModeStandard": "程序坞和菜单栏",
+      "runModeTray": "仅菜单栏",
+      "runModeHideTray": "仅程序坞",
+      "lightweightMode": "关闭窗口后节省内存",
+      "lightweightModeDesc": "下载会继续；重新打开稍慢，未保存的输入会清除。",
+      "notifications": "通知",
+      "notificationsDesc": "应用故障提醒始终开启。",
+      "downloadCompleted": "下载完成",
+      "downloadFailed": "下载失败",
+      "description": "启动、退出与通知",
+      "desktopOnly": "启动和通知偏好可在桌面应用中设置。"
+    },
+    "appearance": {
+      "theme": "主题",
+      "themeAuto": "跟随系统",
+      "themeLight": "浅色",
+      "themeDark": "深色",
+      "language": "语言",
+      "traySpeedometer": "在菜单栏显示速度",
+      "traySpeedometerDesc": "在应用图标旁显示下载和上传速度。",
+      "trayIconColor": "托盘图标颜色",
+      "trayIconColorDesc": "选择在系统面板上容易看清的颜色。",
+      "trayIconColorAuto": "跟随应用主题",
+      "trayIconColorLight": "浅色图标（深色面板）",
+      "trayIconColorDark": "深色图标（浅色面板）",
+      "reduceMotion": "减少动画",
+      "reduceMotionDesc": "减少界面中的动态效果。",
+      "liquidGlassEffect": "液态玻璃",
+      "liquidGlassEffectDesc": "让下载工具栏呈现半透明玻璃效果。",
+      "liquidGlassEffectMacDesc": "macOS 26 及以上也会应用到窗口；更改后窗口会重新打开。",
+      "runMode": "显示位置",
+      "runModeStandard": "程序坞与菜单栏",
+      "runModeTray": "仅菜单栏",
+      "runModeHideTray": "仅程序坞",
+      "runModeLaunch": "打开 Motrix 时",
+      "runModeStandardDesktop": "打开主窗口",
+      "runModeTrayDesktop": "在系统托盘中启动",
+      "runModeLinuxDesc": "系统托盘的可用性和激活方式取决于桌面环境。",
+      "lightweightMode": "轻量模式",
+      "lightweightModeDesc": "关闭窗口后节省内存，下载不受影响。重新打开稍慢，未保存的输入会清除。",
+      "byteUnitSystem": "大小和速度单位",
+      "byteUnitSystemDesc": "选择文件大小和速度的显示单位。",
+      "byteUnitDecimal": "十进制（{{megabyte}}、{{gigabyte}} · 1000）",
+      "byteUnitBinary": "二进制（{{megabyte}}、{{gigabyte}} · 1024）",
+      "byteUnitSystemDefault": "跟随系统（{{units}}）",
+      "sidebarColor": "主题色",
+      "sidebarColors": {
+        "auto": "自动",
+        "blue": "冰蓝",
+        "cloud": "云白",
+        "cyan": "湖青",
+        "gold": "香槟",
+        "gray": "淡灰",
+        "green": "薄荷",
+        "orange": "琥橙",
+        "pink": "玫粉",
+        "violet": "鸢紫"
+      },
+      "themeAndEffects": "主题与效果",
+      "languageAndDisplay": "语言与显示",
+      "menuBar": "菜单栏",
+      "description": "主题、语言与显示",
+      "systemTray": "系统托盘",
+      "followSystem": "跟随系统"
+    },
+    "about": {
+      "appIconAlt": "Motrix 应用图标",
+      "version": "版本 {{version}}",
+      "tagline": "在内容坍缩之前，保存真正值得留下的东西，让美好进入你的收藏轨道。",
+      "webVersionNote": "此 Web 版本由部署管理员负责更新。",
+      "update": {
+        "title": "应用更新",
+        "currentVersion": "当前版本 {{version}}",
+        "idleTitle": "让 Motrix 保持最新",
+        "idle": "当前安装的是版本 {{version}}。立即检查，或让 Motrix 在启动时自动检查。",
+        "managedTitle": "通过原安装来源更新",
+        "managedDescription": "此 Windows 打包版通过原安装来源更新，应用内更新不可用。",
+        "unsupportedTitle": "自动更新不可用",
+        "unsupported": "当前版本不支持自动更新，请到官网下载最新版。",
+        "check": "检查更新",
+        "checkAction": "检查",
+        "checking": "正在检查…",
+        "checkingTitle": "正在检查更新…",
+        "checkingDescription": "正在连接 Motrix 更新服务…",
+        "upToDateTitle": "Motrix 已是最新版本",
+        "upToDate": "版本 {{version}} 是当前可用的最新版本。",
+        "available": "Motrix {{version}} 已发布。",
+        "availableTitle": "Motrix {{version}} 已发布",
+        "availableDescription": "现在下载，并在准备好时自行选择重启安装。",
+        "download": "下载更新",
+        "downloading": "下载中…",
+        "downloadingTitle": "正在下载 Motrix {{version}}",
+        "downloadingDescription": "你可以关闭此窗口，下载会在后台继续。",
+        "downloadedTitle": "更新已可安装",
+        "downloaded": "Motrix {{version}} 已准备好安装。",
+        "restart": "重启并安装",
+        "cancelledTitle": "下载已取消",
+        "cancelled": "更新下载已取消。",
+        "cancelledDescription": "准备好后可以重新开始下载。",
+        "errorTitle": "无法更新 Motrix",
+        "errorDescription": "请检查网络连接，然后重试。",
+        "error": "更新失败：{{message}}",
+        "retry": "重试",
+        "automaticChecks": "自动检查更新",
+        "automaticChecksDescription": "Motrix 启动时",
+        "automaticChecksError": "无法保存此设置",
+        "channelLabel": "更新通道",
+        "channelDescription": "选择稳定版本，或通过测试版本体验新功能。",
+        "channelStable": "稳定版",
+        "channelBeta": "测试版",
+        "channelBetaWarning": "测试版可能不够稳定，也会接收后续稳定版。切回稳定版后不再接收测试版，不会自动降级。",
+        "channelSaveError": "无法保存更新通道，请重试。"
+      },
+      "details": {
+        "author": "作者",
+        "createdBy": "开发者",
+        "license": "开源许可证",
+        "licenseValue": "{{license}} 许可证"
+      },
+      "resources": {
+        "title": "相关资源",
+        "repository": "开源仓库",
+        "repositoryDescription": "在 GitHub 浏览源代码",
+        "manual": "用户手册",
+        "manualDescription": "阅读用户手册",
+        "plugins": "插件",
+        "changelog": "更新日志",
+        "website": "官方网站",
+        "websiteDescription": "访问 motrix.app",
+        "acknowledgments": "致谢",
+        "acknowledgmentsDescription": "在 motrix.app 查看项目致谢"
+      }
+    },
+    "advanced": {
+      "rpc": {
+        "title": "RPC",
+        "port": "RPC 端口",
+        "portDesc": "修改后需重启。",
+        "secret": "RPC 密钥",
+        "secretDesc": "用于验证 RPC 连接。"
+      },
+      "persistence": {
+        "title": "进度与恢复",
+        "enable": "保存恢复数据",
+        "enableDesc": "保存用于重启后继续下载的数据。",
+        "dbPath": "恢复数据文件",
+        "dbPathDesc": "留空则使用默认位置。",
+        "dbPathPlaceholder": "默认位置",
+        "historyLimit": "已完成下载的恢复记录",
+        "historyLimitDesc": "不影响下载列表和已下载的文件。",
+        "historyKeepAll": "全部保留",
+        "historyKeepRecent": "保留最近…",
+        "historySessionOnly": "不保留",
+        "historyCount": "保留条数",
+        "historyCountHint": "较早的恢复记录会被移除。",
+        "historyCountPositive": "请输入大于 0 的数量。"
+      },
+      "description": "RPC、进度与恢复"
+    },
+    "bittorrent": {
+      "trackers": {
+        "autoSync": "自动更新 Tracker 列表",
+        "autoSyncDesc": "从已添加的来源获取最新列表。",
+        "syncInterval": "更新间隔（小时）",
+        "syncIntervalDesc": "可设为 1–168 小时。",
+        "enableProbe": "检查 Tracker 可用性",
+        "enableProbeDesc": "使用前检查 Tracker 是否能正常响应。",
+        "probeTimeout": "检查超时（毫秒）",
+        "probeTimeoutDesc": "等待响应的最长时间，1,000–30,000 毫秒。",
+        "healthyThreshold": "慢响应判定时间（毫秒）",
+        "healthyThresholdDesc": "响应超过此时间会标记为缓慢，500–10,000 毫秒。",
+        "minSuccessRate": "最低成功率",
+        "minSuccessRateDesc": "使用达到此成功率的 Tracker，0.5 表示 50%。",
+        "maxTrackerCount": "每个任务的 Tracker 数量",
+        "maxTrackerCountDesc": "最多使用的 Tracker 数量，5–200。",
+        "title": "Trackers",
+        "manageSourcesHint": "在 Tracker 页面管理来源。",
+        "blacklistMovedInfo": "在 Tracker → 黑名单中管理屏蔽的地址。"
+      },
+      "geoip": {
+        "title": "节点位置",
+        "enable": "显示国家或地区",
+        "enableDesc": "在节点列表中显示位置，需要时会下载位置数据。",
+        "lastUpdated": "最后更新",
+        "neverUpdated": "从未更新",
+        "updateNow": "现在更新",
+        "updating": "更新中…",
+        "source": "位置数据来源",
+        "sourceDesc": "选择位置数据的下载来源。",
+        "source.loyalsoldier": "Loyalsoldier（社区维护）",
+        "source.p3terx": "P3TERX（社区镜像）",
+        "source.maxmind": "MaxMind 官方",
+        "source.custom": "自定义 URL",
+        "maxmindUnsupported": "暂不支持",
+        "customUrl": "自定义下载地址",
+        "customUrlPlaceholder": "https://example.com/GeoLite2-Country.mmdb",
+        "autoUpdate": "自动更新",
+        "autoUpdateDesc": "大约每周检查一次位置数据更新。",
+        "status.loaded": "已就绪",
+        "status.notDownloaded": "尚未下载位置数据",
+        "status.downloading": "下载中…",
+        "status.error": "更新失败",
+        "customUrlDesc": "填写 .mmdb 格式国家数据文件的链接。",
+        "saveBeforeUpdate": "请先保存设置，再更新位置数据。",
+        "updateFailed": "无法更新位置数据，请重试。"
+      },
+      "listen": {
+        "title": "传入连接",
+        "listenPort": "BT 监听端口",
+        "listenPortDesc": "用于接收其他用户的连接。",
+        "dhtListenPort": "DHT 监听端口",
+        "dhtListenPortDesc": "用于通过 DHT 查找其他用户。",
+        "dhtEnabled": "启用 DHT",
+        "dhtEnabledDesc": "无需依赖 Tracker 也能查找其他用户。"
+      },
+      "peers": {
+        "title": "节点",
+        "btMaxPeers": "每种子最大节点数",
+        "btMaxPeersDesc": "单个任务同时连接的节点数量上限。",
+        "btEnableLpd": "本地节点发现",
+        "btEnableLpdDesc": "查找局域网内共享文件的设备。",
+        "magnetFileSelection": "下载前选择文件",
+        "magnetFileSelectionDesc": "磁力链接加载后，选择要下载的文件。",
+        "magnetFileSelectionAutoDownload": "超时后下载全部文件",
+        "magnetFileSelectionAutoDownloadDesc": "超过下方等待时间后开始下载；关闭窗口或浏览器后仍会生效。",
+        "magnetFileSelectionTimeoutSeconds": "选择文件等待时间（秒）",
+        "magnetFileSelectionTimeoutSecondsDesc": "从文件列表加载完成时计时，也适用于正在等待的任务。",
+        "magnetFileSelectionTimeoutInvalid": "请输入 {{min}} 至 {{max}} 秒之间的整数。"
+      },
+      "seeding": {
+        "title": "做种",
+        "seedRatio": "分享率上限",
+        "seedRatioDesc": "上传量 ÷ 下载量，达到后停止做种；0 表示不限。",
+        "seedTime": "做种时间上限（分钟）",
+        "seedTimeDesc": "0 表示不限，适用于新任务和重新开始做种的任务。"
+      },
+      "newMagnetTasks": "新建磁力任务",
+      "description": "磁力链接、做种与 Tracker"
+    },
+    "downloads": {
+      "performance": {
+        "title": "性能",
+        "profile": "下载性能",
+        "profileDesc": "平衡下载速度与资源占用。",
+        "learnMore": "了解更多",
+        "metrics": {
+          "connections": "最大连接数",
+          "perServer": "单服务器上限",
+          "minimum": "最小分段",
+          "cache": "磁盘缓存"
+        },
+        "customParameters": "自定义性能参数",
+        "profiles": {
+          "auto": {
+            "label": "自动",
+            "desc": "按磁盘和文件大小自动调整，下方为默认值。"
+          },
+          "balanced": {
+            "label": "均衡",
+            "desc": "降低资源占用，适合日常下载。"
+          },
+          "high": {
+            "label": "高速",
+            "desc": "增加连接数，提升下载速度。"
+          },
+          "maximum": {
+            "label": "极限",
+            "desc": "使用更多连接，部分服务器可能会限制连接数。"
+          },
+          "custom": {
+            "label": "自定义",
+            "desc": "设置连接数、分段大小和缓存。"
+          }
+        },
+        "maxConcurrentDownloads": "同时下载任务数",
+        "maxConcurrentDownloadsDesc": "超出的任务会排队等待。",
+        "maxConnectionPerServer": "单服务器最大连接数",
+        "maxConnectionPerServerDesc": "每个文件对同一服务器的连接上限。",
+        "split": "单文件最大连接数",
+        "splitDesc": "下载单个文件时使用的连接数。",
+        "minSplitSize": "最小分段大小（{{unit}}）",
+        "minSplitSizeDesc": "小于此值两倍的分段不再拆分。"
+      },
+      "reliability": {
+        "title": "连接与重试",
+        "userAgent": "User-Agent",
+        "userAgentDesc": "向网站标识下载工具，按网站要求修改。",
+        "connectTimeout": "连接等待时间（秒）",
+        "connectTimeoutDesc": "等待服务器连接的最长时间。",
+        "socketTimeout": "数据等待时间（秒）",
+        "socketTimeoutDesc": "连接后未收到数据的最长等待时间。",
+        "maxTries": "最多尝试次数",
+        "maxTriesDesc": "包含首次尝试；0 表示不限次数。",
+        "retryWait": "重试间隔（秒）",
+        "retryWaitDesc": "失败后等多久再试。",
+        "lowestSpeedLimit": "最低连接速度（{{unit}}）",
+        "lowestSpeedLimitDesc": "低于此速度时断开连接；0 表示关闭。"
+      },
+      "disk": {
+        "fileDeletionMode": "删除任务文件时",
+        "fileDeletionTrash": "移到回收站",
+        "fileDeletionPermanent": "直接删除",
+        "fileDeletionTrashDesc": "清空回收站后才会释放磁盘空间。",
+        "fileDeletionPermanentDesc": "删除后无法从回收站恢复。",
+        "title": "磁盘与文件",
+        "fileAllocation": "磁盘空间预留",
+        "fileAllocationDesc": "下载开始前，为文件预留空间。",
+        "fileAllocationNone": "不预留",
+        "fileAllocationPrealloc": "预先分配",
+        "fileAllocationTrunc": "设置文件大小",
+        "fileAllocationFalloc": "系统分配",
+        "modifiedTime": "文件修改时间",
+        "modifiedTimeDesc": "适用于下载完成的 HTTP 和 FTP 文件。",
+        "modifiedTimeLocal": "下载时间",
+        "modifiedTimeServer": "服务器提供的时间",
+        "diskCache": "磁盘缓存 ({{unit}})",
+        "diskCacheDesc": "写入磁盘前暂存文件数据的内存。",
+        "sessionSaveInterval": "进度保存间隔（秒）",
+        "sessionSaveIntervalDesc": "保存越频繁，意外退出时丢失的进度越少。"
+      },
+      "magnet": {
+        "title": "磁力链",
+        "magnetResolveTimeout": "磁力链接加载时限（秒）",
+        "magnetResolveTimeoutDesc": "等待文件列表加载的最长时间。"
+      },
+      "speedLimit": {
+        "title": "速度限制",
+        "titleDesc": "选择 Motrix 在常规、低速和自动模式下如何使用网络。",
+        "modeSection": "速度模式",
+        "modeSectionDesc": "选择 Motrix 应当怎样使用你的网络。",
+        "turtle": "速度模式",
+        "turtleDesc_off": "使用常规速度上限。",
+        "turtleDesc_on": "立即使用低速上限，适合临时给其他应用让出网络。",
+        "turtleDesc_auto": "根据时间和网络带宽自动调整速度。",
+        "turtle_off": "常规",
+        "turtle_on": "低速",
+        "turtle_auto": "自动",
+        "baseSection": "常规限速",
+        "baseSectionDesc": "日常下载使用；所有模式都会遵循这里的上限。",
+        "baseDownload": "下载",
+        "baseDownloadDesc": "日常下载时允许的最高速度。",
+        "baseUpload": "上传",
+        "baseUploadDesc": "日常上传时允许的最高速度。",
+        "unlimited": "不限速",
+        "setUnlimited": "设为不限速",
+        "standardLimit": "沿用常规上限",
+        "useStandardLimit": "沿用常规上限",
+        "altSection": "低速限速",
+        "altSectionDesc": "低速模式和定时规则使用；只会在常规上限基础上进一步降速。",
+        "altDownload": "下载",
+        "altDownloadDesc": "低速模式生效时允许的最高下载速度。",
+        "altUpload": "上传",
+        "altUploadDesc": "低速模式生效时允许的最高上传速度。",
+        "autoSection": "自动规则",
+        "autoSectionDesc": "仅在自动模式下生效。",
+        "autoSchedule": "按时段降低速度",
+        "scheduleEnabled": "定时启用低速模式",
+        "scheduleEnabledDesc": "在指定日期和时段自动切换到低速上限。",
+        "scheduleFrom": "开始时间",
+        "scheduleTo": "结束时间",
+        "scheduleTimeFormat": "24 小时制（HH:mm）",
+        "scheduleDays": "重复日期",
+        "scheduleDaysHint": "结束时间早于开始时间时，持续至次日。",
+        "weekdays": {
+          "sun": {
+            "short": "日",
+            "long": "星期日"
+          },
+          "mon": {
+            "short": "一",
+            "long": "星期一"
+          },
+          "tue": {
+            "short": "二",
+            "long": "星期二"
+          },
+          "wed": {
+            "short": "三",
+            "long": "星期三"
+          },
+          "thu": {
+            "short": "四",
+            "long": "星期四"
+          },
+          "fri": {
+            "short": "五",
+            "long": "星期五"
+          },
+          "sat": {
+            "short": "六",
+            "long": "星期六"
+          }
+        },
+        "autoAdaptive": "为其他应用留出带宽",
+        "adaptiveEnabled": "为其他应用预留带宽",
+        "adaptiveEnabledDesc": "按下方填写的宽带速度计算限速。",
+        "linkDown": "宽带下载速度",
+        "linkDownDesc": "网络连接能够达到的下载速度。",
+        "linkUp": "宽带上传速度",
+        "linkUpDesc": "网络连接能够达到的上传速度。",
+        "fillFromPeak": "估算宽带速度",
+        "fillFromPeakHint": "按近期最高下载和上传速度估算。",
+        "estimateEmpty": "暂无可用的速度记录。请先完成一次不限速下载，或手动填写网络带宽。",
+        "estimateSuccess": "已根据近期速度填入网络带宽。",
+        "estimateError": "无法读取近期速度记录，请手动填写网络带宽。",
+        "headroomPercent": "为其他应用预留",
+        "headroomPercentDesc": "当前预留 {{reserved}}%；Motrix 最多使用 {{motrix}}%。",
+        "effect": {
+          "title": "当前设置效果",
+          "standard": "当前使用常规上限：下载 {{download}}，上传 {{upload}}。",
+          "lowSpeed": "当前使用低速上限：下载 {{download}}，上传 {{upload}}。",
+          "noAutoRules": "尚未启用自动规则，当前效果与常规模式相同。",
+          "standardValues": "常规上限：下载 {{download}}，上传 {{upload}}。",
+          "scheduleRule": "在 {{from}}–{{to}}{{nextDay}} 使用低速上限",
+          "nextDay": "（次日）",
+          "adaptiveRule": "为其他应用预留 {{reserved}}% 带宽",
+          "adaptiveRulePending": "在网络带宽填写完成后为其他应用预留 {{reserved}}% 带宽",
+          "ruleSeparator": "，并",
+          "autoRules": "Motrix 将{{rules}}。",
+          "lowerWins": "多项限速同时生效时取最低值。"
+        },
+        "bandwidthUsed": "Motrix 最多使用 {{motrix}}%。",
+        "bandwidthPending": "填入下载和上传速度后生效。"
+      },
+      "newTasks": "新建任务",
+      "defaultDownloadFolder": "默认保存位置",
+      "autofillFromClipboard": "自动填入剪贴板链接",
+      "fillInLinksWhenOpeningNewTask": "新建任务时，自动填入已复制的链接。",
+      "saveFolders": "保存位置",
+      "description": "文件、下载速度与连接"
+    },
+    "network": {
+      "dns": {
+        "title": "DNS",
+        "mode": "DNS 解析方式",
+        "modeDesc": "下载时查找服务器地址的方式。",
+        "modeAuto": "自动",
+        "modeSystem": "系统 DNS",
+        "modeEngine": "内置 DNS"
+      },
+      "proxy": {
+        "title": "代理",
+        "enable": "启用代理",
+        "enableDesc": "让下方选中的连接通过代理。",
+        "server": "服务器",
+        "protocol": "协议",
+        "host": "服务器地址",
+        "hostPlaceholder": "proxy.example.com",
+        "port": "端口",
+        "auth": "代理登录",
+        "authDesc": "代理需要用户名和密码时开启。",
+        "user": "用户名",
+        "password": "密码",
+        "showPassword": "显示密码",
+        "hidePassword": "隐藏密码",
+        "bypass": "不使用代理的地址",
+        "bypassDesc": "每行填写一个域名、IP 或 CIDR。开头加 . 仅匹配子域名。文件下载不支持 * 通配符。",
+        "bypassScopeNote": "仅下载文件和更新应用",
+        "scopes": "代理用途",
+        "scopesDesc": "选择哪些流量通过代理。",
+        "scopeDownload": "下载文件",
+        "scopeDownloadDesc": "BT 仅代理 HTTP(S)；节点、DHT 和 UDP Tracker 直接连接。",
+        "scopeUpdateApp": "更新应用",
+        "scopeUpdateAppDesc": "通过代理检查 Motrix 更新。",
+        "scopeUpdateTrackers": "更新 Tracker 列表",
+        "scopeUpdateTrackersDesc": "通过代理更新 Tracker 列表，不影响 BT 下载连接。",
+        "importFromSystem": "从系统导入",
+        "importedToast": "已从系统导入代理：{{host}}:{{port}}",
+        "noSystemProxy": "未配置系统代理。",
+        "bypassPlaceholder": "localhost\n127.0.0.1\n.local",
+        "scopeHint": "BT 节点、DHT 和 UDP Tracker 仍直接连接。",
+        "scopeNone": "未选择",
+        "scopeChoose": "选择…",
+        "scopeSeparator": "、"
+      },
+      "nat": {
+        "title": "端口映射（NAT）",
+        "enable": "启用端口映射",
+        "enableDesc": "请求路由器开放 BitTorrent 设置中的端口。",
+        "preferredProtocol": "首选协议",
+        "mappingTtl": "映射有效期（秒）",
+        "btPortHint": "映射作用于 BitTorrent 设置中配置的 BT/DHT 端口。",
+        "automatic": "自动"
+      },
+      "stun": {
+        "title": "NAT 类型检测",
+        "privacyHint": "使用第三方 STUN 服务器。",
+        "enable": "检测 NAT 类型",
+        "servers": "STUN 服务器",
+        "empty": "至少添加一个 STUN 服务器。",
+        "addServer": "添加 STUN 服务器"
+      },
+      "reachability": {
+        "title": "外网连接检查",
+        "privacyHint": "通过第三方服务检查外网能否连接。",
+        "enable": "检查入站端口",
+        "endpoints": "检查服务地址（HTTPS）",
+        "empty": "至少添加一个检查服务。",
+        "addEndpoint": "添加检查服务"
+      },
+      "diagnostic": {
+        "title": "自动网络检查",
+        "enable": "定期检查",
+        "interval": "检查间隔（秒）",
+        "enableDesc": "定期运行上方已开启的检测。"
+      },
+      "description": "代理、DNS 与连接检查",
+      "diagnostics": "网络诊断"
+    },
+    "common": {
+      "browse": "浏览…",
+      "add": "添加",
+      "remove": "移除",
+      "preset": "快捷：",
+      "noChange": "无可保存的更改",
+      "setAsDefault": "设为默认",
+      "openHelp": "查看帮助",
+      "generate": "生成",
+      "changeDirectory": "更改目录",
+      "directoryEmpty": "（未选择目录）",
+      "showSecret": "显示密钥",
+      "hideSecret": "隐藏密钥"
+    },
+    "integration": {
+      "system": {
+        "title": "默认应用",
+        "protocolMagnet": "用 Motrix 打开磁力链接",
+        "protocolMagnetDesc": "在浏览器里点击磁力链接时，用 Motrix 打开。",
+        "torrentAssociation": "用 Motrix 打开种子文件",
+        "torrentAssociationDesc": "双击种子文件时，用 Motrix 打开。",
+        "torrentAssociationMacDesc": "在 Finder 中右键任意 .torrent 文件 → 显示简介 → 打开方式 → 选择 Motrix → 全部更改…",
+        "defaultAssociationsWindows": "种子文件和磁力链接的默认应用",
+        "defaultAssociationsWindowsDesc": "在 Windows 设置中选择用 Motrix 打开种子文件和磁力链接。需先安装 Motrix。",
+        "torrentFiles": ".torrent 文件",
+        "magnetLinks": "磁力链接",
+        "associationStatusLabel": "当前 Windows 默认应用状态",
+        "associationChecking": "正在检查…",
+        "associationSetupRequired": "需要安装程序",
+        "associationDefault": "当前默认",
+        "associationNotDefault": "不是默认",
+        "associationUnavailable": "无法确认",
+        "associationNotRegistered": "尚未注册",
+        "openWindowsSettings": "打开 Windows 设置",
+        "defaultAssociationsLinux": "Linux 文件与链接关联",
+        "defaultAssociationsLinuxCheckingDesc": "正在识别当前 Linux 软件包并读取桌面关联…",
+        "defaultAssociationsLinuxUnavailableDesc": "当前应用环境无法读取桌面关联状态。",
+        "defaultAssociationsLinuxDesc": "通过 deb 或 rpm 安装时，Motrix 可以一键设为 .torrent 默认应用；磁力链接开关会在应用此对话框后生效。",
+        "defaultAssociationsLinuxAppImageDesc": "通过下方的桌面集成安全注册或移除此 AppImage。删除桌面入口前，Motrix 会先恢复经过验证的原默认程序。",
+        "defaultAssociationsLinuxSandboxDesc": "当前软件包会把 Motrix 注册为候选处理程序，但默认应用由桌面环境决定。卸载软件包后，之前的默认程序可能不会自动恢复。",
+        "associationStatusLabelLinux": "当前 Linux 文件与链接关联状态",
+        "linuxPackageDetected": "软件包：{{package}}",
+        "linuxPackage": {
+          "appimage": "AppImage",
+          "native": "deb / rpm",
+          "flatpak": "Flatpak",
+          "snap": "Snap",
+          "unknown": "未知软件包"
+        },
+        "protocolMagnetAppImageDesc": "启用桌面集成后，保存设置会立即同步磁力链接关联。",
+        "protocolMagnetSandboxDesc": "保存时 Motrix 会请求更改，但沙箱或桌面环境可能仍要求你手动选择默认应用。",
+        "protocolMagnetApplyFailed": "设置已保存，但无法更改桌面关联。请在系统设置中选择默认应用。",
+        "setTorrentDefaultLinux": "设为 .torrent 默认",
+        "repairLinuxAssociations": "修复关联",
+        "viewLinuxInstructions": "查看设置方法",
+        "linuxActionSet": "Motrix 已成为 .torrent 文件的默认应用。",
+        "linuxActionFallback": "当前软件包无法自动设置，已改为打开设置说明。",
+        "linuxActionFailed": "无法更新 Linux 默认应用，请检查桌面环境设置。"
+      },
+      "browser": {
+        "title": "浏览器扩展",
+        "masterSwitch": "连接浏览器扩展",
+        "masterSwitchDesc": "安装浏览器扩展后，将网页下载发送到 Motrix。",
+        "install": {
+          "chrome": "Chrome",
+          "edge": "Microsoft Edge",
+          "firefox": "Firefox",
+          "safari": "Safari",
+          "github": "GitHub",
+          "store": "安装扩展",
+          "development": "开发版"
+        },
+        "pairedTitle": "已连接的扩展",
+        "pairedEmpty": "还没有扩展连接到 Motrix。",
+        "lastActive": "上次活跃",
+        "revoke": "断开",
+        "disconnecting": "正在断开…",
+        "addTrusted": {
+          "add": "添加扩展",
+          "idPlaceholder": "扩展 ID",
+          "labelPlaceholder": "备注（可选）",
+          "browserLabel": "浏览器",
+          "chromiumEdge": "Chrome / Edge",
+          "firefox": "Firefox",
+          "cancel": "取消",
+          "addAction": "添加"
+        },
+        "pairToast": {
+          "title": "{{browser}} 扩展请求连接 Motrix",
+          "extensionId": "ID：{{id}}",
+          "deny": "拒绝",
+          "pairCode": "配对码",
+          "copyCode": "复制配对码",
+          "pairCodeHint": "在扩展中输入此配对码",
+          "identityLabel": {
+            "official": "Motrix 官方扩展",
+            "attested": "已验证的扩展",
+            "unverified": "未验证的扩展"
+          },
+          "identityUnverifiedWarning": "无法验证此扩展的身份，请确认信任后再继续。"
+        },
+        "pairUnavailable": "该配对请求已失效——请在浏览器扩展中重新发起配对。",
+        "trustedExtensions": "受信任的扩展",
+        "trustedSummary": "共 {{count}} 个",
+        "trustedGuidance": "使用其他可信扩展时，添加开发者提供的扩展 ID。",
+        "trustedEmpty": "还没有添加。",
+        "headerId": "扩展 ID",
+        "headerBrowser": "浏览器",
+        "headerSource": "来源",
+        "removeTrusted": "移除",
+        "sourceLabel": {
+          "builtin": "内置",
+          "userAdded": "已添加",
+          "imported": "已导入"
+        },
+        "degradedPort": {
+          "title": "Bridge 正在使用备用端口运行",
+          "description": "端口 16802–16806 均不可用，Bridge 改用端口 {{port}}。浏览器扩展按标准端口范围探测将无法自动发现它——请通过 Native Messaging 配对，或设置固定端口。Motrix CLI 与 Native Host 不受影响。"
+        },
+        "pairingStateDegraded": {
+          "title": "扩展访问已暂时关闭",
+          "description": "Motrix 无法安全更新已配对扩展记录。本次运行中的现有扩展会话已关闭，新访问也已阻止。请重启 Motrix 以重试修复；此提示消失前，不要将下方列表视为完整记录。"
+        }
+      },
+      "cli": {
+        "title": "命令行工具",
+        "tool": {
+          "title": "Motrix 命令行工具",
+          "description": "在终端运行 motrix，即可控制本应用。",
+          "managerLabel": "包管理器",
+          "commandLabel": "安装命令",
+          "copyCommand": "复制安装命令",
+          "manager": {
+            "npm": "npm",
+            "pnpm": "pnpm",
+            "yarn": "Yarn Classic",
+            "bun": "Bun",
+            "volta": "Volta"
+          },
+          "attentionTitle": "命令行工具需要处理",
+          "status": {
+            "checking": "正在检查",
+            "ready": "可以安装",
+            "installing": "正在安装",
+            "installed": "已安装",
+            "needsAttention": "需要处理",
+            "manualOnly": "手动安装",
+            "error": "失败"
+          },
+          "action": {
+            "checking": "正在检查…",
+            "install": "安装",
+            "installing": "正在安装…",
+            "checkAgain": "重新检查"
+          },
+          "metadata": {
+            "version": "版本",
+            "path": "可执行文件",
+            "manager": "安装方式",
+            "unknown": "未知"
+          },
+          "successGuidance": "打开一个新终端，然后运行 motrix --help。",
+          "diagnostics": {
+            "show": "显示详情",
+            "hide": "隐藏详情"
+          },
+          "reason": {
+            "nodeMissing": "未找到 Node.js 22 或更高版本。安装 Node.js 后重新检查。",
+            "nodeTooOld": "需要 Node.js 22 或更高版本，当前检测到 {{version}}。",
+            "managerMissing": "未找到受支持的包管理器。安装 npm、pnpm、Yarn Classic、Bun 或 Volta 后重新检查。",
+            "sandboxed": "此沙箱发行包不支持一键安装。请复制命令并在终端中运行。",
+            "unsupportedWeb": "只有桌面应用支持一键安装。请复制命令并在 Motrix 所在主机上运行。",
+            "permission": "包管理器无法写入全局安装目录。请使用 Node.js 版本管理器或用户可写的 prefix；不要使用 sudo。",
+            "network": "包管理器无法访问 registry。请检查网络或 registry 配置后重试。",
+            "timeout": "安装时间过长，已停止。请检查网络后重试。",
+            "pathMissing": "包已安装，但 PATH 中找不到 motrix。请打开新终端，或将提示的安装目录加入 PATH。",
+            "pathShadowed": "PATH 中有另一个 motrix 可执行文件排在前面。请移除旧入口或修正 PATH 后重新检查。",
+            "verifyFailed": "安装程序已经结束，但 Motrix 无法验证当前生效的 motrix 可执行文件。",
+            "installFailed": "包管理器无法安装 @motrix/cli。请查看详情后重试，或手动运行安装命令。",
+            "unknown": "Motrix 无法检查命令行工具。请重试，或手动运行已复制的命令。"
+          }
+        },
+        "remote": {
+          "title": "已配对的远程工具",
+          "description": "本机工具会自动连接；连接其他电脑或服务器时，运行 motrix pair。",
+          "empty": "暂无已配对的远程工具。",
+          "lastActive": "最近活跃",
+          "neverActive": "从未使用",
+          "revoke": "撤销"
+        },
+        "pairToast": {
+          "title": "{{name}} 想与 Motrix 配对",
+          "code": "验证码：{{code}}",
+          "allow": "允许",
+          "deny": "拒绝"
+        },
+        "inbox": {
+          "title": "待审批",
+          "empty": "暂无远程配对请求。",
+          "approve": "批准",
+          "deny": "拒绝",
+          "expiresIn": "{{time}} 后过期"
+        },
+        "pairUnavailable": "该配对请求已不在待审批 —— 请重跑 motrix pair。"
+      },
+      "media": {
+        "title": "媒体工具",
+        "desc": "使用 FFmpeg 合并或转换媒体文件。",
+        "notDetected": "未探测到 FFmpeg",
+        "refresh": "刷新",
+        "binaryPath": "自定义 FFmpeg 路径",
+        "browse": "浏览…",
+        "download": {
+          "action": "下载 FFmpeg",
+          "verifyInstall": "下载并验证",
+          "manual": "FFmpeg 手册",
+          "installing": "正在验证…",
+          "installed": "已验证并安装。",
+          "failed": "下载或验证失败，已保留原有安装。",
+          "disclosure": "使用 Motrix 项目签名验证，未采用 Authenticode 签名。Windows 仍可能弹出安全提示。",
+          "projectDisclosure": "Motrix 构建 · GPL。校验后安装到 Motrix 数据目录。",
+          "macDisclosure": "验证 Developer ID 签名和公证，保留系统安全保护。",
+          "progress": "FFmpeg 下载进度",
+          "bytes": "{{received}} / {{total}} 字节",
+          "directory": "安装目录：{{path}}",
+          "detectionRefreshFailed": "无法刷新 FFmpeg 检测结果，请再次点击“刷新”。",
+          "restartPluginHint": "请重启 Motrix，让已启用的插件检测到此次安装。",
+          "phases": {
+            "idle": "准备下载",
+            "metadata": "正在检查正式发布…",
+            "downloading": "正在下载 FFmpeg…",
+            "verifying": "正在校验发布签名…",
+            "extracting": "正在校验并解压文件…",
+            "systemTrust": "正在检查 macOS 签名与公证…",
+            "installing": "正在安装 FFmpeg…",
+            "installed": "已验证并安装。",
+            "failed": "安装失败。"
+          },
+          "errors": {
+            "unavailable": "暂时没有完整且发布后不可修改的正式版本。",
+            "unsupported": "当前平台不支持一键安装。",
+            "busy": "另一项 FFmpeg 安装正在进行。",
+            "download": "下载失败或超时，请检查网络后重试。",
+            "verification": "签名、压缩包结构或文件完整性校验未通过。",
+            "install": "无法安装文件，请检查数据目录的权限及剩余空间。",
+            "systemTrust": "macOS 拒绝了签名身份或公证凭据，未绕过系统安全检查。"
+          }
+        },
+        "detection": {
+          "readyTitle": "FFmpeg {{version}}",
+          "unavailableTitle": "FFmpeg 不可用",
+          "untrustedTitle": "FFmpeg 已被 macOS 阻止",
+          "usingSource": "当前使用 {{source}}",
+          "unavailableDesc": "请设置自定义路径、安装 FFmpeg，或将它加入 PATH 后刷新。",
+          "untrustedDesc": "文件存在，但未通过 macOS 安全验证。请安装可信版本，或在「隐私与安全性」中批准后刷新。",
+          "showDetails": "显示检测详情",
+          "hideDetails": "隐藏检测详情",
+          "sourcesChecked_other": "已检查 {{count}} 个来源",
+          "source": "来源",
+          "location": "检测位置",
+          "result": "结果",
+          "copyManagedPath": "复制 Motrix FFmpeg 路径",
+          "editCustomPath": "编辑自定义 FFmpeg 路径",
+          "finishEditingCustomPath": "完成编辑自定义 FFmpeg 路径",
+          "notConfigured": "未设置"
+        },
+        "candidateKind": {
+          "manual": "自定义路径",
+          "userData": "Motrix 数据目录",
+          "env": "MOTRIX_FFMPEG_BIN",
+          "path": "系统 PATH"
+        },
+        "state": {
+          "active": "使用中",
+          "available": "已找到",
+          "missing": "未找到",
+          "untrusted": "macOS 已阻止",
+          "unconfigured": "未设置",
+          "version_mismatch": "不受支持"
+        },
+        "stagingMB": "临时文件空间上限（MB）",
+        "stagingMBDesc": "每个插件、每个任务处理媒体时可用的临时空间。",
+        "opTimeoutSec": "FFmpeg 超时（秒）",
+        "opTimeoutSecDesc": "单次媒体处理的最长时间，最多 3,600 秒。",
+        "cleanupStaging": "清理临时文件",
+        "cleanupConfirm": "删除所有 FFmpeg 临时目录？",
+        "restartHint": "已保存。重启 Motrix 后，已启用的插件才能检测到更改。",
+        "restartNow": "立即重启",
+        "validation": {
+          "fileMissing": "该路径不存在。"
+        },
+        "applyHint": "保存后用于新媒体下载；请在浏览器扩展中重新扫描以更新支持状态。",
+        "savedTitle": "FFmpeg 配置已保存",
+        "desktopSavedHint": "新媒体下载会读取保存的路径。已启用的插件需要重启 Motrix 才能检测到此次更改。",
+        "pipelineUnavailable": "媒体下载功能当前不可用。",
+        "ffmpegRequired": "此下载需要 FFmpeg。请在“设置 → 集成 → 媒体工具”中配置并保存后重试。"
+      },
+      "pairResolveFailed": "提交决定失败，请重试。",
+      "appimage": {
+        "title": "桌面集成",
+        "desc": "将此 Motrix AppImage 注册到桌面环境，让浏览器和磁力链接能把下载交给它。",
+        "enable": "启用桌面集成",
+        "remove": "移除桌面集成",
+        "prompt": {
+          "title": "将 Motrix 集成到桌面环境？",
+          "message": "允许此 Motrix AppImage 注册到你的桌面环境吗？",
+          "detail": "Motrix 会在你的用户数据目录下添加桌面入口和图标，并把自己注册为 motrix: 链接、磁力链接和 .torrent 文件的处理程序。这样浏览器和 Motrix 扩展就能唤起 Motrix 并把下载交给它。不会写入 home 目录以外的位置，你可以随时在设置中撤销。",
+          "accept": "集成",
+          "decline": "暂不"
+        },
+        "status": {
+          "healthy": "已与当前桌面集成。",
+          "notIntegrated": "尚未与当前桌面集成。",
+          "failedTitle": "桌面集成未完成",
+          "failedDetail": "Motrix 未能把自己注册为链接处理程序。在你重新启用桌面集成之前，浏览器唤起可能无法工作。",
+          "removeBlockedDetail": "Motrix 无法安全恢复经过验证的原处理程序，因此保留了桌面入口，避免留下失效的默认关联。请先在桌面环境中选择其他默认应用，再重试移除集成。",
+          "externalManaged": "桌面集成由另一个 Motrix 安装提供。"
+        },
+        "movedHint": "如果在 Motrix 未运行时移动 AppImage，链接可能无法唤起，直到你从新位置手动启动一次 Motrix。"
+      },
+      "appimageHost": {
+        "title": "AppImage 浏览器唤起",
+        "desc": "允许扩展在点击连接时打开此 AppImage。使用前请开启浏览器集成。",
+        "enable": "启用浏览器唤起",
+        "repair": "修复",
+        "useCurrent": "改用当前 AppImage",
+        "remove": "移除浏览器唤起",
+        "copyDiagnostics": "复制诊断",
+        "status": {
+          "ready": "本机安装检查通过，请从浏览器连接验证。",
+          "disabled": "浏览器唤起已停用。",
+          "conflict": "其他安装占用了这些文件，请先移除其浏览器集成。",
+          "permissions": "请检查文件可执行，且只有当前账户有写入权限。",
+          "invalid": "安装记录或可执行文件无效。",
+          "sourceChanged": "AppImage 已变化，请运行需要使用的版本并修复安装。",
+          "missing": "缺少必要文件，请从当前位置运行 AppImage 并修复。",
+          "io": "操作失败，请检查磁盘访问权限后重试修复。"
+        }
+      },
+      "description": "浏览器、默认应用与工具"
+    },
+    "validation": {
+      "rangeHint": "范围：{{min}}–{{max}}。",
+      "range": "请输入 {{min}}–{{max}} 之间的数值。",
+      "integerRange": "请输入 {{min}}–{{max}} 之间的整数。",
+      "minimum": "请输入不小于 {{min}} 的数值。",
+      "maximum": "请输入不大于 {{max}} 的数值。",
+      "integer": "请输入整数。",
+      "wholeBytes": "小数位过多，请减少小数位。",
+      "number": "请输入有效数字。",
+      "invalid": "请输入有效值。",
+      "selection": "请选择一个可用选项。",
+      "textLength": "请缩短至 {{max}} 个字符以内。",
+      "itemCount": "最多可填写 {{max}} 个地址。",
+      "text": "请删除换行或不可见的控制字符。",
+      "directory": "请选择下载文件夹。",
+      "proxyHost": "请输入服务器名称或 IP 地址，不要包含 http:// 或端口。",
+      "stunServer": "请按“主机:端口”填写，例如 stun.example.com:3478。端口范围为 1–65535。",
+      "httpsUrl": "请输入以 https:// 开头的完整地址。",
+      "httpUrl": "请输入以 http:// 或 https:// 开头的完整地址。",
+      "saveFailed": "未能保存更改，请重试。",
+      "address": "地址 {{number}}",
+      "addressDraft": "新地址",
+      "required": "请先填写地址。",
+      "time": "请使用 24 小时制填写，例如 23:00。",
+      "loadFailed": "无法加载设置，请重试。"
+    },
+    "feedback": {
+      "syncFailedTitle": "设置已保存，但界面更新失败",
+      "syncFailedBody": "设置已保存。请重试同步以更新当前页面，无需再次保存。",
+      "retrySync": "重试同步",
+      "applyFailedTitle": "设置已保存，但部分更改未能应用",
+      "applyFailedBody": "已保存的配置仍然保留。请检查应用日志，解决问题后重启受影响的服务。",
+      "appRestartTitle": "重启 Motrix 以应用设置",
+      "appRestartBody": "设置已保存，请在方便时重启 Motrix。"
+    },
+    "connection": {
+      "originMismatchTitle": "服务器访问地址不匹配。",
+      "originMismatchBody": "实时更新不可用。请使用服务器配置的访问地址，或联系管理员修正配置。",
+      "disconnectedTitle": "实时更新连接已中断。",
+      "disconnectedBody": "部分信息可能延迟。如果持续出现，请检查服务器连接和反向代理配置。"
+    }
+  },
+  "menu": {
+    "app": {
+      "title": "Motrix",
+      "about": "关于 Motrix",
+      "preferences": "设置…",
+      "checkForUpdates": "检查更新…",
+      "show": "显示 Motrix",
+      "hide": "隐藏 Motrix",
+      "hideOthers": "隐藏其他",
+      "unhide": "显示全部",
+      "quit": "退出 Motrix"
+    },
+    "file": {
+      "title": "文件"
+    },
+    "task": {
+      "title": "任务",
+      "newTask": "新建任务…",
+      "newBtTask": "新建 BitTorrent 任务…",
+      "openFile": "打开 Torrent 文件…",
+      "taskList": "任务列表",
+      "pauseTask": "暂停",
+      "resumeTask": "继续",
+      "deleteTask": "移除任务…",
+      "moveTaskUp": "在队列中上移",
+      "moveTaskDown": "在队列中下移",
+      "pauseAllTask": "全部暂停",
+      "resumeAllTask": "全部继续",
+      "selectAllTask": "全选任务",
+      "clearRecentTasks": "清空已停止的任务记录…"
+    },
+    "edit": {
+      "title": "编辑",
+      "undo": "撤销",
+      "redo": "重做",
+      "cut": "剪切",
+      "copy": "复制",
+      "paste": "粘贴",
+      "delete": "删除",
+      "selectAll": "全选"
+    },
+    "window": {
+      "title": "窗口",
+      "reload": "重新加载",
+      "close": "关闭",
+      "minimize": "最小化",
+      "zoom": "缩放",
+      "toggleFullscreen": "切换全屏",
+      "front": "全部置于顶层"
+    },
+    "help": {
+      "title": "帮助",
+      "officialWebsite": "官方网站",
+      "manual": "使用手册",
+      "changelog": "更新日志",
+      "reportProblem": "反馈问题",
+      "toggleDevTools": "切换开发者工具"
+    }
+  },
+  "errors": {
+    "task": {
+      "create": {
+        "dedupExhausted": "同名文件过多（>9999）。",
+        "torrentMetaFailed": "无法持久化 torrent 元数据。"
+      }
+    }
+  },
+  "trackers": {
+    "effective": {
+      "enabled": "注入精选 Tracker",
+      "enabledDesc": "为新建的公共 BT 任务补充精选 Tracker。",
+      "disabled": "已禁用 — 开启后可查看生效的 Tracker 列表。",
+      "empty": "暂无生效的 Tracker，运行同步以填充。",
+      "column": {
+        "url": "URL",
+        "health": "健康度",
+        "responseTimeMs": "响应 (ms)",
+        "lastProbedAt": "最后探测",
+        "source": "来源"
+      }
+    },
+    "blacklist": {
+      "enabled": "启用黑名单过滤",
+      "enabledDesc": "屏蔽可疑和错误的 Tracker 服务器。",
+      "disabled": "已禁用 — 开启后可查看黑名单。",
+      "empty": "黑名单为空。",
+      "summary": "共 {{count}} 条已生效",
+      "column": {
+        "url": "URL",
+        "source": "来源"
+      }
+    },
+    "combobox": {
+      "placeholder": "选择来源",
+      "addSourcePlaceholder": "https://example.com/list.txt",
+      "addSource": "添加",
+      "removeSource": "移除源",
+      "empty": "无匹配的源。",
+      "builtinBadge": "内置",
+      "cdnBadge": "CDN",
+      "directBadge": "直连"
+    },
+    "sync": {
+      "syncing": "同步中…",
+      "fetching": "正在获取 Tracker 列表…",
+      "probing": "正在检测 Tracker 可用性…",
+      "applying": "正在应用 Tracker 列表…",
+      "failed": "同步未完成，请检查网络或来源后重试。",
+      "unavailable": "无法获取同步状态，请检查连接后重试。",
+      "details": {
+        "title": "更新详情",
+        "scope": "此列表用于补充新建的公共 BT 任务，已有下载保持当前 Tracker。",
+        "sources": "来源状态",
+        "candidates": "候选列表",
+        "history": "更新记录",
+        "disabled": "已关闭",
+        "noSources": "没有启用的来源",
+        "attention": "{{count}} 个 Tracker · {{failed}} 个来源需关注",
+        "summary": "{{count}} 个 Tracker · 最近成功：{{time}}",
+        "lastAttempt": "最近检查",
+        "nextCheck": "下次检查",
+        "autoOff": "自动更新已关闭",
+        "enginePending": "已保存，等待应用到下载引擎。",
+        "sourceResult": "{{count}} 个地址 · 最近成功：{{time}}",
+        "retryAt": "下次重试：{{time}}",
+        "evidence": "连接检查仅提供可达性参考，不代表一定能找到节点或获得下载速度。",
+        "firstSeen": "首次发现：{{time}}",
+        "noCandidates": "没有匹配的候选地址",
+        "showMore": "显示更多",
+        "run": "{{success}} 个来源成功 · {{failed}} 个失败 · 入选 +{{added}} / −{{removed}}",
+        "noHistory": "暂无更新记录",
+        "retry": "重试失败来源",
+        "state": {
+          "fresh": "已更新",
+          "cached": "使用上次成功缓存",
+          "expired": "缓存已过期",
+          "pending": "尚未检查",
+          "failed": "无可用缓存"
+        },
+        "failure": {
+          "network": "连接失败，保留上次成功缓存，最长 7 天。",
+          "http": "来源返回 HTTP 错误。",
+          "invalid": "响应不是有效的 Tracker 列表。",
+          "limit": "来源超过大小或地址数量限制。",
+          "missing-cache": "来源返回 304，但没有可用缓存。"
+        },
+        "reason": {
+          "selected": "已入选",
+          "capacity": "候补",
+          "blacklisted": "黑名单排除",
+          "unsupported": "不支持的协议",
+          "cooldown": "连续连接失败"
+        },
+        "outcome": {
+          "success": "已完成",
+          "partial": "部分完成",
+          "failed": "失败"
+        }
+      }
+    }
+  },
+  "plugins": {
+    "title": "插件",
+    "empty": "尚未安装任何插件。",
+    "errors_other": "{{count}} 个错误",
+    "status": {
+      "active": "运行中",
+      "inactive": "已就绪",
+      "disabled": "已禁用",
+      "error": "出错"
+    },
+    "install": {
+      "title": "添加插件",
+      "github": "GitHub",
+      "github.spec": "GitHub 仓库(owner/repo[@tag])",
+      "url": "URL",
+      "url.spec": "插件包 URL(.moext)",
+      "local": "本地文件",
+      "local.pick": "选择 .moext 文件",
+      "lead": "粘贴插件地址、选择 .moext 文件，或将文件拖到输入区。",
+      "placeholder": "粘贴 GitHub 地址、链接，或选择本地 .moext 文件",
+      "detected": {
+        "auto": "自动",
+        "github": "GitHub",
+        "url": "链接",
+        "local": "文件"
+      },
+      "detectedRow": {
+        "ok": "自动识别为 {{type}}",
+        "localSupported": "支持本地 .moext"
+      },
+      "checkAriaLabel": "检查该插件",
+      "install": "安装插件",
+      "pickLocal": "选择本地 .moext 文件",
+      "localUnavailable": "当前宿主不支持本地文件安装。",
+      "localPrepareFailed": "无法准备此插件文件：{{detail}}",
+      "dropHint": "将 .moext 文件拖至此处以检查该插件",
+      "dragDisabledHint": "当前环境不支持拖拽。请使用 GitHub 地址或链接。",
+      "warning": "安装前请注意：只有信任作者并预期它会使用上述权限时，才继续安装。",
+      "officialVerified": "已验证 Motrix 官方签名",
+      "officialSignatureInvalid": "无法验证此插件的官方签名，请刷新插件市场后重试。",
+      "officialBuiltinOnly": "此版本需要内置插件专属权限，请安装支持可选安装的新版本。",
+      "builtinAlreadyInstalled": "此插件已内置，请使用插件的更新功能。",
+      "hostIncompatible": "此插件需要 Motrix {{required}}，当前版本为 {{current}}。请升级或切换到满足要求的 Motrix 版本后重试。"
+    },
+    "consent": {
+      "installTitle": "安装 {{name}} {{version}}？",
+      "upgradeTitle": "升级 {{name}} 到 {{version}}？",
+      "notVerified": "此插件未经验证。仅在你信任来源时安装。",
+      "confirm": "同意并安装",
+      "permissions": "所需权限",
+      "optionalPermissions": "可选权限",
+      "hostPermissions": "主机访问范围",
+      "invokesCommands": "调用其他插件的命令",
+      "calleeMissing": "未安装",
+      "source": "来源：{{type}} · {{url}}",
+      "broadAccess": {
+        "title": "广泛主机访问",
+        "body": "此插件可读取并修改任意 URL 的下载。仅在你信任来源时安装。",
+        "tag": "广泛"
+      },
+      "diff": {
+        "title": "相对上次授权的变化",
+        "permissions": "新增权限",
+        "optionalPermissions": "新增可选权限",
+        "hostPermissions": "新增主机访问",
+        "invokesCommands": "新增跨插件命令调用",
+        "publicCommands": "新增公开命令",
+        "publicCommandsSchema": "公开命令格式已变更",
+        "heap": "内存申请",
+        "engines": "Motrix 引擎版本",
+        "source": "包来源"
+      }
+    },
+    "detail": {
+      "overview": "概览",
+      "settings": "设置",
+      "logs": "日志",
+      "about": "关于",
+      "loading": "加载中…",
+      "back": "返回插件列表",
+      "author": "作者",
+      "homepage": "主页",
+      "uninstall": "卸载",
+      "uninstallConfirm": "卸载此插件？其数据会被一并清除。",
+      "enabled": "已启用",
+      "disabled": "已禁用",
+      "access": "权限",
+      "advanced": "高级",
+      "accessGranted": "该插件已获得的权限",
+      "accessOptional": "可选权限",
+      "hero": {
+        "ready": "已就绪",
+        "review": "查看权限",
+        "attention": "需要处理",
+        "off": "已关闭",
+        "optional": "可申请额外权限"
+      },
+      "mini": {
+        "purpose": "用途",
+        "access": "权限",
+        "health": "运行状态"
+      },
+      "healthOk": "一切正常",
+      "healthIssues_other": "最近 1 天报告了 {{count}} 个问题",
+      "accessNone": "仅访问自身设置",
+      "accessHosts_other": "读取 {{count}} 个网站",
+      "accessBroad": "可读取任意网站",
+      "attentionTitle": "该插件报告了一个问题",
+      "attentionGeneric": "请查看日志了解详情。",
+      "viewIssue": "查看错误",
+      "removeTitle": "移除插件",
+      "removeDesc": "移除该插件会同时删除它在 Motrix 中存储的数据。",
+      "uninstallConfirmTitle": "确认卸载 {{name}}？",
+      "uninstallConfirmDesc": "这将从 Motrix 中移除该插件及其存储的设置。",
+      "operations": "操作",
+      "operationsFailed": "操作界面加载失败，请重试。"
+    },
+    "permissions": {
+      "empty": "此插件未请求任何权限。",
+      "granted": "已授予",
+      "denied": "已拒绝"
+    },
+    "logs": {
+      "verbose": "详细模式",
+      "verboseWarning": "1 小时内捕获完整 URL 与 header，请谨慎使用。",
+      "filterLabel": "日志级别",
+      "levels": {
+        "all": "全部级别",
+        "trace": "追踪",
+        "debug": "调试",
+        "info": "信息",
+        "warn": "警告",
+        "error": "错误",
+        "fatal": "严重"
+      },
+      "copy": "复制",
+      "clear": "清空",
+      "output": "实时输出",
+      "entryCount_other": "{{count}} 条日志",
+      "empty": "暂无日志条目",
+      "emptyHint": "插件产生的新活动会自动显示在这里。",
+      "emptyFiltered": "当前级别下没有日志。"
+    },
+    "lead": "为 Motrix 添加小功能。保留你信任的插件，关闭不再用的。",
+    "search": "查找插件",
+    "registry": {
+      "availableTitle": "可安装的插件",
+      "featured": "精选",
+      "byAuthor": "作者：{{name}}",
+      "requires": "需要 Motrix {{range}}",
+      "notInstalled": "未安装",
+      "notFound": "插件「{{id}}」不在插件注册表中",
+      "viewOnWebsite": "在 motrix.app 查看",
+      "updated": "更新于 {{date}}",
+      "featuresTitle": "功能",
+      "permissionsTitle": "权限",
+      "permissionsPreviewNote": "以上为注册表条目的预览，实际授权确认始终以插件包内的 manifest 为准。",
+      "optionalTag": "可选",
+      "install": "安装",
+      "updateAvailable": "可更新",
+      "updateTo": "更新到 v{{version}}",
+      "refresh": "检查更新",
+      "builtinUpdateTitle": "更新内置插件",
+      "builtinConsentLead": "此更新请求了新的访问权限：",
+      "revertToBundled": "还原为内置版本",
+      "restartRequired": "更新已安装，重启 Motrix 后完全生效。",
+      "updateInstalled": "更新已安装。",
+      "actionFailed": "操作未能完成。"
+    },
+    "searchNoMatch": "没有与「{{query}}」匹配的插件",
+    "clearSearch": "清除搜索",
+    "tone": {
+      "safe": "运行正常",
+      "review": "需要确认",
+      "optional": "可选授权",
+      "off": "已关"
+    },
+    "card": {
+      "advancedDetails": "高级详情",
+      "commandsInvoked": "发起的命令调用：{{count}}",
+      "commandsServing": "接受的命令调用：{{count}}",
+      "primaryAction": {
+        "settings": "设置",
+        "open": "打开",
+        "reviewAccess": "查看权限",
+        "viewIssue": "查看错误",
+        "grantAccess": "授予权限",
+        "turnOn": "启用"
+      },
+      "plain": {
+        "safe": "该插件已启用、准备就绪。它仅保存自身设置，不访问任何网站。",
+        "reviewBroadHost": "该插件可读取 {{hostSummary}}。仅当你信任时才保持启用。",
+        "reviewError": "该插件报告了一个问题。",
+        "optional": "该插件无需额外权限即可工作。你可以稍后再授予更多权限。",
+        "off": "该插件已关闭。"
+      }
+    },
+    "help": {
+      "guidance": {
+        "firstUse": {
+          "title": "添加可信插件",
+          "body": "从可信来源安装插件，检查其请求的权限后再启用。",
+          "safety": "仅为插件预期处理的网站授予访问权限。",
+          "browse": "去 Motrix 官方插件市场发现更多插件"
+        },
+        "ongoing": "启用插件前请检查其权限。仅为插件预期处理的网站授予访问权限。"
+      }
+    },
+    "diagnostics": {
+      "title": "诊断",
+      "intro": "查看最近 24 小时内插件之间的成功调用。",
+      "callGraph": {
+        "toolbarLabel": "调用图控制项",
+        "modeLabel": "关系视图",
+        "modes": {
+          "graph": "调用图",
+          "table": "表格"
+        },
+        "filters": {
+          "searchLabel": "搜索调用关系",
+          "searchPlaceholder": "查找插件或命令",
+          "clearSearch": "清除搜索",
+          "pluginsGroup": "插件",
+          "commandsGroup": "命令",
+          "noSuggestions": "没有插件或命令建议"
+        },
+        "refresh": "刷新",
+        "refreshing": "正在刷新…",
+        "refreshTooltip": "加载最新的成功调用记录",
+        "renderGraphTooltip": "将这组大型结果渲染为调用图",
+        "columns": {
+          "caller": "调用方",
+          "command": "命令",
+          "callee": "被调用方",
+          "calls": "调用次数",
+          "lastCall": "最近调用"
+        },
+        "legend": {
+          "label": "调用量图例",
+          "fewerCalls": "调用较少",
+          "moreCalls": "调用较多"
+        },
+        "loading": {
+          "graph": "正在加载调用记录…",
+          "metadata": "正在加载插件详情…"
+        },
+        "globalEmpty": {
+          "title": "尚无成功的跨插件调用",
+          "description": "内置插件默认情况下可能不会产生跨插件流量。"
+        },
+        "filteredEmpty": "没有符合当前搜索的成功调用。",
+        "errors": {
+          "graphTitle": "无法加载调用记录",
+          "graphDescription": "请重新尝试加载成功调用记录。",
+          "graphRetry": "重试调用记录",
+          "metadataTitle": "无法加载插件详情",
+          "metadataDescription": "需要先加载插件详情，才能识别已不可用的插件。",
+          "metadataRetry": "重试插件详情",
+          "layout": "无法排列调用关系图。",
+          "layoutRetry": "重新排列",
+          "canvasTitle": "无法显示调用图画布",
+          "canvasDescription": "你可以重试画布，或改用信息完整的表格视图。",
+          "canvasRetry": "重试画布",
+          "canvasTable": "改用表格"
+        },
+        "truncated": "受读取预算、保留策略或文件轮换影响，调用记录可能不完整。",
+        "statuses": {
+          "active": "运行中",
+          "inactive": "已就绪但空闲",
+          "disabled": "已禁用",
+          "error": "需要处理",
+          "missing": "未安装"
+        },
+        "inspector": {
+          "label": "调用图选中项详情",
+          "scopeTitle": "成功调用",
+          "neutralScope": "选择插件或连接，以查看最近 24 小时内的成功调用。",
+          "pluginId": "插件 ID",
+          "status": "状态",
+          "incomingCalls": "传入调用",
+          "outgoingCalls": "传出调用",
+          "connections": "关联插件",
+          "noConnections": "没有关联插件",
+          "openPlugin": "打开插件",
+          "edgeTitle": "连接详情",
+          "totalCalls": "总调用次数",
+          "commands": "命令"
+        },
+        "tableRegionLabel": "可滚动的命令调用关系",
+        "tableLabel": "插件命令调用关系",
+        "counts": {
+          "calls_other": "{{count}} 次成功调用",
+          "commands_other": "{{count}} 个命令"
+        },
+        "aria": {
+          "graphLabel": "插件命令调用关系",
+          "graphDescription": "最近 24 小时内共有 {{nodeCount}} 个插件和 {{pairCount}} 条调用关系。",
+          "nodeLabel": "{{name}}，插件 {{id}}，{{status}}，{{incoming}} 次传入调用，{{outgoing}} 次传出调用",
+          "edgeLabel": "{{source}} 通过 {{commands}} 个命令调用 {{target}} {{calls}} 次",
+          "nodeDescription": "选择插件节点以查看详情。",
+          "nodeKeyboardInstruction": "使用方向键移动此插件节点。",
+          "nodeMoved": "插件节点已向{{direction}}移动到 {{x}}, {{y}}。",
+          "directions": {
+            "left": "左",
+            "right": "右",
+            "up": "上",
+            "down": "下"
+          },
+          "edgeDescription": "选择调用连线以查看详情。",
+          "controls": "插件调用图视图控制项",
+          "zoomIn": "放大调用图",
+          "zoomOut": "缩小调用图",
+          "fitView": "使插件调用图适应视图",
+          "interactive": "切换调用图交互模式",
+          "minimap": "插件调用图概览",
+          "handle": "只读调用端点"
+        }
+      }
+    },
+    "permission": {
+      "http": {
+        "strong": "读取网页",
+        "plain": "打开此插件支持的网页。",
+        "cookies": {
+          "strong": "使用 Cookie",
+          "plain": "用于访问已登录的网站。"
+        }
+      },
+      "ffmpeg": {
+        "strong": "使用 FFmpeg",
+        "plain": "处理音频或视频。",
+        "requirement": "用于处理音视频，使用前请先<settings>在设置中安装或选择 FFmpeg</settings>。"
+      },
+      "notify": {
+        "strong": "发送通知",
+        "plain": "显示完成提醒。"
+      },
+      "fs": {
+        "task": {
+          "read": {
+            "strong": "读取任务文件",
+            "plain": "查看下载任务里的文件。"
+          },
+          "write": {
+            "strong": "修改任务文件",
+            "plain": "可添加或更新任务文件。"
+          }
+        },
+        "storage": {
+          "strong": "保存插件文件",
+          "plain": "只存此插件自己的文件。"
+        }
+      },
+      "storage": {
+        "strong": "保存设置",
+        "plain": "记住此插件的选项。"
+      },
+      "notifications": {
+        "strong": "发送通知",
+        "plain": "显示插件提醒。"
+      },
+      "network": {
+        "strong": "读取网页",
+        "plain": "获取支持的网站内容。"
+      },
+      "tasks:read": {
+        "strong": "读取下载",
+        "plain": "查看下载列表。"
+      },
+      "tasks:write": {
+        "strong": "管理你的下载",
+        "plain": "可暂停、恢复或删除任务。"
+      },
+      "unknown": {
+        "plain": "未知权限。"
+      },
+      "accessTone": {
+        "required": "需要",
+        "websiteAccess": "网站访问",
+        "offByDefault": "可选",
+        "allowed": "已允许",
+        "noAccess": "关闭",
+        "grant": "允许"
+      }
+    }
+  },
+  "plugin": {
+    "ffmpeg": {
+      "destination_phase_disallowed": "在 {{phase}} hook 中，ffmpeg 不能写入 {{kind}}。请改为写入 plugin storage，或把调用移到 beforeFinalize。",
+      "staging_quota_exceeded": "ffmpeg 临时空间配额已耗尽（当前任务）。请减小输出体积或在媒体设置中调高上限。"
+    },
+    "install": {
+      "ffmpeg": {
+        "title": "FFmpeg 要求",
+        "notInstalled": "本机未安装 FFmpeg。",
+        "versionMismatch": "已安装 FFmpeg {{version}}。",
+        "requiredByPlugin": "此插件必须 ffmpeg。安装后再试。",
+        "optionalDegraded": "此插件的媒体功能在装 ffmpeg 前不可用。"
+      }
+    }
+  },
+  "bridge": {
+    "receiver": {
+      "error": {
+        "invalidPayload": "扩展提交的请求格式不正确",
+        "invalidUrlScheme": "URL 必须是 http: 或 https:",
+        "unsupportedKind": "此版本 Motrix 不支持 {{kind}} 类型下载",
+        "unsupportedLive": "直播流暂不支持下载",
+        "unsupportedMaster": "扩展发送了 master playlist，应为 variant",
+        "unsupportedEncryption": "受 DRM 保护的内容无法下载",
+        "authExpired": "会话已过期 — 请在浏览器中刷新页面后重试",
+        "notFound": "资源不存在 (404)",
+        "transientFailure": "重试后仍失败：{{detail}}",
+        "rangeNotSatisfiable": "续传失败；请重新开始下载",
+        "diskFull": "磁盘已满",
+        "diskWriteFailed": "写入磁盘失败：{{detail}}",
+        "muxFailed": "ffmpeg 合成阶段失败",
+        "muxAborted": "合成已取消",
+        "cancelled": "已取消",
+        "internalError": "内部错误：{{detail}}"
+      }
+    }
+  },
+  "onboarding": {
+    "disclaimer": {
+      "title": "使用声明",
+      "language": "语言",
+      "languages": {
+        "english": "English",
+        "chinese": "简体中文"
+      },
+      "summary": "继续前，请阅读以下内容。",
+      "body": "Motrix 仅提供下载管理功能，不提供、存储、托管或推荐任何下载内容。您应确保通过 Motrix 获取、使用或分享的内容已获得合法授权，并遵守适用的著作权及其他法律法规。因您下载、使用或分享内容产生的责任由您自行承担。点击「同意并继续」即表示您已阅读并理解本声明。",
+      "highlights": {
+        "downloadManagement": "仅提供下载管理功能",
+        "authorized": "已获得合法授权",
+        "responsibility": "责任由您自行承担"
+      },
+      "localConsent": "您的选择将保存在本机。",
+      "agree": "同意并继续",
+      "quit": "退出",
+      "retry": "重试",
+      "saveFailed": "未能保存同意记录，请检查磁盘空间后重试。"
+    }
+  },
+  "notification": {
+    "taskError": {
+      "title": "{{name}} 下载失败"
+    },
+    "taskComplete": {
+      "title": "{{name}} 下载完成"
+    },
+    "engineFailure": {
+      "title": "下载引擎故障"
+    },
+    "engineCompatibility": {
+      "title": "检测到非 Motrix 版 aria2",
+      "body": "当前 aria2 {{version}} 不是 Motrix fork。连接设置已限制为不超过 {{limit}}，且 SQLite 历史持久化不可用。请恢复内置 aria2_motrix 引擎以获得完整支持。"
+    },
+    "engineRestartRequired": {
+      "title": "重启下载引擎以应用设置",
+      "body": "设置已保存，可在方便时重启下载引擎。",
+      "restartNow": "立即重启"
+    },
+    "dnsFallback": {
+      "title": "{{name}} 已改用系统 DNS 重试",
+      "body": "引擎无法联系任何 DNS 服务器，本次会话已切换到系统解析器。"
+    },
+    "center": {
+      "title": "通知",
+      "markAllRead": "全部标为已读",
+      "clearAll": "清空",
+      "empty": "暂无通知",
+      "emptyDesc": "下载活动和重要应用提醒会显示在这里",
+      "unreadDotAria": "有未读通知",
+      "unreadBadgeAria_other": "{{count}} 条未读通知",
+      "rowUnreadAria": "{{title}}（未读）",
+      "toastRegionAria": "通知",
+      "removeAria": "移除{{title}}",
+      "actionFailed": "未能更新通知，请重试。",
+      "markRead": "标为已读",
+      "viewTask": "查看任务",
+      "taskRemoved": "任务已移除",
+      "openTaskFailed": "未能打开任务，请重试。"
+    }
+  },
+  "applicationMenu": {
+    "signOut": "退出登录…",
+    "back": "返回",
+    "serverUnavailable": "暂时无法连接服务器。当前会话尚未退出。",
+    "retry": "重试",
+    "actionFailed": "操作未完成，请检查连接后重试。",
+    "clearTitle": "清空已停止的任务记录？",
+    "clearDescription": "清除此对话框打开时已完成、失败或移除的任务记录，保留磁盘上的下载文件。",
+    "clearConfirm": "清空记录",
+    "logoutTitle": "退出此服务器？",
+    "logoutDescription": "使用同一浏览器会话的其他标签页也会退出。服务器上的下载会继续，这些标签页中未保存的输入将被丢弃。",
+    "logoutConfirm": "退出登录",
+    "discardTitle": "丢弃此任务草稿？",
+    "discardDescription": "未保存的链接、种子选择和设置将被丢弃。",
+    "discardConfirm": "丢弃"
+  },
+  "directoryPicker": {
+    "title": "选择服务器文件夹",
+    "description": "路径位于服务器上；使用 Docker 时为容器内路径。",
+    "back": "后退",
+    "forward": "前进",
+    "up": "上一级",
+    "refresh": "刷新",
+    "goToFolder": "前往文件夹",
+    "location": "位置",
+    "viewOptions": "视图选项",
+    "sortBy": "排序依据",
+    "sortName": "名称",
+    "sortModified": "修改时间",
+    "sortOrder": "顺序",
+    "sortAscending": "升序",
+    "sortDescending": "降序",
+    "showHidden": "显示隐藏文件夹",
+    "folders": "文件夹",
+    "loading": "正在加载文件夹…",
+    "empty": "没有子文件夹",
+    "incomplete": "当前仅显示部分文件夹。可输入完整路径前往其他文件夹。",
+    "selectFolder": "选择文件夹",
+    "selectedPath": "所选文件夹",
+    "path": "文件夹路径",
+    "go": "前往",
+    "newFolder": "新建文件夹",
+    "folderName": "文件夹名称",
+    "create": "创建",
+    "createHelp": "取消选择后，已创建的文件夹仍会保留在服务器上。",
+    "fallback": "请求的文件夹不可用，正在显示 {{path}}。",
+    "refreshAfterCreateFailed": "文件夹已创建，但未能刷新列表。",
+    "unknownOutcome": "无法确认文件夹是否已创建。请先刷新检查，再在此处创建其他文件夹。",
+    "retry": "重试",
+    "errors": {
+      "invalidPath": "请输入有效的文件夹绝对路径。",
+      "outsideRoots": "此文件夹不在允许的位置范围内。",
+      "notFound": "此文件夹已不存在。",
+      "notDirectory": "此路径不是文件夹。",
+      "permissionDenied": "你没有使用此文件夹的权限。",
+      "alreadyExists": "已存在同名文件或文件夹。",
+      "invalidName": "请输入有效的文件夹名称。",
+      "tooLarge": "路径或文件夹名称过长。",
+      "unavailable": "服务器未能完成请求，请重试。",
+      "creationOutcomeUnknown": "无法确认文件夹是否已创建。请先刷新检查，再在此处创建其他文件夹。",
+      "notFile": "请选择可读取的普通文件。",
+      "unsupportedFileType": "不支持此文件扩展名。"
+    },
+    "places": {
+      "common": "常用位置",
+      "allowed": "允许的位置",
+      "default": "默认目录",
+      "home": "主目录",
+      "desktop": "桌面",
+      "documents": "文稿",
+      "downloads": "下载",
+      "root": "文件系统",
+      "loadFailed": "部分目录位置未能加载。"
+    },
+    "openFileTitle": "选择文件",
+    "saveFileTitle": "保存文件",
+    "fileDescription": "浏览 Motrix 服务器上的文件。",
+    "selectFile": "选择文件",
+    "saveFile": "使用此文件名",
+    "files": "文件和文件夹",
+    "fileName": "文件名",
+    "emptyFiles": "此文件夹为空。",
+    "fileErrors": {
+      "invalidPath": "请输入有效的绝对路径。",
+      "outsideRoots": "此路径不在允许的位置范围内。",
+      "notFound": "此路径已不存在。",
+      "permissionDenied": "你没有使用此路径的权限。",
+      "invalidName": "请输入有效的文件名。",
+      "tooLarge": "路径或文件名过长。"
+    },
+    "selectedFilePath": "所选文件",
+    "file": {
+      "chooseOnServer": "请点击选择服务器上的文件。",
+      "singleFile": "请一次选择一个文件。",
+      "wrongType": "请选择以下格式的文件：{{extensions}}。",
+      "pathUnavailable": "无法读取此文件的位置，请点击选择。",
+      "choose": "选择文件",
+      "dropHint": "拖入文件，或点击选择",
+      "browseHint": "点击浏览文件",
+      "change": "点击更换文件"
+    }
+  },
+  "directoryPreferences": {
+    "sectionDescription": "把常用文件夹放在这里，下载时方便选择。",
+    "manage": "管理目录",
+    "manageDescription": "设置常用目录，管理最近使用的目录。",
+    "title": "管理目录",
+    "description": "从列表移除文件夹不会删除文件夹或其中的文件。",
+    "favorites": "常用目录",
+    "recent": "最近使用",
+    "addFavorite": "添加常用目录",
+    "removeFavorite": "移除常用目录",
+    "favoriteRecent": "添加到常用目录",
+    "removeRecent": "删除最近记录",
+    "clearRecent": "清空最近记录",
+    "emptyFavorites": "暂无常用目录",
+    "emptyRecent": "暂无最近记录",
+    "loading": "正在加载目录…",
+    "retry": "重试",
+    "limitHint": "最多可保存 {{count}} 个常用目录。",
+    "pickerFailed": "无法打开文件夹选择器，请重试。",
+    "close": "关闭",
+    "history": "目录历史",
+    "emptyHistory": "暂无常用目录或最近记录",
+    "errors": {
+      "conflict": "设置已在其他窗口中更改。请检查当前修改后再次保存。",
+      "invalidPath": "请输入有效的文件夹绝对路径。",
+      "outsideRoots": "此文件夹不在允许的位置内。",
+      "notFound": "此文件夹已不存在。",
+      "notDirectory": "此路径不是文件夹。",
+      "permissionDenied": "没有权限使用此文件夹。",
+      "tooLarge": "此文件夹路径过长。",
+      "unavailable": "无法更新目录记录，请刷新确认当前状态。",
+      "limitReached": "常用目录已达上限，请先移除一个再添加。"
+    },
+    "manageAction": "管理",
+    "alreadyFavorite": "已在常用目录中"
+  },
+  "units": {
+    "bytes": {
+      "b": "B",
+      "kb": "KB",
+      "mb": "MB",
+      "gb": "GB",
+      "tb": "TB",
+      "pb": "PB",
+      "eb": "EB",
+      "kib": "KiB",
+      "mib": "MiB",
+      "gib": "GiB",
+      "tib": "TiB",
+      "pib": "PiB",
+      "eib": "EiB"
+    },
+    "perSecond": "{{value}}/s"
+  },
+  "protocol": {
+    "title": "Motrix",
+    "deprecatedScheme": "mo:// 协议已停用，请改用 motrix://。",
+    "deprecatedCommand": "此链接操作已停用，请使用 Motrix 内的操作控件。",
+    "unsupportedCommand": "不支持此链接命令。",
+    "unsupportedParameters": "此链接包含不支持的参数，未打开相关内容或执行更改。",
+    "invalidLink": "此 Motrix 链接无效。",
+    "invalidSource": "链接必须包含一个有效的 HTTP、HTTPS、FTP 或 Magnet 地址。",
+    "waitingMerged": "等待中的任务现已归入活动任务，已打开活动任务列表。",
+    "stoppedSplit": "已停止的任务现按已完成和错误分类，已打开全部下载。",
+    "invalidStatus": "下载分类无效，已打开全部下载。"
+  },
+  "mediaMerge": {
+    "title": "合并音频和视频",
+    "description": "将视频画面与音频合为一个文件，无需重新编码。",
+    "videoInput": "视频文件",
+    "audioInput": "音频文件",
+    "output": "输出文件",
+    "provider": "插件",
+    "browse": "选择…",
+    "browseField": "选择{{field}}",
+    "required": "请选择文件或填写完整路径。",
+    "outputHint": "保存为 MP4 或 MKV，并使用新文件名。MP4 不兼容时可尝试 MKV。",
+    "noPlugin": "请安装并启用音视频合并扩展，并在“设置 → 集成 → 媒体工具”中配置 FFmpeg。",
+    "serverPaths": "选择 Motrix 服务器上的文件；不会上传本机文件。",
+    "start": "合并",
+    "running": "正在合并…",
+    "cancelling": "正在取消…",
+    "completed": "合并成功",
+    "cancelled": "已取消合并",
+    "failed": "合并失败",
+    "invalidSelection": "请选择两个已完成的单文件下载任务。",
+    "jobMissing": "此合并任务已不可用。",
+    "busy": "已有另一个合并任务正在运行。",
+    "pluginUnavailable": "音视频合并插件不可用。",
+    "absolutePaths": "请填写完整的文件绝对路径。",
+    "invalidFiles": "请选择两个非空媒体文件。",
+    "sameInput": "请选择两个不同的输入文件。",
+    "outputFormat": "输出文件名需以 .mp4 或 .mkv 结尾。",
+    "outputExists": "输出文件已存在，请使用新文件名。",
+    "invalidOutput": "插件未生成有效的输出文件。",
+    "again": "再次合并",
+    "pluginDisabled": "启用此扩展后即可合并文件。",
+    "choose": {
+      "videoInput": "选择视频",
+      "audioInput": "选择音频",
+      "output": "选择保存位置"
+    },
+    "hint": {
+      "videoInput": "提供合并后的画面",
+      "audioInput": "提供合并后的声音",
+      "output": "保存为 MP4 或 MKV"
+    },
+    "preserveOriginals": "无损合并，保留源文件",
+    "format": "输出格式"
+  }
+}

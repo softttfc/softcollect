@@ -1,0 +1,116 @@
+import { FileList } from '@renderer/components/file-list/file-list'
+import { Button } from '@renderer/components/ui/button'
+import { useByteFormat } from '@renderer/hooks/use-byte-format'
+import { useTaskFiles } from '@renderer/hooks/use-task-files'
+import { formatProgressPercent } from '@renderer/lib/format'
+import { transport } from '@renderer/lib/transport'
+import { Commands } from '@shared/protocol/commands'
+import type { DownloadTask, TaskFile } from '@shared/types/task'
+import { TaskKind, TaskStatus, TaskType } from '@shared/types/task'
+import { mediaProgressPercent } from '@shared/utils/media-progress'
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+
+const ACTIVE_DOWNLOAD = new Set<TaskStatus>([
+  TaskStatus.Downloading,
+  TaskStatus.Seeding,
+  TaskStatus.FetchingMetadata,
+])
+
+const READ_ONLY_STATES = new Set<TaskStatus>([
+  TaskStatus.Finalizing,
+  TaskStatus.Completed,
+  TaskStatus.Removed,
+])
+
+function arraysEqualSorted(a: number[], b: number[]): boolean {
+  if (a.length !== b.length) return false
+  const sa = [...a].sort((x, y) => x - y)
+  const sb = [...b].sort((x, y) => x - y)
+  return sa.every((v, i) => v === sb[i])
+}
+
+export function FilesTab({ task }: { task: DownloadTask }) {
+  const { t } = useTranslation()
+  const { formatBytes } = useByteFormat()
+  const isMedia = task.kind === TaskKind.Hls || task.kind === TaskKind.Mux
+  const isActive = ACTIVE_DOWNLOAD.has(task.status)
+  const { files } = useTaskFiles(task.id, isActive)
+  const initial = task.bt?.selectedFiles ?? []
+  const [draft, setDraft] = useState<number[]>(initial)
+  // Direct HTTP/FTP and single-file tasks have no file selection to make.
+  // Media tasks require the entire segment plan, so their list is read-only
+  // too, with no select-all checkbox or Save/Cancel controls.
+  const isStructurallyImmutable =
+    isMedia ||
+    task.type === TaskType.Http ||
+    task.type === TaskType.Ftp ||
+    files.length <= 1
+  const isReadOnly =
+    READ_ONLY_STATES.has(task.status) || isStructurallyImmutable
+  const selectedIndices = isStructurallyImmutable
+    ? files.map((file) => file.index)
+    : isReadOnly
+      ? initial
+      : draft
+  const dirty = !arraysEqualSorted(draft, initial)
+  const canSave = dirty && draft.length > 0
+
+  async function onSave() {
+    await transport.invoke(Commands.SetSelectedFiles, {
+      taskId: task.id,
+      indices: draft,
+    })
+  }
+
+  return (
+    <div className="flex min-h-26 flex-1 flex-col gap-2 border border-border rounded-md">
+      <FileList<TaskFile>
+        scrollbar="custom"
+        showColumnHeaders={false}
+        className="max-h-60"
+        files={files}
+        selectedIndices={selectedIndices}
+        onSelectionChange={isReadOnly ? undefined : setDraft}
+        readOnly={isReadOnly}
+        renderRowSize={
+          isMedia ? (f) => (f.size > 0 ? formatBytes(f.size) : '—') : undefined
+        }
+        rowTrailingLabel={t('panel.downloads.column.progress')}
+        renderRowTrailing={
+          isActive || isMedia
+            ? (f) => (
+                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                  {(isMedia ? mediaProgressPercent : formatProgressPercent)(
+                    f.progress ??
+                      (files.length === 1 && !isMedia
+                        ? task.progress
+                        : f.completedBytes / Math.max(f.size, 1))
+                  )}
+                  %
+                </span>
+              )
+            : undefined
+        }
+        headerClassName="rounded-t-md"
+        headerSlot={
+          !isReadOnly && (
+            <div className="flex shrink-0 justify-end gap-2">
+              <Button
+                variant="ghost"
+                disabled={!dirty}
+                onClick={() => setDraft(initial)}
+                size="xs"
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button disabled={!canSave} onClick={onSave} size="xs">
+                {t('common.save')}
+              </Button>
+            </div>
+          )
+        }
+      />
+    </div>
+  )
+}

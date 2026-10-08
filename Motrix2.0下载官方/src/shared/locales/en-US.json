@@ -1,0 +1,3011 @@
+{
+  "operatorUnlock": {
+    "title": "Unlock Motrix",
+    "help": "This server requires the operator token. On the host, set MOTRIX_OPERATOR_TOKEN, or read the token from <dataDir>/operator-token, then paste it below.",
+    "placeholder": "Operator token",
+    "error": "Invalid operator token. Check MOTRIX_OPERATOR_TOKEN or <dataDir>/operator-token on the host and try again.",
+    "submit": "Unlock"
+  },
+  "operatorAdmin": {
+    "help": "Usage:\n  motrix-admin pairing pending [--json]\n  motrix-admin pairing approve <user-code> [--json]\n  motrix-admin pairing deny <user-code> [--json]\n\nThe command talks only to the running Motrix server over container loopback.",
+    "errorPrefix": "motrix-admin: {{message}}",
+    "usageHint": "Run `motrix-admin --help` for usage.",
+    "pending": {
+      "none": "No pending pairing requests.",
+      "row": "{{userCode}}  {{clientName}}  {{clientVersion}}  expires in {{ttl}}",
+      "ttl": "{{minutes}}m {{seconds}}s"
+    },
+    "decision": {
+      "approve": "Approved {{userCode}} for {{clientName}} ({{clientVersion}}).",
+      "deny": "Denied {{userCode}} for {{clientName}} ({{clientVersion}})."
+    },
+    "errors": {
+      "usage": {
+        "jsonRepeated": "--json may only be specified once.",
+        "unknownOption": "Unknown command-line option.",
+        "pairingCommandRequired": "Expected the pairing command.",
+        "pairingOperationRequired": "Expected pairing pending, pairing approve CODE, or pairing deny CODE.",
+        "pairingCodeInvalid": "Pairing code must contain eight ASCII characters and cannot use I, O, 0, or 1.",
+        "portInvalid": "PORT must be an integer between 1 and 65535."
+      },
+      "credential": {
+        "tokenHeaderInvalid": "MOTRIX_OPERATOR_TOKEN cannot be used in an HTTP header.",
+        "dataDirNotAbsolute": "MOTRIX_DATA_DIR must be an absolute path.",
+        "unavailable": "Operator credential is unavailable. Set MOTRIX_OPERATOR_TOKEN or ensure operator-token exists in the data directory.",
+        "notFile": "Operator credential path is not a regular file.",
+        "unreadable": "Operator credential could not be read.",
+        "invalid": "Operator credential file is invalid.",
+        "rejected": "Operator credential was rejected by Motrix."
+      },
+      "server": {
+        "responseUnreadable": "Motrix returned an unreadable response.",
+        "responseOversized": "Motrix returned an oversized response.",
+        "responseInvalidJson": "Motrix returned an invalid JSON response.",
+        "rpcHttp": "Motrix pairing RPC failed with HTTP {{status}}.",
+        "approvalUnavailable": "Pairing approval is not available in the running Motrix server.",
+        "pendingResponseInvalid": "Motrix returned an invalid pending-pairing response.",
+        "decisionOutcomeUnknown": "The pairing decision outcome is unknown. Run pairing pending before trying again.",
+        "decisionResponseInvalid": "Motrix returned an invalid pairing-decision response.",
+        "requestNoLongerPending": "Pairing request is no longer pending.",
+        "noMatchingRequest": "No pending pairing request matches {{userCode}}.",
+        "ambiguousRequest": "More than one pending pairing request matches {{userCode}}; no decision was applied.",
+        "unexpected": "Unexpected motrix-admin failure."
+      },
+      "unavailable": {
+        "loopback": "The running Motrix server is unavailable on container loopback.",
+        "approvalNotReady": "Pairing approval is not ready in the running Motrix server."
+      }
+    }
+  },
+  "common": {
+    "clearSearch": "Clear search",
+    "download": "Download",
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close",
+    "loading": "Loading...",
+    "name": "Name:",
+    "error": "Error",
+    "remove": "Remove",
+    "collapse": "Collapse",
+    "apply": "Apply",
+    "confirm": "Confirm",
+    "status": {
+      "finalizing": "Finalizing…"
+    },
+    "reset": "Reset",
+    "retry": "Retry",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
+  },
+  "quit": {
+    "confirm": {
+      "message_one": "{{count}} download is still active.",
+      "message_other": "{{count}} downloads are still active.",
+      "detail": "Quitting now will pause it. Are you sure you want to quit?",
+      "quitButton": "Quit",
+      "dontAskAgain": "Don’t ask again"
+    }
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "downloads": "Downloads",
+    "completed": "Completed",
+    "trackers": "Trackers",
+    "plugins": "Plugins",
+    "notifications": "Notifications",
+    "settings": "Settings"
+  },
+  "chrome": {
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "restore": "Restore",
+    "close": "Close",
+    "toggleSidebar": "Toggle sidebar",
+    "newTask": "New task",
+    "sidebarTitle": "Sidebar",
+    "sidebarDescription": "Application navigation."
+  },
+  "tray": {
+    "newTask": "New Task",
+    "newTorrentTask": "New Torrent Task",
+    "openTorrentFile": "Open Torrent File",
+    "showMotrix": "Show Motrix",
+    "manual": "Manual",
+    "checkUpdates": "Check for Updates",
+    "preferences": "Settings",
+    "quit": "Quit"
+  },
+  "panel": {
+    "connection": {
+      "polling": "Periodic updates",
+      "reconnecting": "Reconnecting to server…",
+      "unavailable": "Server unreachable",
+      "originMismatch": "Access address mismatch"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "engine": {
+        "title": "Engine",
+        "features": "Features",
+        "startFailed": "aria2 engine could not start",
+        "state": {
+          "ready": "Ready",
+          "starting": "Starting…",
+          "reconnecting": "Reconnecting…",
+          "failed": "Failed",
+          "disconnected": "Disconnected",
+          "stopped": "Stopped"
+        },
+        "name": "Aria2",
+        "version": "Version",
+        "rpcPort": "RPC port",
+        "listenPort": "Listen port",
+        "diagnostics": {
+          "title": "Engine diagnostics",
+          "description": "Check engine, identify the process using Motrix’s RPC port, and recover safely.",
+          "open": "Diagnose",
+          "checking": "Running engine checks…",
+          "runAgain": "Run again",
+          "loadFailed": "Could not run engine diagnostics.",
+          "currentStatus": "Current status",
+          "lastChecked": "Checked at {{time}}",
+          "checks": {
+            "binary": "Engine",
+            "features": "Features",
+            "rpc": "RPC port",
+            "process": "Process",
+            "communication": "Connection"
+          },
+          "binary": {
+            "available": "{{name}} {{version}}",
+            "unavailable": "{{name}} is missing or cannot be started."
+          },
+          "features": {
+            "none": "Not reported",
+            "unavailable": "Unavailable"
+          },
+          "rpc": {
+            "listening": "{{port}} (Listening)",
+            "available": "{{port}} (Available)",
+            "occupied": "{{port}} (In use)"
+          },
+          "process": {
+            "none": "No port conflict",
+            "unidentified": "Unidentified, Will not be stopped",
+            "current_app": "PID {{pid}} ({{name}}), Managed by Motrix",
+            "verified_orphan": "PID {{pid}} ({{name}}), Verified Motrix leftover; safe to stop",
+            "external_aria2": "PID {{pid}} ({{name}}), Unverified ownership; will not be stopped",
+            "other": "PID {{pid}} ({{name}}), Unverified ownership; will not be stopped",
+            "unknown": "PID {{pid}}, Unidentified; will not be stopped"
+          },
+          "communication": {
+            "ready": "Motrix can communicate with aria2."
+          },
+          "reason": {
+            "port_in_use": "Motrix’s RPC port is occupied, so aria2 engine could not start.",
+            "binary_unavailable": "The bundled aria2 executable is missing or unavailable.",
+            "spawn_failed": "The aria2 process could not be created.",
+            "rpc_unavailable": "aria2 engine started but did not accept Motrix RPC connections.",
+            "unexpected_exit": "aria2 engine exited unexpectedly.",
+            "health_check_failed": "aria2 stopped responding to Motrix.",
+            "unknown": "aria2 engine could not start for an unknown reason."
+          },
+          "recommendation": {
+            "title": "Recommended recovery",
+            "retry": "The port is free. Retry aria2 without changing your settings.",
+            "force_terminate": "This process is verified as Motrix-owned. Force stop PID {{pid}}, then restart aria2 on the Motrix RPC port {{rpcPort}}.",
+            "switch_port": "The process cannot be safely terminated. Use port {{port}} only as a fallback, or close the conflicting process yourself."
+          },
+          "technicalDetails": "Technical details",
+          "retry": "Retry",
+          "restart": "Restart engine",
+          "switchPort": "Use port {{port}}",
+          "forceRecover": "Force stop & recover",
+          "recovered": "The aria2 engine is available again.",
+          "recoveredOnPort": "The aria2 engine recovered on RPC port {{port}}.",
+          "recoveryFailed": "Engine recovery failed. Run diagnostics again for the latest status.",
+          "fallback": {
+            "available": "Motrix’s default port {{port}} is available and can be restored now.",
+            "verifiedOrphan": "A verified leftover Motrix aria2 process (PID {{pid}}) is using the default port {{port}}. Motrix can safely stop it before restoring the port.",
+            "blocked": "The default port {{port}} is used by PID {{pid}} ({{name}}), but Motrix cannot verify ownership. The process will not be terminated.",
+            "unidentified": "The process using default port {{port}} could not be identified. Motrix will keep using the current port.",
+            "restore": "Restore Motrix default port {{port}}",
+            "restoring": "Restoring Motrix’s default port {{port}}…",
+            "restoredDefault": "Motrix’s default RPC port {{port}} has been restored.",
+            "confirm": {
+              "title": "Stop the leftover process and restore port {{port}}?",
+              "description": "PID {{pid}} is verified as a leftover Motrix aria2 process. It will be stopped, the default port {{port}} will be saved, and aria2 will restart.",
+              "action": "Stop and restore port {{port}}"
+            }
+          },
+          "confirmForce": {
+            "title": "Force stop the leftover aria2 process?",
+            "description": "PID {{pid}} matches Motrix’s bundled binary, private RPC secret, and data paths. It will be terminated immediately, then aria2 will restart on the Motrix RPC port.",
+            "action": "Force stop & recover"
+          },
+          "details": "Diagnostic details",
+          "versionUnknown": "Version unavailable",
+          "copy": "Copy diagnostics",
+          "copied": "Copied",
+          "copyFailed": "Could not copy diagnostics. Please try again.",
+          "refreshFailed": "Could not refresh diagnostics. The last successful report is shown below.",
+          "summary": {
+            "ready": "The download engine is running normally",
+            "starting": "The download engine is starting",
+            "restarting": "The download engine is recovering",
+            "stopped": "The download engine is stopped",
+            "port_in_use": "The engine’s control port is occupied",
+            "binary_unavailable": "The download engine is unavailable",
+            "spawn_failed": "The download engine could not start",
+            "rpc_unavailable": "The engine’s control connection is unavailable",
+            "unexpected_exit": "The download engine exited unexpectedly",
+            "health_check_failed": "The download engine stopped responding",
+            "unknown": "The download engine is unavailable"
+          },
+          "impact": {
+            "failed": "Download controls are unavailable. Task status may be out of date.",
+            "connecting": "Download controls will be available when the engine is ready.",
+            "stopped": "Start the engine to begin or manage downloads."
+          },
+          "runtime": {
+            "process": "Process",
+            "running": "Running",
+            "notRunning": "Not running",
+            "connection": "Connection",
+            "connected": "Connected",
+            "connecting": "Connecting…",
+            "disconnected": "Not connected",
+            "unavailable": "Unavailable",
+            "connectionStatus": "{{transport}} ({{status}})"
+          },
+          "port": {
+            "available": "{{port}} (Available)",
+            "listening": "{{port}} (Listening)",
+            "occupied": "{{port}} (In use)"
+          },
+          "motrixEngine": "aria2 Motrix",
+          "transport": {
+            "websocket": "WebSocket"
+          }
+        }
+      },
+      "speed": {
+        "up": "UPLOAD",
+        "down": "DOWNLOAD",
+        "peak": "Peak {{value}}",
+        "offline": "offline"
+      },
+      "speedUp": {
+        "title": "Upload Speed"
+      },
+      "speedDown": {
+        "title": "Download Speed"
+      },
+      "active": {
+        "title": "Active Tasks",
+        "downloading": "Downloading",
+        "seeding": "Seeding",
+        "waiting": "Waiting",
+        "error": "Error",
+        "engineOffline": "engine offline"
+      },
+      "transfer": {
+        "title": "Transfer",
+        "rangeLabel": "Transfer range",
+        "scope": {
+          "today": "Today",
+          "allTime": "All Time"
+        },
+        "download": "Down",
+        "upload": "Up",
+        "sinceTime": "Since {{time}}",
+        "sinceDate": "Since {{date}}",
+        "empty": {
+          "today": "No transfer recorded today.",
+          "allTime": "No transfer recorded yet."
+        },
+        "loading": "Loading transfer data",
+        "unavailable": "Transfer data unavailable",
+        "retry": "Retry",
+        "updated": "Updated {{time}}",
+        "outOfDate": "Data may be out of date",
+        "totalLabel": "{{scope}} transfer total: {{value}}"
+      },
+      "activity": {
+        "title": "Activity",
+        "loading": "Loading activity",
+        "unavailable": "Activity unavailable",
+        "retry": "Retry",
+        "stale": "Activity may be out of date",
+        "coverageDegraded": "Activity may be incomplete since {{time}}",
+        "rangeSummary": "{{weeks}} weeks of download activity, {{start}} to {{end}}",
+        "completedIntensity": "Color intensity shows completed downloads",
+        "less": "Less",
+        "more": "More",
+        "weekday": {
+          "sun": "Sun",
+          "mon": "Mon",
+          "tue": "Tue",
+          "wed": "Wed",
+          "thu": "Thu",
+          "fri": "Fri",
+          "sat": "Sat"
+        },
+        "tooltip": {
+          "completed": "{{count}} completed",
+          "submitted": "{{count}} submitted",
+          "recovered": "Includes a completion detected during recovery",
+          "recoveredCount": "{{count}} recovered",
+          "untracked": "Not tracked yet",
+          "noData": "No activity data",
+          "noDataOnDate": "No activity data on {{date}}",
+          "completedOnDate": "{{count}} completed on {{date}}",
+          "partial": "Tracking began at {{time}}",
+          "partialShort": "Partial day",
+          "coverage": "Coverage may be incomplete since {{time}}",
+          "coverageShort": "Data may be incomplete",
+          "today": "Today, still updating"
+        }
+      },
+      "tasks": {
+        "title": "Tasks",
+        "viewLabel": "Task view",
+        "view": {
+          "active": "Active",
+          "failed": "Failed",
+          "recent": "Recent"
+        },
+        "newTask": "New task",
+        "more": "+{{count}} more",
+        "loading": "Loading tasks",
+        "unavailable": "Tasks unavailable",
+        "retry": "Retry",
+        "empty": {
+          "active": "No active tasks",
+          "failed": "No failed tasks",
+          "recent": "Nothing completed yet"
+        },
+        "offline": "Engine offline",
+        "metric": {
+          "fetching": "Fetching",
+          "ready": "Ready",
+          "finalizing": "Finalizing",
+          "queued": "Queued",
+          "paused": "Paused"
+        },
+        "secondary": {
+          "metadata": "Fetching metadata",
+          "chooseFiles": "Awaiting file selection",
+          "finalizing": "Finishing download",
+          "waiting": "Waiting to start",
+          "eta": "ETA {{time}}",
+          "ratio": "Ratio {{ratio}}",
+          "saved": "{{percent}}% saved",
+          "offline": "Offline (last known progress)",
+          "completed": "Completed {{time}}",
+          "failed": "Failed: {{reason}}",
+          "technicalDetail": "Technical detail: {{detail}}"
+        },
+        "progressLabel": "{{name}} progress"
+      },
+      "configure": {
+        "action": "Configure",
+        "addTile": "Add",
+        "addTitle": "Add a tile",
+        "apply": "Apply",
+        "cancel": "Cancel",
+        "reset": "Reset",
+        "drag": "Drag tile",
+        "removeTile": "Remove tile",
+        "resizeTile": "Resize tile",
+        "sizeGroup": "Tile size",
+        "size": "{{width}} × {{height}}",
+        "currentSize": "Current size: {{width}} × {{height}}",
+        "invalidCapacity": "Not enough space for this size",
+        "availabilityHints": {
+          "space": "Shrink or remove another tile.",
+          "bounds": "Move the tile inward first.",
+          "unsupported": "Choose a supported size."
+        },
+        "sizeLabels": {
+          "compact": "Compact",
+          "wide": "Wide",
+          "tall": "Tall",
+          "large": "Large",
+          "fullWidth": "Full width",
+          "fullHeight": "Full height"
+        },
+        "sizeUnavailable": {
+          "unsupported": "Unsupported",
+          "outOfBounds": "Does not fit",
+          "insufficientSpace": "Not enough space"
+        },
+        "presets": {
+          "action": "Presets",
+          "custom": "Custom",
+          "undo": "Undo last preset",
+          "balanced": {
+            "title": "Balanced"
+          },
+          "taskFocus": {
+            "title": "Task Focus"
+          },
+          "speedFocus": {
+            "title": "Speed Focus"
+          },
+          "compact": {
+            "title": "Compact"
+          }
+        },
+        "saveFailed": "Could not save layout. Try again.",
+        "expandHint": "Expand the window to configure Dashboard layout."
+      },
+      "errors": {
+        "tileFailed": "{{tile}}: render failed",
+        "retry": "Retry"
+      },
+      "speedLimit": {
+        "title": "Speed Limit",
+        "unlimited": "Unlimited",
+        "smart": "Automatic",
+        "settings": "Speed limit settings",
+        "turtle": {
+          "off": "Standard mode",
+          "on": "Low-speed mode",
+          "auto": "Automatic mode"
+        },
+        "tooltip": {
+          "off": "Use the standard speed limits",
+          "on": "Use the low-speed limits now",
+          "auto": "Adjust speed automatically based on schedule and bandwidth"
+        },
+        "reason": {
+          "base": "Standard limit",
+          "turtle": "Low-speed mode",
+          "schedule": "Schedule",
+          "videoApp": "Video app",
+          "adaptive": "Bandwidth reserve"
+        }
+      },
+      "nat": {
+        "title": "NAT",
+        "compact": {
+          "state": {
+            "active": "Mapped",
+            "settingUp": "Mapping",
+            "failed": "Mapping",
+            "off": "Off"
+          },
+          "caption": {
+            "active_one": "{{count}} port",
+            "active_other": "{{count}} ports",
+            "settingUp": "Connecting…",
+            "failed": "Unavailable",
+            "off": "BT / DHT",
+            "waiting": "Loading…"
+          }
+        },
+        "internalIp": "Local IP",
+        "gatewayIp": "Router",
+        "caption": {
+          "off": "BT port mapping is off.",
+          "settingUp": "Connecting to your router…",
+          "failed": "Automatic mapping unavailable.",
+          "waiting": "Waiting for network status…"
+        },
+        "mappingDetails": "Mapped ports",
+        "mappingPurpose": {
+          "bt-listen": "BitTorrent",
+          "dht-listen": "DHT"
+        },
+        "portMapping": "Internal {{internal}} to external {{external}}",
+        "noMappings": "No active port mappings.",
+        "state": {
+          "active": "Active",
+          "settingUp": "Initializing",
+          "failed": "Failed",
+          "off": "Off"
+        },
+        "retrying": "Retrying {{attempt}}/{{max}}",
+        "type": "Type",
+        "externalIp": "External IP",
+        "mappings": "Mappings",
+        "mappingsValue_one": "{{count}} active",
+        "mappingsValue_other": "{{count}} active",
+        "health": "Health",
+        "healthScore": {
+          "good": "Good",
+          "fair": "Fair",
+          "poor": "Poor",
+          "unknown": "—"
+        },
+        "natType": {
+          "open": "Open",
+          "fullcone": "Full cone",
+          "restricted": "Restricted",
+          "port-restricted": "Port restricted",
+          "symmetric": "Symmetric",
+          "blocked": "Blocked",
+          "unknown": "Unknown"
+        },
+        "lastCheck": "Last check",
+        "lastCheckNever": "Never",
+        "actions": {
+          "group": "NAT controls",
+          "enable": "Enable NAT",
+          "disable": "Disable NAT",
+          "remap": "Force remap",
+          "diagnose": "Run diagnostic",
+          "troubleshoot": "NAT troubleshooting guide",
+          "short": {
+            "enable": "Enable",
+            "disable": "Disable",
+            "remap": "Remap",
+            "diagnose": "Diagnose",
+            "help": "Help"
+          },
+          "settings": "NAT settings"
+        },
+        "rateLimited": "Too frequent — try again shortly",
+        "none": "—"
+      }
+    },
+    "completed": {
+      "title": "Completed",
+      "desc": "Completed download tasks"
+    },
+    "trackers": {
+      "title": "Trackers",
+      "desc": "Manage tracker health and subscriptions",
+      "tab": {
+        "effective": "Effective",
+        "blacklist": "Blacklist"
+      },
+      "searchPlaceholder": "Filter by URL…",
+      "syncNow": "Sync Now"
+    },
+    "downloads": {
+      "title": "Downloads",
+      "heading": {
+        "all": "All Downloads",
+        "active": "Active Downloads",
+        "completed": "Completed Downloads",
+        "error": "Failed Downloads"
+      },
+      "status": {
+        "queued": "Queued",
+        "fetchingMetadata": "Fetching",
+        "metadataReady": "Awaiting file selection",
+        "downloading": "Downloading",
+        "finalizing": "Finalizing",
+        "seeding": "Seeding",
+        "paused": "Paused",
+        "completed": "Completed",
+        "error": "Error"
+      },
+      "column": {
+        "name": "Name",
+        "size": "Size",
+        "progress": "Progress",
+        "down": "Download speed",
+        "up": "Upload speed",
+        "eta": "ETA",
+        "connections": "Peers",
+        "status": "Status",
+        "createdAt": "Date created",
+        "finishedAt": "Date completed"
+      },
+      "columnHeader": {
+        "down": "Download",
+        "up": "Upload"
+      },
+      "timestamp": {
+        "notRecorded": "Not recorded",
+        "notCompleted": "Not completed yet",
+        "relativeDateTime": "{{date}}, {{time}}"
+      },
+      "sort": {
+        "down": "Download speed",
+        "up": "Upload speed",
+        "asc": "{{column}}: ascending",
+        "desc": "{{column}}: descending",
+        "sortAscending": "Sort {{column}} ascending",
+        "sortDescending": "Sort {{column}} descending",
+        "reset": "Restore default order"
+      },
+      "empty": {
+        "noTasks": "No downloads yet",
+        "noTasksCta": "Press + to add one",
+        "noMatchFilter": "No tasks match this filter",
+        "noMatchSearch": "No tasks match “{{query}}”",
+        "clearSearch": "Clear search",
+        "unavailable": "Tasks unavailable",
+        "motion": {
+          "open": "Tune glass motion",
+          "title": "Glass motion",
+          "description": "Development preview",
+          "enabled": "Motion effects",
+          "enabledDesc": "Synced with Appearance → Reduce motion. Changes save immediately.",
+          "systemReducedMotion": "Motion is disabled by your system’s Reduce Motion preference.",
+          "saveFailed": "Couldn’t save the motion setting. Try again.",
+          "loadFade": "Load fade",
+          "breathing": "Breathing light",
+          "pointerFollow": "Follow pointer",
+          "positionConstraint": "Gravity position limit",
+          "horizontalSpeed": "Horizontal speed"
+        }
+      },
+      "stats": {
+        "downSpeed": "Download speed",
+        "upSpeed": "Upload speed",
+        "engineOk": "Engine ready",
+        "engineStarting": "Engine starting",
+        "engineOffline": "Engine offline",
+        "natActive": "NAT mapped",
+        "natActiveDesc": "Helps other BT peers connect to you.",
+        "natSettingUp": "NAT mapping",
+        "natRetrying": "Automatic retries ({{attempt}}/{{max}})",
+        "natMapping": "NAT mapping",
+        "natUnavailable": "Automatic mapping unavailable",
+        "natUnavailableDesc": "Doesn’t affect link downloads. BT connections may be limited.",
+        "natRetry": "Retry",
+        "natDisable": "Turn off NAT mapping",
+        "natSettings": "Network settings",
+        "natHelp": "Network guide"
+      },
+      "tab": {
+        "all": "All",
+        "active": "Active",
+        "completed": "Completed",
+        "error": "Error"
+      },
+      "inspector": {
+        "overview": {
+          "transfer": "Transfer",
+          "progress": "Progress",
+          "network": "Network",
+          "general": "General",
+          "createdAt": "Created",
+          "finishedAt": "Completed",
+          "downSpeed": "Download speed",
+          "upSpeed": "Upload speed",
+          "eta": "ETA",
+          "downloaded": "Downloaded",
+          "totalSize": "Total size",
+          "percent": "Percent",
+          "peers": "Peers",
+          "seeds": "Seeds",
+          "ratio": "Ratio",
+          "type": "Type",
+          "infoHash": "Info hash",
+          "private": "Private",
+          "connections": "Connections",
+          "uploaded": "Uploaded",
+          "seedingTime": "Seeding time",
+          "seedingRecordedSince": "Recorded since {{date}}. Paused and offline time is excluded; earlier seeding history is unavailable.",
+          "seedingUnavailable": "Seeding time has not been recorded for this task."
+        },
+        "activity": {
+          "transferTitle": {
+            "session": "Session transfer",
+            "lifetime": "Lifetime transfer"
+          },
+          "download": "Download",
+          "upload": "Upload",
+          "loading": "Loading activity…",
+          "collecting": "Collecting transfer data…",
+          "noSessionHistory": "No transfer recorded in this app session.",
+          "lifetimeEmpty": "Lifetime history is not available yet.",
+          "noTraffic": "No network traffic right now.",
+          "unavailable": "Lifetime activity is unavailable.",
+          "coverageGap": "Tracking was interrupted.",
+          "retry": "Retry",
+          "notAvailable": "Not available",
+          "stale": {
+            "short": "Stale data.",
+            "message": "Data may be out of date. Last updated {{time}}."
+          },
+          "range": {
+            "label": "Transfer time range",
+            "session": "Session(60s)",
+            "lifetime": "Lifetime",
+            "latest": "Latest 60 seconds",
+            "adaptive_one": "Adaptive resolution · {{count}} sample",
+            "adaptive_other": "Adaptive resolution · {{count}} samples"
+          },
+          "timeline": {
+            "title": "Task history",
+            "current": "Now {{status}}",
+            "cluster_one": "+{{count}} event",
+            "cluster_other": "+{{count}} events",
+            "repeated": "{{label}} ×{{count}}",
+            "truncated_one": "Earlier history truncated {{count}} event",
+            "truncated_other": "Earlier history truncated {{count}} events",
+            "truncatedAt": "Earliest truncation: {{time}}",
+            "timeRange": "{{start}}–{{end}}",
+            "detailTitle": "{{label}} details",
+            "destination": "{{event}} {{status}}",
+            "previous": "Show previous timeline events",
+            "next": "Show next timeline events",
+            "event": {
+              "added": "Added",
+              "started": "Started",
+              "paused": "Paused",
+              "resumed": "Resumed",
+              "stage_changed": "Stage changed",
+              "completed": "Completed",
+              "failed": "Failed",
+              "observed_state": "State recovered"
+            },
+            "status": {
+              "queued": "Queued",
+              "fetching_metadata": "Fetching metadata",
+              "metadata_ready": "Metadata ready",
+              "downloading": "Downloading",
+              "finalizing": "Finalizing",
+              "seeding": "Seeding",
+              "paused": "Paused",
+              "completed": "Completed",
+              "error": "Failed",
+              "removed": "Removed"
+            }
+          },
+          "summary": {
+            "title": "Current summary",
+            "average": "Average",
+            "averageExpanded": "Average download speed",
+            "peak": "Peak",
+            "peakExpanded": "Peak download speed",
+            "active": "Active",
+            "activeExpanded": "Active transfer time"
+          },
+          "chart": {
+            "accessibleSummary": "{{range}} from {{start}} to {{end}}. Latest download {{download}}, upload {{upload}}. Lifetime average download {{average}}, peak download {{peak}}, active {{activeDuration}}. {{sampleLabel}}. {{state}}",
+            "activeSeconds_one": "{{count}} second",
+            "activeSeconds_other": "{{count}} seconds",
+            "sampleCount_one": "{{count}} sample",
+            "sampleCount_other": "{{count}} samples",
+            "noDataQualityIssues": "No tracking warnings."
+          }
+        },
+        "pieces": {
+          "mapLabel": "Download piece map",
+          "legend": {
+            "done": "Completed",
+            "active": "Downloading",
+            "endgame": "Endgame",
+            "pending": "Pending"
+          },
+          "empty": "No pieces data",
+          "pieceLength": "Piece length",
+          "totalPieces": "Total pieces"
+        },
+        "peers": {
+          "summary_one": "{{count}} peer ({{seeders}} seeder)",
+          "summary_other": "{{count}} peers ({{seeders}} seeders)",
+          "empty": "No peers connected",
+          "col": {
+            "country": "Geo",
+            "endpoint": "IP : Port",
+            "client": "Client",
+            "down": "↓",
+            "up": "↑",
+            "progress": "%",
+            "flags": "Flags",
+            "flagsHint": "D = peer is sending to us, U = we are sending to peer, S = peer is a seeder. Underscore means inactive."
+          }
+        },
+        "trackers": {
+          "summary_one": "{{count}} tracker",
+          "summary_other": "{{count}} trackers",
+          "driftSuffix_one": "{{count}} not in global",
+          "driftSuffix_other": "{{count}} not in global",
+          "privateBanner": "Private torrent — global trackers will not be merged.",
+          "empty": "No trackers",
+          "loadFailed": "Failed to load trackers: {{reason}}",
+          "action": {
+            "edit": "Edit",
+            "save": "Save",
+            "cancel": "Cancel",
+            "sync": "Sync",
+            "delete": "Delete tracker"
+          },
+          "syncPrivateDisabled": "Sync is unavailable for private torrents.",
+          "saveFailed": "Failed to update trackers: {{reason}}",
+          "syncFailed": "Failed to sync trackers: {{reason}}",
+          "deleteFailed": "Failed to remove tracker: {{reason}}",
+          "invalidLines_one": "Skipped {{count}} invalid line",
+          "invalidLines_other": "Skipped {{count}} invalid lines",
+          "editPlaceholder": "One tracker URL per line. http(s)/udp/ws(s) only.",
+          "editHint": "These trackers replace the task’s effective bt-tracker list. Announce-list entries from the .torrent are unaffected.",
+          "preview": {
+            "title": "Update task trackers",
+            "description": "Review changes to supplemental trackers. Torrent trackers and manually added addresses are preserved.",
+            "reconnect": "This task will briefly pause and reconnect, then resume automatically.",
+            "added": "Add: {{count}}",
+            "removed": "Remove: {{count}}",
+            "retained": "Keep {{count}} existing supplemental trackers. Native announce tiers stay unchanged.",
+            "excluded": "{{count}} trackers you removed are excluded from automatic updates.",
+            "apply": "Apply update",
+            "changesPending": "Pending changes: {{count}}"
+          }
+        },
+        "multi": {
+          "totals": "Totals",
+          "liveSpeed": "Live speed",
+          "statusDist": "Status distribution",
+          "totalSize": "Total size",
+          "downloaded": "Downloaded",
+          "avgProgress": "Avg progress",
+          "combinedDown": "Combined ↓",
+          "combinedUp": "Combined ↑",
+          "longestEta": "Longest ETA"
+        },
+        "tab": {
+          "overview": "Overview",
+          "files": "Files",
+          "pieces": "Pieces",
+          "peers": "Peers",
+          "trackers": "Trackers",
+          "activity": "Activity"
+        },
+        "placeholder": {
+          "files": "Files list.",
+          "peers": "Peers list.",
+          "trackers": "Trackers list."
+        }
+      },
+      "action": {
+        "pause": "Pause",
+        "queueMoveFailed": "Could not update the waiting queue.",
+        "queueTaskStarted": "The task is no longer in the waiting queue.",
+        "queueMoveHint": "Queue position determines which waiting download starts next. Column sorting is saved separately.",
+        "queueBoundary": "Selection is already at the queue boundary",
+        "queueMoved": "Waiting queue updated",
+        "moveQueueDown": "Move Down in Queue",
+        "moveQueueUp": "Move Up in Queue",
+        "resume": "Resume",
+        "retry": "Retry",
+        "openFolder": "Open folder",
+        "copyUrl": "Copy URL",
+        "copyUrls": "Copy URLs",
+        "copyPath": "Copy file path",
+        "copied": "Copied to clipboard",
+        "copyFailed": "Could not copy to clipboard. Try again.",
+        "selectFilesFailed": "Could not open file selection.",
+        "copyUrlFailed": "Copy failed: could not load the task’s link details. Try again.",
+        "selectFiles": "Select files",
+        "remove": "Remove",
+        "removeConfirmWithFiles": "Also delete the downloaded file(s) from disk",
+        "cancel": "Cancel",
+        "batchPartial": "{{ok}} succeeded, {{failed}} failed",
+        "singleTaskFailed": "{{name}}: {{reason}}",
+        "stopSeeding": "Stop seeding",
+        "reseed": "Re-seed",
+        "retryWithDialog": "Retry with options... (Alt+Click)",
+        "finalizingTooltip": "Task is finalizing, please wait",
+        "pauseTooltipBatch": "Pause {{n}} of {{total}} selected",
+        "resumeTooltipBatch": "Resume {{n}} of {{total}} selected",
+        "retryTooltipBatch": "Retry {{n}} of {{total}} selected",
+        "reseedTooltipBatch": "Re-seed {{n}} of {{total}} selected",
+        "stopSeedingTooltipBatch": "Stop seeding {{n}} of {{total}} selected",
+        "removeTooltipBatch": "Remove {{n}} of {{total}} selected",
+        "removeWithFilesShift": "Hold Shift to also delete files",
+        "removeFilesEstimate": "Will delete {{bytes}} from disk",
+        "removeSingleTitle": "Remove “{{name}}”?",
+        "removeAll_paused_Title": "Remove {{count}} paused tasks?",
+        "removeAll_seeding_Title": "Remove {{count}} seeding tasks?",
+        "removeAll_completed_Title": "Remove {{count}} completed tasks?",
+        "removeAll_error_Title": "Remove {{count}} failed tasks?",
+        "removeAll_downloading_Title": "Remove {{count}} active tasks?",
+        "removeMixedTitle": "Remove {{count}} tasks?",
+        "openFile": "Open file",
+        "openFileFailed": "Could not open file",
+        "chooseFiles": "Choose files…",
+        "queueOrder": "Download order",
+        "moveQueueTop": "Move to Front",
+        "moveQueueBottom": "Move to Back",
+        "copyError": "Copy error information",
+        "errorReport": "{{name}}\nTask ID: {{id}}\n{{details}}"
+      },
+      "titleCount": "{{shown}} shown · {{total}} total",
+      "type": {
+        "http": "HTTP",
+        "magnet": "Magnet",
+        "bt": "BitTorrent",
+        "ftp": "FTP",
+        "metalink": "Metalink"
+      },
+      "search": {
+        "placeholder": "Search downloads",
+        "activeTypeFilters": "Type filter: {{types}}",
+        "filters": "Filters",
+        "resetFilters": "Reset filters",
+        "clearQuery": "Clear search",
+        "activeQuery": "Search: {{query}}",
+        "scopeLabel": "Type",
+        "clear": "Clear",
+        "empty": "No matching tasks",
+        "emptyHint": "Try clearing the type scope or another keyword"
+      },
+      "stale": {
+        "banner": "Task list may be out of date — reconnecting…"
+      },
+      "view": {
+        "title": "List View",
+        "columns": "Columns",
+        "resetColumns": "Restore Default Columns",
+        "sortBy": "Sort By",
+        "ascending": "Ascending",
+        "descending": "Descending",
+        "showInspector": "Show Inspector",
+        "hideInspector": "Hide Inspector",
+        "inspector": "Task Inspector",
+        "resizeInspector": "Resize Inspector",
+        "selectToInspect": "Select a task to view its details.",
+        "resizeColumn": "Resize {{column}} column",
+        "taskActions": "More"
+      },
+      "speedLimit": {
+        "title": "Speed mode",
+        "currentMode": "Speed mode: {{mode}}",
+        "uploadLimit": "Upload limit: {{speed}}",
+        "downloadLimit": "Download limit: {{speed}}",
+        "saveFailed": "Couldn’t change the speed mode. Try again."
+      },
+      "media": {
+        "preparing": "Preparing",
+        "decrypting": "Decrypting",
+        "assembling": "Assembling",
+        "muxing": "Merging",
+        "renaming": "Saving",
+        "stage": "Stage",
+        "downloadProgress": "Download progress",
+        "muxProgress": "Merge progress",
+        "parts": "Segments",
+        "partsFormat": "{{completed}} / {{total}} segments",
+        "downloadSize": "Download size",
+        "outputSize": "Output size",
+        "downloadEta": "Download ETA",
+        "avgDownloadProgress": "Average download progress",
+        "processingTasks": "Processing"
+      },
+      "completionShutdown": {
+        "more": "More download actions",
+        "enable": "Shut down after all downloads finish",
+        "disable": "Cancel shutdown after downloads",
+        "waiting": "Waiting for all downloads to finish",
+        "countdown": "Shutting down in {{seconds}} seconds",
+        "detail": "Applies once. Paused or failed tasks prevent shutdown. Seeding ends when the computer shuts down.",
+        "unavailable": "Automatic shutdown is unavailable or permission was denied.",
+        "failed": "Could not prepare or request shutdown. Your computer has not been forced to shut down.",
+        "preparing": "Preparing to shut down…",
+        "requested": "Shutdown requested"
+      }
+    }
+  },
+  "task": {
+    "add": {
+      "title": "New Task",
+      "links": "Links",
+      "torrent": "Torrent",
+      "urlPlaceholder": "Enter a URL, magnet link, or BT info hash…",
+      "dropTorrent": "Drop .torrent file here or click to select",
+      "clearSelection": "Clear selection",
+      "createFailed": "Failed to create download task.",
+      "createFailedWithReason": "Failed to create download task: {{reason}}",
+      "createFailedByPlugin": "Couldn’t create the task: the plugin “{{pluginId}}” stopped it ({{detail}}). Disable that plugin under Settings → Plugins, then try again.",
+      "createFailedPathTooLong": "Couldn’t create the task: the destination path is {{length}} characters, over the Windows limit of {{limit}}. Choose a shorter save folder or file name.",
+      "parseFailed": "Failed to parse torrent file.",
+      "urlsCount_one": "{{count}} URL",
+      "urlsCount_other": "{{count}} URLs",
+      "urlsWithInvalid": "{{valid}} valid, {{invalid}} invalid",
+      "validUrlCount": "{{count}} valid",
+      "invalidUrlCount": "{{count}} invalid",
+      "urlsLabel": "URLs",
+      "advanced": "Advanced",
+      "filename": "Filename",
+      "filenameAuto": "Auto",
+      "split": "Connections",
+      "userAgent": "User-Agent",
+      "referer": "Referer",
+      "cookie": "Cookie",
+      "authorization": "Authorization",
+      "allProxy": "Proxy",
+      "dlLimit": "DL Limit",
+      "ulLimit": "UL Limit",
+      "seedRatio": "Seed Ratio",
+      "unlimited": "Unlimited",
+      "browse": "browse",
+      "pickPathTitle": "Select save directory",
+      "pickPathCustom": "Custom path",
+      "saveTo": "Save to",
+      "saveDirEmpty": "Choose a folder…",
+      "changeSaveDir": "Change save directory",
+      "created": "Task added",
+      "batchCreated": "{{count}} tasks added",
+      "createdCopy": "Separate copy added",
+      "createdPartial": "{{ok}} added · {{failed}} failed",
+      "torrentQueueProgress": "Torrent {{current}} of {{total}}",
+      "downloadAndContinue": "Download & Continue",
+      "downloadAllTorrents": "Download All ({{count}})",
+      "skipTorrent": "Skip",
+      "queueAdvanceFailed": "Could not open the next torrent.",
+      "duplicate": {
+        "title": "This torrent already exists",
+        "active-info-hash": "{{name}} is already active. aria2 cannot run the same torrent content twice at the same time.",
+        "selection-mismatch": "{{name}} uses the same destination with a different file selection. Motrix will not overwrite it or silently create a renamed copy.",
+        "existing-files": "{{name}} already exists in this destination, but its task record is unavailable. Motrix will not overwrite it.",
+        "filesOnDisk": "Torrent files",
+        "showExisting": "Show existing task",
+        "createCopy": "Create separate copy"
+      },
+      "adding": "Adding…",
+      "interpretedMagnet": "Magnet link detected",
+      "interpretedInfoHash": "BT info hash converted to a magnet link",
+      "unsupportedCurl": "This cURL command cannot be imported faithfully. Copy the URL or a Bash GET command with supported options.",
+      "invalidJson": "Expected a JSON URL string or an array of URL strings.",
+      "interpretedJson": "URLs imported from JSON",
+      "sourceLine": "Line {{line}}",
+      "sourceCorrections": {
+        "useCanonicalUrl": "Use this expanded URL",
+        "usePathSeparators": "Treat backslashes as path separators",
+        "encodeLiteralCharacters": "Encode as literal characters"
+      },
+      "sourceErrors": {
+        "missingScheme": "Include the URL scheme, such as https://.",
+        "invalidHost": "The URL host is missing or invalid.",
+        "invalidPort": "The URL port is invalid.",
+        "controlCharacter": "Remove control characters from the URL.",
+        "invalidUnicode": "The URL contains invalid Unicode.",
+        "ambiguousBackslash": "A backslash makes the host or path ambiguous. Choose how to interpret it.",
+        "invalidPercentEncoding": "A percent sign must be followed by two hexadecimal digits.",
+        "credentialsInUrl": "Use the authentication fields instead of credentials in the URL.",
+        "unsupportedProtocol": "This URL protocol is not supported for this download.",
+        "urlTooLong": "The URL exceeds the 16 KiB limit.",
+        "tooManySources": "Input exceeds the allowed number or size of links.",
+        "ambiguousStructure": "The URL parser would change this address. Review the expanded URL.",
+        "unescapedCharacter": "Encode spaces and reserved characters explicitly.",
+        "invalidMagnet": "The magnet link needs a supported BT info hash in its xt parameter.",
+        "mixedProtocols": "Mirrors of one download must use the same protocol family.",
+        "unsupportedInput": "This input container was not imported. Paste a URL or a supported JSON or Bash cURL input.",
+        "unsupportedRequestOptions": "HTTP headers cannot be applied to an FTP download."
+      },
+      "interpretedCurl": "cURL command parsed",
+      "filterBy": {
+        "video": "Video",
+        "audio": "Audio",
+        "image": "Image",
+        "doc": "Document"
+      },
+      "errors": {
+        "urlsRequired": "At least one URL is required",
+        "saveDirRequired": "Save directory is required",
+        "noFilesSelected": "Select at least one file",
+        "missingSource": "Torrent file or magnet link is required"
+      },
+      "selectionTimeout": {
+        "started": "File selection timed out: downloading all files in {{name}}",
+        "failed": "Could not start {{name}} automatically. Open task details to select files and retry."
+      },
+      "undoCorrection": "Undo URL correction",
+      "submissionUnconfirmed": "The result is unconfirmed. Retry will check the original request before creating another task."
+    },
+    "detail": {
+      "peers": "Peers: {{count}}",
+      "seeds": "Seeds: {{count}}"
+    },
+    "torrent": {
+      "column": {
+        "name": "File name",
+        "type": "File type",
+        "size": "Size"
+      },
+      "fileSelected_one": "{{count}} file selected",
+      "fileSelected_other": "{{count}} files selected",
+      "selectAll": "Select all",
+      "video": "Video",
+      "audio": "Audio",
+      "image": "Image",
+      "doc": "Doc"
+    },
+    "remove": {
+      "title": "Remove task?",
+      "description": "“{{name}}” will be removed from the download list.",
+      "deleteFilesLabel": "Delete downloaded files",
+      "confirm": "Remove",
+      "cancel": "Cancel",
+      "orphanToast": "Task removed. Files kept at {{path}}.",
+      "notAvailableDuringFinalize": "Please wait for the task to finish finalizing."
+    },
+    "recovery": {
+      "toast": "Recovered {{count}} interrupted task(s). Click to review.",
+      "finalizeRenameFailed": "Failed to rename file. The download file remains with .motrix suffix.",
+      "reseedFailed": "Download complete, but seeding failed to start.",
+      "metaMissing": "Torrent metadata is missing. Cannot start seeding.",
+      "startup": {
+        "torrentMetaMissing": "Cannot recover this BitTorrent task: the .torrent metadata file is missing. Please remove and re-add the task.",
+        "reAddFailed": "Cannot recover this task: the engine rejected the re-add request. Please remove and re-add manually.",
+        "dirtyMetadata": "Cannot recover this task: it is missing the identifying information needed to resume.",
+        "resumeCheckpointMissing": "The partial file was preserved, but its resume checkpoint is missing. Restart safely or re-add the task.",
+        "resumeCredentialsRequired": "The partial file was preserved, but this download needs request credentials that cannot be replayed automatically.",
+        "resumePathInvalid": "The partial file was preserved because its stored output path is invalid.",
+        "resumeSourceChanged": "The partial file was preserved because the remote file changed since the download started.",
+        "resumeRangeUnsupported": "The partial file was preserved because the server does not support safe range resume.",
+        "resumeValidationFailed": "The partial file was preserved because Motrix could not verify that the remote file is unchanged.",
+        "mediaInterrupted": "This media download was interrupted by an app restart and can’t be resumed. Re-add it to retry."
+      }
+    },
+    "error": {
+      "detail": {
+        "finalizeFailed": "Could not finish the download: {{cause}}",
+        "recoveryFailed": "Could not recover the download: {{cause}}",
+        "recoveryOutputConflict": "Both the temporary and final files exist; both were preserved for manual review",
+        "filesMissing": "Files are missing after the app restarted",
+        "renameFileFailed": "Failed to rename the file: {{cause}}",
+        "renameDirFailed": "Failed to rename the directory: {{cause}}",
+        "pluginChainAborted": "Plugin chain aborted: {{cause}}",
+        "magnetCleanupQuarantined": "Magnet metadata cleanup is quarantined",
+        "muxFailed": "Failed to mux the downloaded media",
+        "pathTooLong": "The path is {{length}} characters; Windows allows {{limit}}"
+      },
+      "reason": {
+        "unknown": "Download failed",
+        "notFound": "File not found",
+        "unauthorized": "Authorization required",
+        "networkError": "Network connection failed",
+        "timeout": "Download timed out",
+        "diskFull": "Disk is full",
+        "fileWriteError": "Could not write the file",
+        "pathTooLong": "File path is too long for Windows",
+        "checksumMismatch": "File checksum did not match",
+        "tooManyRedirects": "Too many redirects",
+        "serverError": "Server returned an error",
+        "btMetadataFailed": "Torrent metadata could not be fetched",
+        "btTrackerError": "Tracker connection failed",
+        "generic": "Download failed"
+      },
+      "hint": {
+        "diskFull": "Free up disk space or change the save folder, then retry",
+        "unauthorized": "Check your credentials or access permissions, then retry",
+        "networkError": "Check your network connection, then retry",
+        "timeout": "Check your connection speed and stability, then retry",
+        "fileWriteError": "Check folder permissions and available disk space, then retry",
+        "pathTooLong": "Shorten the save folder or the file name, then retry",
+        "checksumMismatch": "The downloaded file may be corrupted; re-download to verify it",
+        "tooManyRedirects": "The source link may be broken; try a different link",
+        "btMetadataFailed": "Check the magnet link or add more trackers, then retry"
+      }
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "desc": "Configure Motrix",
+    "cards": {
+      "general": {
+        "title": "General",
+        "desc": "Startup, default save folder, system integration"
+      },
+      "bittorrent": {
+        "title": "BitTorrent",
+        "desc": "DHT, listen ports, trackers, peer geo"
+      },
+      "appearance": {
+        "title": "Appearance",
+        "desc": "Theme, language, tray icon"
+      },
+      "advanced": {
+        "title": "Advanced",
+        "desc": "RPC, SQLite persistence"
+      },
+      "about": {
+        "title": "About",
+        "desc": "Version, updates, source code and manual"
+      },
+      "downloads": {
+        "title": "Downloads",
+        "desc": "Concurrency, bandwidth limits, network reliability"
+      },
+      "network": {
+        "title": "Network",
+        "desc": "Proxy, DNS, and NAT/UPnP"
+      },
+      "integration": {
+        "title": "Integration",
+        "desc": "Browser extensions, CLI, system integrations"
+      }
+    },
+    "general": {
+      "launchAtStartup": "Open at login",
+      "launchAtStartupDesc": "Start Motrix automatically when you log in.",
+      "linuxAutostartDesc": "Manage login startup in your desktop environment.",
+      "linuxAutostartGuide": "View setup guide",
+      "showMainWindowAtLogin": "Show window at login",
+      "showMainWindowAtLoginDesc": "Hidden with “{{mode}}”.",
+      "defaultSaveDir": "Default download folder",
+      "defaultSaveDirDesc": "New downloads land here unless overridden per-task.",
+      "inAppNotifications": "In-app notifications",
+      "inAppNotificationsDesc": "Choose which download notifications to show. App alerts stay on.",
+      "notifyInAppOnComplete": "Show completed downloads",
+      "notifyInAppOnError": "Show failed downloads",
+      "notificationBadgeStyle": "Unread badge",
+      "notificationBadgeCount": "Count",
+      "notificationBadgeDot": "Dot",
+      "notificationBadgeHidden": "Hidden",
+      "systemNotifications": "System notifications",
+      "notifyOnComplete": "Notify when download completes",
+      "notifyOnCompleteDesc": "Show a system notification when a task finishes.",
+      "autofillClipboardLinks": "Autofill link from clipboard",
+      "autofillClipboardLinksDesc": "When New Task opens, paste a link found in your clipboard into the empty URL field.",
+      "notifyOnError": "Notify on failure",
+      "notifyOnErrorDesc": "Show a system notification when a download fails while the window is in the background.",
+      "warnBeforeQuit": "Confirm before quitting",
+      "warnBeforeQuitDesc": "Ask before quitting if downloads are still running.",
+      "notificationBadgeDesc": "Shown on the notification center icon.",
+      "notificationOff": "Off",
+      "notificationSystem": "System notifications",
+      "notificationInApp": "In-app notifications",
+      "notificationBoth": "Both",
+      "startupAndQuitting": "Startup and quitting",
+      "runMode": "Show app in",
+      "runModeStandard": "Dock and menu bar",
+      "runModeTray": "Menu bar only",
+      "runModeHideTray": "Dock only",
+      "lightweightMode": "Save memory when the window is closed",
+      "lightweightModeDesc": "Downloads continue. Reopening is slower and unsaved input is cleared.",
+      "notifications": "Notifications",
+      "notificationsDesc": "App error alerts stay on.",
+      "downloadCompleted": "Download completed",
+      "downloadFailed": "Download failed",
+      "description": "Startup, quitting and notifications",
+      "desktopOnly": "Startup and notification preferences are available in the desktop app."
+    },
+    "appearance": {
+      "theme": "Theme",
+      "themeAuto": "System",
+      "themeLight": "Light",
+      "themeDark": "Dark",
+      "language": "Language",
+      "traySpeedometer": "Show speed in menu bar",
+      "traySpeedometerDesc": "See download and upload speeds beside the app icon.",
+      "trayIconColor": "Tray icon color",
+      "trayIconColorDesc": "Choose a color that stands out on your system panel.",
+      "trayIconColorAuto": "Follow app theme",
+      "trayIconColorLight": "Light icon (dark panel)",
+      "trayIconColorDark": "Dark icon (light panel)",
+      "reduceMotion": "Reduce motion",
+      "reduceMotionDesc": "Use fewer animations throughout the app.",
+      "liquidGlassEffect": "Liquid Glass",
+      "liquidGlassEffectDesc": "Give the download toolbar a translucent glass effect.",
+      "liquidGlassEffectMacDesc": "Also applies to the window on macOS 26+. The window reopens when changed.",
+      "runMode": "Show app in",
+      "runModeStandard": "Dock & Menu Bar",
+      "runModeTray": "Menu Bar Only",
+      "runModeHideTray": "Dock Only",
+      "runModeLaunch": "When opening Motrix",
+      "runModeStandardDesktop": "Open Main Window",
+      "runModeTrayDesktop": "Start in System Tray",
+      "runModeLinuxDesc": "System tray availability and activation behavior depend on your desktop environment.",
+      "lightweightMode": "Lightweight mode",
+      "lightweightModeDesc": "Save memory when the window is closed. Downloads continue, but reopening takes longer and clears unsaved input.",
+      "byteUnitSystem": "Size and speed units",
+      "byteUnitSystemDesc": "Choose how file sizes and speeds are displayed.",
+      "byteUnitDecimal": "Decimal ({{megabyte}}, {{gigabyte}} · 1000)",
+      "byteUnitBinary": "Binary ({{megabyte}}, {{gigabyte}} · 1024)",
+      "byteUnitSystemDefault": "Follow system ({{units}})",
+      "sidebarColor": "Accent color",
+      "sidebarColors": {
+        "auto": "Auto",
+        "blue": "Blue",
+        "cloud": "Cloud White",
+        "cyan": "Cyan",
+        "gold": "Gold",
+        "gray": "Gray",
+        "green": "Green",
+        "orange": "Orange",
+        "pink": "Pink",
+        "violet": "Violet"
+      },
+      "themeAndEffects": "Theme and effects",
+      "languageAndDisplay": "Language and display",
+      "menuBar": "Menu bar",
+      "description": "Theme, language and display",
+      "systemTray": "System tray",
+      "followSystem": "Follow system"
+    },
+    "advanced": {
+      "rpc": {
+        "title": "RPC",
+        "port": "RPC port",
+        "portDesc": "Restart required after changing this.",
+        "secret": "RPC secret",
+        "secretDesc": "Required for RPC connections."
+      },
+      "persistence": {
+        "title": "Progress and recovery",
+        "enable": "Save recovery data",
+        "enableDesc": "Keep data used to resume downloads after restarting.",
+        "dbPath": "Recovery data file",
+        "dbPathDesc": "Leave empty to use the default location.",
+        "dbPathPlaceholder": "Default location",
+        "historyLimit": "Completed recovery records",
+        "historyLimitDesc": "The download list and downloaded files are unaffected.",
+        "historyKeepAll": "All records",
+        "historyKeepRecent": "Latest records…",
+        "historySessionOnly": "Do not retain",
+        "historyCount": "Records to keep",
+        "historyCountHint": "Older recovery records are removed.",
+        "historyCountPositive": "Enter a number greater than 0."
+      },
+      "description": "RPC, progress and recovery"
+    },
+    "about": {
+      "appIconAlt": "Motrix app icon",
+      "version": "Version {{version}}",
+      "tagline": "Before content collapses, preserve what truly matters, let beauty enter your orbit of preservation.",
+      "webVersionNote": "This web edition is updated by its deployment administrator.",
+      "update": {
+        "title": "App updates",
+        "currentVersion": "Current version {{version}}",
+        "idleTitle": "Keep Motrix up to date",
+        "idle": "Version {{version}} is installed. Check now, or let Motrix check when it opens.",
+        "managedTitle": "Updates from your installation source",
+        "managedDescription": "This packaged Windows edition is updated through its original installation source. In-app updates are unavailable.",
+        "unsupportedTitle": "Automatic updates unavailable",
+        "unsupported": "This version cannot update automatically. Download the latest version from the official website.",
+        "check": "Check for updates",
+        "checkAction": "Check",
+        "checking": "Checking…",
+        "checkingTitle": "Checking for updates…",
+        "checkingDescription": "Contacting the Motrix update service…",
+        "upToDateTitle": "Motrix is up to date",
+        "upToDate": "Version {{version}} is the latest available release.",
+        "available": "Motrix {{version}} is available.",
+        "availableTitle": "Motrix {{version}} is available",
+        "availableDescription": "Download it now and choose when to restart and install.",
+        "download": "Download update",
+        "downloading": "Downloading…",
+        "downloadingTitle": "Downloading Motrix {{version}}",
+        "downloadingDescription": "You can close this window. The download will continue in the background.",
+        "downloadedTitle": "Update ready to install",
+        "downloaded": "Motrix {{version}} is ready to install.",
+        "restart": "Restart and install",
+        "cancelledTitle": "Download cancelled",
+        "cancelled": "The update download was cancelled.",
+        "cancelledDescription": "Try the download again when you’re ready.",
+        "errorTitle": "Couldn’t update Motrix",
+        "errorDescription": "Check your connection and try again.",
+        "error": "Update failed: {{message}}",
+        "retry": "Retry",
+        "automaticChecks": "Check automatically",
+        "automaticChecksDescription": "When Motrix opens",
+        "automaticChecksError": "Couldn’t save this setting",
+        "channelLabel": "Update channel",
+        "channelDescription": "Choose stable releases or try new features in beta.",
+        "channelStable": "Stable",
+        "channelBeta": "Beta",
+        "channelBetaWarning": "Beta may be less stable. You’ll also receive newer stable releases. Switching back stops beta updates without downgrading.",
+        "channelSaveError": "Couldn’t save the update channel. Try again."
+      },
+      "details": {
+        "author": "Author",
+        "createdBy": "Created by",
+        "license": "License",
+        "licenseValue": "{{license}} License"
+      },
+      "resources": {
+        "title": "Resources",
+        "repository": "Source repository",
+        "repositoryDescription": "Browse the code on GitHub",
+        "manual": "Manual",
+        "manualDescription": "Read the user manual",
+        "plugins": "Plugins",
+        "changelog": "Changelog",
+        "website": "Official website",
+        "websiteDescription": "Visit motrix.app",
+        "acknowledgments": "Acknowledgments",
+        "acknowledgmentsDescription": "View project credits on motrix.app"
+      }
+    },
+    "bittorrent": {
+      "trackers": {
+        "autoSync": "Update tracker list automatically",
+        "autoSyncDesc": "Keep the list up to date using your sources.",
+        "syncInterval": "Update interval (hours)",
+        "syncIntervalDesc": "From 1 to 168 hours.",
+        "enableProbe": "Check tracker availability",
+        "enableProbeDesc": "Test trackers before using them for downloads.",
+        "probeTimeout": "Check timeout (ms)",
+        "probeTimeoutDesc": "Wait up to this long for a response. 1,000–30,000 ms.",
+        "healthyThreshold": "Slow response threshold (ms)",
+        "healthyThresholdDesc": "Longer responses are marked slow. 500–10,000 ms.",
+        "minSuccessRate": "Minimum success rate",
+        "minSuccessRateDesc": "Use trackers with at least this success rate. 0.5 = 50%.",
+        "maxTrackerCount": "Trackers per task",
+        "maxTrackerCountDesc": "Use up to this many trackers. 5–200.",
+        "title": "Trackers",
+        "manageSourcesHint": "Manage sources in the Trackers page.",
+        "blacklistMovedInfo": "Manage blocked trackers in Trackers → Blacklist."
+      },
+      "geoip": {
+        "title": "Peer locations",
+        "enable": "Show country or region",
+        "enableDesc": "Show locations in the peer list. Downloads location data when needed.",
+        "lastUpdated": "Last updated",
+        "neverUpdated": "Never",
+        "updateNow": "Update now",
+        "updating": "Updating…",
+        "source": "Location data source",
+        "sourceDesc": "Choose where to download location data.",
+        "source.loyalsoldier": "Loyalsoldier (community)",
+        "source.p3terx": "P3TERX (community mirror)",
+        "source.maxmind": "MaxMind (official)",
+        "source.custom": "Custom URL",
+        "maxmindUnsupported": "Not supported yet",
+        "customUrl": "Custom download URL",
+        "customUrlPlaceholder": "https://example.com/GeoLite2-Country.mmdb",
+        "autoUpdate": "Update automatically",
+        "autoUpdateDesc": "Check for new location data about once a week.",
+        "status.loaded": "Ready",
+        "status.notDownloaded": "Location data not downloaded",
+        "status.downloading": "Downloading…",
+        "status.error": "Update failed",
+        "customUrlDesc": "Link to a country database in .mmdb format.",
+        "saveBeforeUpdate": "Save changes before updating location data.",
+        "updateFailed": "Couldn’t update location data. Try again."
+      },
+      "listen": {
+        "title": "Incoming connections",
+        "listenPort": "BT listen port",
+        "listenPortDesc": "Accept incoming peer connections on this port.",
+        "dhtListenPort": "DHT listen port",
+        "dhtListenPortDesc": "Find peers through DHT on this port.",
+        "dhtEnabled": "Enable DHT",
+        "dhtEnabledDesc": "Find peers without relying on a tracker."
+      },
+      "peers": {
+        "title": "Peers",
+        "btMaxPeers": "Max peers per torrent",
+        "btMaxPeersDesc": "The most peers one task can connect to at once.",
+        "btEnableLpd": "Local peer discovery",
+        "btEnableLpdDesc": "Find peers sharing files on your local network.",
+        "magnetFileSelection": "Choose files before downloading",
+        "magnetFileSelectionDesc": "Show file selection after a magnet link loads.",
+        "magnetFileSelectionAutoDownload": "Download all if no selection is made",
+        "magnetFileSelectionAutoDownloadDesc": "Starts after the time below, even if the app window or browser is closed.",
+        "magnetFileSelectionTimeoutSeconds": "Time to choose files (s)",
+        "magnetFileSelectionTimeoutSecondsDesc": "Starts when the file list is ready. Changes also apply to tasks already waiting.",
+        "magnetFileSelectionTimeoutInvalid": "Enter a whole number from {{min}} to {{max}} seconds."
+      },
+      "seeding": {
+        "title": "Seeding",
+        "seedRatio": "Share ratio limit",
+        "seedRatioDesc": "Upload ÷ download. Seeding stops at this ratio. 0 = unlimited.",
+        "seedTime": "Seed time limit (minutes)",
+        "seedTimeDesc": "0 = unlimited. Applies to new tasks and when seeding is restarted."
+      },
+      "newMagnetTasks": "New magnet tasks",
+      "description": "Magnets, seeding and trackers"
+    },
+    "downloads": {
+      "performance": {
+        "title": "Performance",
+        "profile": "Download performance",
+        "profileDesc": "Balance download speed and resource use.",
+        "learnMore": "Learn more",
+        "metrics": {
+          "connections": "Max connections",
+          "perServer": "Per-server cap",
+          "minimum": "Min segment",
+          "cache": "Disk cache"
+        },
+        "customParameters": "Custom performance parameters",
+        "profiles": {
+          "auto": {
+            "label": "Automatic",
+            "desc": "Adjusts to your drive and file size. Values below are defaults."
+          },
+          "balanced": {
+            "label": "Balanced",
+            "desc": "Uses fewer resources for everyday downloads."
+          },
+          "high": {
+            "label": "High speed",
+            "desc": "Uses more connections for faster downloads."
+          },
+          "maximum": {
+            "label": "Maximum",
+            "desc": "Uses more connections. Some servers may limit them."
+          },
+          "custom": {
+            "label": "Custom",
+            "desc": "Set connections, segment size, and cache."
+          }
+        },
+        "maxConcurrentDownloads": "Simultaneous downloads",
+        "maxConcurrentDownloadsDesc": "Additional tasks wait in the queue.",
+        "maxConnectionPerServer": "Max connections per server",
+        "maxConnectionPerServerDesc": "Per-file connection limit for one server.",
+        "split": "Max connections per file",
+        "splitDesc": "Connections used to download one file.",
+        "minSplitSize": "Min segment size ({{unit}})",
+        "minSplitSizeDesc": "Segments below 2× this size won’t split."
+      },
+      "reliability": {
+        "title": "Connections and retries",
+        "userAgent": "User-Agent",
+        "userAgentDesc": "Identifies the app to websites. Change it if a site requires a different one.",
+        "connectTimeout": "Connection timeout (s)",
+        "connectTimeoutDesc": "How long to wait for a connection.",
+        "socketTimeout": "No-data timeout (s)",
+        "socketTimeoutDesc": "How long to wait when no data arrives.",
+        "maxTries": "Maximum attempts",
+        "maxTriesDesc": "Includes the first attempt. 0 = unlimited.",
+        "retryWait": "Retry delay (s)",
+        "retryWaitDesc": "Wait this long before trying again.",
+        "lowestSpeedLimit": "Minimum connection speed ({{unit}})",
+        "lowestSpeedLimitDesc": "Disconnect below this speed. 0 = disabled."
+      },
+      "disk": {
+        "title": "Disk and files",
+        "fileDeletionMode": "When deleting task files",
+        "fileDeletionTrash": "Move to trash",
+        "fileDeletionPermanent": "Delete permanently",
+        "fileDeletionTrashDesc": "Space is freed when you empty the trash.",
+        "fileDeletionPermanentDesc": "Deleted files cannot be restored from the trash.",
+        "fileAllocation": "Reserve disk space",
+        "fileAllocationDesc": "Reserve space before downloading a file.",
+        "fileAllocationNone": "Do not reserve",
+        "fileAllocationPrealloc": "Preallocate",
+        "fileAllocationTrunc": "Set file size",
+        "fileAllocationFalloc": "System allocation",
+        "modifiedTime": "File modification time",
+        "modifiedTimeDesc": "For completed HTTP and FTP downloads.",
+        "modifiedTimeLocal": "Download time",
+        "modifiedTimeServer": "Time from server",
+        "diskCache": "Disk cache ({{unit}})",
+        "diskCacheDesc": "Memory used to buffer files before writing to disk.",
+        "sessionSaveInterval": "Progress save interval (s)",
+        "sessionSaveIntervalDesc": "Save more often to reduce progress lost after a crash."
+      },
+      "magnet": {
+        "title": "Magnet",
+        "magnetResolveTimeout": "Magnet loading timeout (s)",
+        "magnetResolveTimeoutDesc": "How long to wait for the file list."
+      },
+      "speedLimit": {
+        "title": "Speed limits",
+        "titleDesc": "Choose how Motrix uses your connection in Standard, Low speed, and Automatic modes.",
+        "modeSection": "Speed mode",
+        "modeSectionDesc": "Choose how Motrix should use your connection.",
+        "turtle": "Speed mode",
+        "turtleDesc_off": "Use the standard speed limits.",
+        "turtleDesc_on": "Use the low-speed limits now to leave room for other apps.",
+        "turtleDesc_auto": "Adjust speed automatically based on time and connection bandwidth.",
+        "turtle_off": "Standard",
+        "turtle_on": "Low speed",
+        "turtle_auto": "Automatic",
+        "baseSection": "Standard limits",
+        "baseSectionDesc": "Used for everyday downloads and respected in every mode.",
+        "baseDownload": "Download",
+        "baseDownloadDesc": "The maximum everyday download speed.",
+        "baseUpload": "Upload",
+        "baseUploadDesc": "The maximum everyday upload speed.",
+        "unlimited": "Unlimited",
+        "setUnlimited": "Set unlimited",
+        "standardLimit": "Use standard",
+        "useStandardLimit": "Use standard limit",
+        "altSection": "Low speed limits",
+        "altSectionDesc": "Used in Low speed mode or by scheduled rules. These limits can only reduce the standard limits.",
+        "altDownload": "Download",
+        "altDownloadDesc": "The maximum download speed while Low speed mode is active.",
+        "altUpload": "Upload",
+        "altUploadDesc": "The maximum upload speed while Low speed mode is active.",
+        "autoSection": "Automatic rules",
+        "autoSectionDesc": "These rules apply only in Automatic mode.",
+        "autoSchedule": "Scheduled slowdown",
+        "scheduleEnabled": "Schedule low speed",
+        "scheduleEnabledDesc": "Switch to the low-speed limits on selected days and times.",
+        "scheduleFrom": "Start",
+        "scheduleTo": "End",
+        "scheduleTimeFormat": "24-hour format (HH:mm)",
+        "scheduleDays": "Days",
+        "scheduleDaysHint": "An end time before the start continues into the next day.",
+        "weekdays": {
+          "sun": {
+            "short": "Sun",
+            "long": "Sunday"
+          },
+          "mon": {
+            "short": "Mon",
+            "long": "Monday"
+          },
+          "tue": {
+            "short": "Tue",
+            "long": "Tuesday"
+          },
+          "wed": {
+            "short": "Wed",
+            "long": "Wednesday"
+          },
+          "thu": {
+            "short": "Thu",
+            "long": "Thursday"
+          },
+          "fri": {
+            "short": "Fri",
+            "long": "Friday"
+          },
+          "sat": {
+            "short": "Sat",
+            "long": "Saturday"
+          }
+        },
+        "autoAdaptive": "Leave bandwidth for other apps",
+        "adaptiveEnabled": "Reserve bandwidth for other apps",
+        "adaptiveEnabledDesc": "Enter your connection speeds below to calculate the limit.",
+        "linkDown": "Connection download speed",
+        "linkDownDesc": "The download speed your internet connection can reach.",
+        "linkUp": "Connection upload speed",
+        "linkUpDesc": "The upload speed your internet connection can reach.",
+        "fillFromPeak": "Estimate connection speed",
+        "fillFromPeakHint": "Based on the fastest recent downloads and uploads.",
+        "estimateEmpty": "No speed history is available yet. Complete an unlimited download or enter bandwidth manually.",
+        "estimateSuccess": "Connection bandwidth filled from recent speeds.",
+        "estimateError": "Could not read recent speed history. Enter bandwidth manually.",
+        "headroomPercent": "Reserve for other apps",
+        "headroomPercentDesc": "Currently reserving {{reserved}}%; Motrix can use up to {{motrix}}%.",
+        "effect": {
+          "title": "Current effect",
+          "standard": "Using standard limits: download {{download}}, upload {{upload}}.",
+          "lowSpeed": "Using low-speed limits now: download {{download}}, upload {{upload}}.",
+          "noAutoRules": "No automatic rules are enabled. This currently behaves like Standard mode.",
+          "standardValues": "Standard limits: download {{download}}, upload {{upload}}.",
+          "scheduleRule": "use low-speed limits from {{from}} to {{to}}{{nextDay}}",
+          "nextDay": " the next day",
+          "adaptiveRule": "reserve {{reserved}}% of bandwidth for other apps",
+          "adaptiveRulePending": "reserve {{reserved}}% of bandwidth for other apps after connection bandwidth is entered",
+          "ruleSeparator": " and ",
+          "autoRules": "Motrix will {{rules}}.",
+          "lowerWins": "The lowest active limit applies."
+        },
+        "bandwidthUsed": "Motrix can use up to {{motrix}}%.",
+        "bandwidthPending": "Enter both connection speeds to apply this limit."
+      },
+      "newTasks": "New tasks",
+      "defaultDownloadFolder": "Default download folder",
+      "autofillFromClipboard": "Autofill links from clipboard",
+      "fillInLinksWhenOpeningNewTask": "Paste copied links when opening a new task.",
+      "saveFolders": "Save folders",
+      "description": "Files, download speed and connections"
+    },
+    "network": {
+      "dns": {
+        "title": "DNS",
+        "mode": "DNS lookup",
+        "modeDesc": "How downloads look up server addresses.",
+        "modeAuto": "Auto",
+        "modeSystem": "System DNS",
+        "modeEngine": "Built-in DNS"
+      },
+      "proxy": {
+        "title": "Proxy",
+        "enable": "Enable proxy",
+        "enableDesc": "Use a proxy for the connections selected below.",
+        "server": "Server",
+        "protocol": "Protocol",
+        "host": "Server address",
+        "hostPlaceholder": "proxy.example.com",
+        "port": "Port",
+        "auth": "Proxy login",
+        "authDesc": "Turn on if your proxy requires a username and password.",
+        "user": "Username",
+        "password": "Password",
+        "showPassword": "Show password",
+        "hidePassword": "Hide password",
+        "bypass": "Connect directly to",
+        "bypassDesc": "One domain, IP or CIDR per line. Start with . to match subdomains only. File downloads don’t support * wildcards.",
+        "bypassScopeNote": "File downloads and app updates only",
+        "scopes": "Use proxy for",
+        "scopesDesc": "Choose which kinds of traffic go through the proxy.",
+        "scopeDownload": "File downloads",
+        "scopeDownloadDesc": "For BT, only HTTP(S) uses the proxy. Peers, DHT and UDP trackers connect directly.",
+        "scopeUpdateApp": "App updates",
+        "scopeUpdateAppDesc": "Check for Motrix updates through the proxy.",
+        "scopeUpdateTrackers": "Tracker list updates",
+        "scopeUpdateTrackersDesc": "Download tracker lists through the proxy; BT traffic is unaffected.",
+        "importFromSystem": "Import from system",
+        "importedToast": "System proxy imported: {{host}}:{{port}}",
+        "noSystemProxy": "No system proxy configured.",
+        "bypassPlaceholder": "localhost\n127.0.0.1\n.local",
+        "scopeHint": "BT peers, DHT and UDP trackers connect directly.",
+        "scopeNone": "None selected",
+        "scopeChoose": "Select…",
+        "scopeSeparator": ", "
+      },
+      "nat": {
+        "title": "Port mapping (NAT)",
+        "enable": "Enable port mapping",
+        "enableDesc": "Ask the router to open the ports set in BitTorrent settings.",
+        "preferredProtocol": "Preferred protocol",
+        "mappingTtl": "Mapping duration (s)",
+        "btPortHint": "Mapping applies to BT/DHT ports configured in BitTorrent.",
+        "automatic": "Automatic"
+      },
+      "stun": {
+        "title": "NAT type detection",
+        "privacyHint": "Uses third-party STUN servers.",
+        "enable": "Detect NAT type",
+        "servers": "STUN servers",
+        "empty": "Add at least one STUN server.",
+        "addServer": "Add STUN server"
+      },
+      "reachability": {
+        "title": "Incoming port check",
+        "privacyHint": "Uses a third-party service to check access from the internet.",
+        "enable": "Check incoming ports",
+        "endpoints": "Check services (HTTPS)",
+        "empty": "Add at least one check service.",
+        "addEndpoint": "Add check service"
+      },
+      "diagnostic": {
+        "title": "Automatic network checks",
+        "enable": "Automatic checks",
+        "interval": "Check interval (s)",
+        "enableDesc": "Repeat the checks enabled above."
+      },
+      "description": "Proxy, DNS and connection checks",
+      "diagnostics": "Network diagnostics"
+    },
+    "common": {
+      "browse": "Browse…",
+      "add": "Add",
+      "remove": "Remove",
+      "preset": "Quick:",
+      "noChange": "No changes to save",
+      "setAsDefault": "Set as default",
+      "openHelp": "Open help",
+      "generate": "Generate",
+      "changeDirectory": "Change directory",
+      "directoryEmpty": "(no directory selected)",
+      "showSecret": "Show secret",
+      "hideSecret": "Hide secret"
+    },
+    "integration": {
+      "system": {
+        "title": "Default app",
+        "protocolMagnet": "Open magnet links with Motrix",
+        "protocolMagnetDesc": "Open magnet links from your browser in Motrix.",
+        "torrentAssociation": "Open .torrent files with Motrix",
+        "torrentAssociationDesc": "Double-click a .torrent file to open it in Motrix.",
+        "torrentAssociationMacDesc": "In Finder, right-click any .torrent file → Get Info → Open with → choose Motrix → Change All…",
+        "defaultAssociationsWindows": "Default app for torrents and magnet links",
+        "defaultAssociationsWindowsDesc": "Choose Motrix for .torrent files and magnet links in Windows settings. Requires an installed copy of Motrix.",
+        "torrentFiles": ".torrent files",
+        "magnetLinks": "Magnet links",
+        "associationStatusLabel": "Current Windows default app status",
+        "associationChecking": "Checking…",
+        "associationSetupRequired": "Setup required",
+        "associationDefault": "Default",
+        "associationNotDefault": "Not default",
+        "associationUnavailable": "Couldn’t verify",
+        "associationNotRegistered": "Not registered",
+        "openWindowsSettings": "Open Windows settings",
+        "defaultAssociationsLinux": "Linux file and link associations",
+        "defaultAssociationsLinuxCheckingDesc": "Checking this Linux package and its current desktop associations…",
+        "defaultAssociationsLinuxUnavailableDesc": "Desktop association status isn’t available from this app environment.",
+        "defaultAssociationsLinuxDesc": "Motrix can set itself as the .torrent default for an installed deb or rpm package. Magnet changes take effect when you apply this dialog.",
+        "defaultAssociationsLinuxAppImageDesc": "Use Desktop integration below to register or remove this AppImage safely. Motrix restores verified previous handlers before deleting its desktop entry.",
+        "defaultAssociationsLinuxSandboxDesc": "This package publishes Motrix as a handler, but your desktop environment chooses the default app. Removing the package may not restore the previous default automatically.",
+        "associationStatusLabelLinux": "Current Linux file and link association status",
+        "linuxPackageDetected": "Package: {{package}}",
+        "linuxPackage": {
+          "appimage": "AppImage",
+          "native": "deb / rpm",
+          "flatpak": "Flatpak",
+          "snap": "Snap",
+          "unknown": "Unknown package"
+        },
+        "protocolMagnetAppImageDesc": "Applied immediately after saving when Desktop integration is enabled.",
+        "protocolMagnetSandboxDesc": "Motrix will request the change when you save, but the sandbox or desktop environment may require you to choose the default app manually.",
+        "protocolMagnetApplyFailed": "The preference was saved, but the desktop association could not be changed. Choose the default app in your system settings.",
+        "setTorrentDefaultLinux": "Set .torrent default",
+        "repairLinuxAssociations": "Repair associations",
+        "viewLinuxInstructions": "View setup steps",
+        "linuxActionSet": "Motrix is now the default for .torrent files.",
+        "linuxActionFallback": "Automatic setup isn’t available for this package. Setup instructions were opened instead.",
+        "linuxActionFailed": "Couldn’t update the Linux default. Check your desktop environment settings."
+      },
+      "browser": {
+        "title": "Browser extensions",
+        "masterSwitch": "Connect browser extensions",
+        "masterSwitchDesc": "Send webpage downloads to Motrix with the browser extension.",
+        "install": {
+          "chrome": "Chrome",
+          "edge": "Microsoft Edge",
+          "firefox": "Firefox",
+          "safari": "Safari",
+          "github": "GitHub",
+          "store": "Install",
+          "development": "Development"
+        },
+        "pairedTitle": "Connected extensions",
+        "pairedEmpty": "No extensions connected yet.",
+        "lastActive": "Last active",
+        "revoke": "Disconnect",
+        "disconnecting": "Disconnecting…",
+        "addTrusted": {
+          "add": "Add extension",
+          "idPlaceholder": "Extension ID",
+          "labelPlaceholder": "Label (optional)",
+          "browserLabel": "Browser",
+          "chromiumEdge": "Chrome / Edge",
+          "firefox": "Firefox",
+          "cancel": "Cancel",
+          "addAction": "Add"
+        },
+        "pairToast": {
+          "title": "A {{browser}} extension wants to connect to Motrix",
+          "extensionId": "ID: {{id}}",
+          "deny": "Don’t allow",
+          "pairCode": "Pairing code",
+          "copyCode": "Copy pairing code",
+          "pairCodeHint": "Type this code in the extension",
+          "identityLabel": {
+            "official": "Official Motrix extension",
+            "attested": "Verified extension",
+            "unverified": "Unverified extension"
+          },
+          "identityUnverifiedWarning": "This extension’s identity could not be verified. Only continue if you trust it."
+        },
+        "pairUnavailable": "This pairing request is no longer pending — retry pairing from the browser extension.",
+        "trustedExtensions": "Trusted extensions",
+        "trustedSummary": "{{count}} total",
+        "trustedGuidance": "For other trusted extensions, add the ID provided by the developer.",
+        "trustedEmpty": "Nothing here yet.",
+        "headerId": "Extension ID",
+        "headerBrowser": "Browser",
+        "headerSource": "Source",
+        "removeTrusted": "Remove",
+        "sourceLabel": {
+          "builtin": "Built-in",
+          "userAdded": "Added",
+          "imported": "Imported"
+        },
+        "degradedPort": {
+          "title": "Bridge running on a fallback port",
+          "description": "Ports 16802–16806 were unavailable, so the bridge bound port {{port}} instead. Browser extensions won’t find it by probing the standard range — pair using native messaging, or set a fixed port. The Motrix CLI and native host are unaffected."
+        },
+        "pairingStateDegraded": {
+          "title": "Extension access is temporarily closed",
+          "description": "Motrix could not safely update its paired-extension records. Existing Extension sessions are closed and new access is blocked for this run. Restart Motrix to retry the repair; do not rely on the list below until this message clears."
+        }
+      },
+      "cli": {
+        "title": "Command-line tools",
+        "tool": {
+          "title": "Motrix command-line tool",
+          "description": "Run motrix in a terminal to control this app.",
+          "managerLabel": "Package manager",
+          "commandLabel": "Install command",
+          "copyCommand": "Copy install command",
+          "manager": {
+            "npm": "npm",
+            "pnpm": "pnpm",
+            "yarn": "Yarn Classic",
+            "bun": "Bun",
+            "volta": "Volta"
+          },
+          "attentionTitle": "Command-line tool needs attention",
+          "status": {
+            "checking": "Checking",
+            "ready": "Ready to install",
+            "installing": "Installing",
+            "installed": "Installed",
+            "needsAttention": "Needs attention",
+            "manualOnly": "Manual install",
+            "error": "Failed"
+          },
+          "action": {
+            "checking": "Checking…",
+            "install": "Install",
+            "installing": "Installing…",
+            "checkAgain": "Check again"
+          },
+          "metadata": {
+            "version": "Version",
+            "path": "Executable",
+            "manager": "Installed with",
+            "unknown": "unknown"
+          },
+          "successGuidance": "Open a new terminal, then run motrix --help.",
+          "diagnostics": {
+            "show": "Show details",
+            "hide": "Hide details"
+          },
+          "reason": {
+            "nodeMissing": "Node.js 22 or newer was not found. Install Node.js, then check again.",
+            "nodeTooOld": "Node.js 22 or newer is required. Detected {{version}}.",
+            "managerMissing": "No supported package manager was found. Install npm, pnpm, Yarn Classic, Bun, or Volta, then check again.",
+            "sandboxed": "One-click installation is unavailable in this sandboxed package. Copy the command and run it in a terminal.",
+            "unsupportedWeb": "One-click installation is available only in the desktop app. Copy the command and run it on the Motrix host.",
+            "permission": "The package manager cannot write to its global install location. Use a Node.js version manager or a user-writable prefix; do not use sudo.",
+            "network": "The package manager could not reach the registry. Check your network or registry configuration, then try again.",
+            "timeout": "Installation took too long and was stopped. Check your network, then try again.",
+            "pathMissing": "The package was installed, but motrix is not on PATH. Open a new terminal or add the reported install directory to PATH.",
+            "pathShadowed": "Another motrix executable appears earlier on PATH. Remove the older entry or correct PATH, then check again.",
+            "verifyFailed": "The installer completed, but Motrix could not verify the active motrix executable.",
+            "installFailed": "The package manager could not install @motrix/cli. Review the details, then try again or run the command manually.",
+            "unknown": "Motrix could not check the command-line tool. Try again or run the copied command manually."
+          }
+        },
+        "remote": {
+          "title": "Paired remote tools",
+          "description": "Local tools connect automatically. Run motrix pair to connect to another computer or server.",
+          "empty": "No remote tools paired.",
+          "lastActive": "Last active",
+          "neverActive": "Never used",
+          "revoke": "Revoke"
+        },
+        "pairToast": {
+          "title": "{{name}} wants to pair with Motrix",
+          "code": "Verification code: {{code}}",
+          "allow": "Allow",
+          "deny": "Don’t allow"
+        },
+        "inbox": {
+          "title": "Pending approvals",
+          "empty": "No pending remote pairing requests.",
+          "approve": "Approve",
+          "deny": "Deny",
+          "expiresIn": "Expires in {{time}}"
+        },
+        "pairUnavailable": "This pairing request is no longer pending — re-run motrix pair."
+      },
+      "media": {
+        "title": "Media tools",
+        "desc": "Merge or convert media with FFmpeg.",
+        "notDetected": "FFmpeg not detected",
+        "refresh": "Refresh",
+        "binaryPath": "Custom FFmpeg path",
+        "browse": "Browse…",
+        "download": {
+          "action": "Download FFmpeg",
+          "verifyInstall": "Download and verify",
+          "manual": "FFmpeg manual",
+          "installing": "Verifying…",
+          "installed": "Verified and installed.",
+          "failed": "Download or verification failed. The previous installation was kept.",
+          "disclosure": "Uses Motrix’s project signature, not Authenticode. Windows warnings may remain.",
+          "projectDisclosure": "Motrix build · GPL. Installs in Motrix’s data directory after verification.",
+          "macDisclosure": "Checks Developer ID and notarization. Keeps system protections enabled.",
+          "progress": "FFmpeg download progress",
+          "bytes": "{{received}} / {{total}} bytes",
+          "directory": "Installed directory: {{path}}",
+          "detectionRefreshFailed": "Couldn’t refresh FFmpeg detection. Try Refresh again.",
+          "restartPluginHint": "Restart Motrix for active plugins to detect the installation.",
+          "phases": {
+            "idle": "Ready to download",
+            "metadata": "Checking the formal release…",
+            "downloading": "Downloading FFmpeg…",
+            "verifying": "Verifying the release signature…",
+            "extracting": "Verifying and extracting files…",
+            "systemTrust": "Checking macOS signing and notarization…",
+            "installing": "Installing FFmpeg…",
+            "installed": "Verified and installed.",
+            "failed": "Installation failed."
+          },
+          "errors": {
+            "unavailable": "No complete, immutable formal release is available yet.",
+            "unsupported": "One-click installation isn’t supported on this platform.",
+            "busy": "Another FFmpeg installation is already running.",
+            "download": "The download failed or timed out. Check the network and try again.",
+            "verification": "The signature, package layout, or file integrity check failed.",
+            "install": "Files couldn’t be installed. Check the data directory’s permissions and free space.",
+            "systemTrust": "macOS rejected the signing identity or notarization. System security checks weren’t bypassed."
+          }
+        },
+        "detection": {
+          "readyTitle": "FFmpeg {{version}}",
+          "unavailableTitle": "FFmpeg is not available",
+          "untrustedTitle": "FFmpeg was blocked by macOS",
+          "usingSource": "Using {{source}}",
+          "unavailableDesc": "Set a custom path, install FFmpeg, or add it to PATH, then refresh.",
+          "untrustedDesc": "The file exists but did not pass macOS security verification. Install a trusted build or approve it in Privacy & Security, then refresh.",
+          "showDetails": "Show detection details",
+          "hideDetails": "Hide detection details",
+          "sourcesChecked_one": "{{count}} source checked",
+          "sourcesChecked_other": "{{count}} sources checked",
+          "source": "Source",
+          "location": "Checked location",
+          "result": "Result",
+          "copyManagedPath": "Copy Motrix FFmpeg path",
+          "editCustomPath": "Edit custom FFmpeg path",
+          "finishEditingCustomPath": "Finish editing custom FFmpeg path",
+          "notConfigured": "Not set"
+        },
+        "candidateKind": {
+          "manual": "Custom path",
+          "userData": "Motrix data directory",
+          "env": "MOTRIX_FFMPEG_BIN",
+          "path": "System PATH"
+        },
+        "state": {
+          "active": "In use",
+          "available": "Found",
+          "missing": "Not found",
+          "untrusted": "Blocked by macOS",
+          "unconfigured": "Not set",
+          "version_mismatch": "Unsupported"
+        },
+        "stagingMB": "Temporary file limit (MB)",
+        "stagingMBDesc": "Space for intermediate files, per plugin and task.",
+        "opTimeoutSec": "FFmpeg timeout (seconds)",
+        "opTimeoutSecDesc": "Maximum time for one media operation, up to 3,600 seconds.",
+        "cleanupStaging": "Clean temporary files",
+        "cleanupConfirm": "Remove all FFmpeg temporary directories?",
+        "restartHint": "Saved. Restart Motrix for active plugins to detect changes.",
+        "restartNow": "Restart now",
+        "validation": {
+          "fileMissing": "File does not exist at this path."
+        },
+        "applyHint": "Save to use this path for new media downloads. Rescan in the browser extension to refresh support.",
+        "savedTitle": "FFmpeg settings saved",
+        "desktopSavedHint": "New media downloads read the saved path. Restart Motrix for active plugins to detect the change.",
+        "pipelineUnavailable": "Media download support is unavailable.",
+        "ffmpegRequired": "This download requires FFmpeg. Configure it in Settings → Integration → Media tools, save, then retry."
+      },
+      "pairResolveFailed": "Couldn’t submit your decision — try again.",
+      "appimage": {
+        "title": "Desktop integration",
+        "desc": "Register this Motrix AppImage with your desktop so browsers and magnet links can hand downloads to it.",
+        "enable": "Enable desktop integration",
+        "remove": "Remove desktop integration",
+        "prompt": {
+          "title": "Integrate Motrix with your desktop?",
+          "message": "Let this Motrix AppImage register with your desktop environment?",
+          "detail": "Motrix will add a desktop entry and icon under your user data directory and register itself as the handler for motrix: links, magnet links, and .torrent files. This lets your browser and the Motrix extension launch Motrix and hand it downloads. Nothing is written outside your home directory, and you can undo this from Settings.",
+          "accept": "Integrate",
+          "decline": "Not now"
+        },
+        "status": {
+          "healthy": "Integrated with this desktop.",
+          "notIntegrated": "Not integrated with this desktop.",
+          "failedTitle": "Desktop integration incomplete",
+          "failedDetail": "Motrix couldn’t register itself as the handler for its links. Browser hand-off may not work until you re-enable desktop integration.",
+          "removeBlockedDetail": "Motrix couldn’t safely restore a verified previous handler, so it kept its desktop entry to avoid leaving a broken default. Choose another default app in your desktop settings, then try removing the integration again.",
+          "externalManaged": "Desktop integration is provided by another Motrix install."
+        },
+        "movedHint": "If you move the AppImage while Motrix is closed, links may fail to launch until you start Motrix once from its new location."
+      },
+      "appimageHost": {
+        "title": "AppImage browser launch",
+        "desc": "Allow an extension to open this AppImage when you click Connect. Enable browser integration to use it.",
+        "enable": "Enable browser launch",
+        "repair": "Repair",
+        "useCurrent": "Use this AppImage",
+        "remove": "Remove browser launch",
+        "copyDiagnostics": "Copy diagnostics",
+        "status": {
+          "ready": "Local installation checks passed. Connect from your browser to verify it.",
+          "disabled": "Browser launch is disabled.",
+          "conflict": "Another installation owns these files. Remove its browser integration first.",
+          "permissions": "Check that the files are executable and writable only by your account.",
+          "invalid": "The installation record or executable is invalid.",
+          "sourceChanged": "The AppImage changed. Run the intended version and repair the installation.",
+          "missing": "A required file is missing. Run the AppImage from its current location and repair.",
+          "io": "The operation failed. Check disk access and try Repair."
+        }
+      },
+      "description": "Browsers, default apps and tools"
+    },
+    "validation": {
+      "rangeHint": "Range: {{min}}–{{max}}.",
+      "range": "Enter a number from {{min}} to {{max}}.",
+      "integerRange": "Enter a whole number from {{min}} to {{max}}.",
+      "minimum": "Enter {{min}} or more.",
+      "maximum": "Enter {{max}} or less.",
+      "integer": "Enter a whole number.",
+      "wholeBytes": "Use fewer decimal places.",
+      "number": "Enter a valid number.",
+      "invalid": "Enter a valid value.",
+      "selection": "Choose an available option.",
+      "textLength": "Use {{max}} characters or fewer.",
+      "itemCount": "Keep {{max}} addresses or fewer.",
+      "text": "Remove line breaks or hidden control characters.",
+      "directory": "Choose a download folder.",
+      "proxyHost": "Enter a server name or IP address, without http:// or a port.",
+      "stunServer": "Use host:port, such as stun.example.com:3478. The port must be 1–65535.",
+      "httpsUrl": "Enter a full address starting with https://.",
+      "httpUrl": "Enter a full address starting with http:// or https://.",
+      "saveFailed": "Couldn’t save your changes. Try again.",
+      "address": "Address {{number}}",
+      "addressDraft": "New address",
+      "required": "Enter an address first.",
+      "time": "Use a 24-hour time, such as 23:00.",
+      "loadFailed": "Couldn’t load settings. Try again."
+    },
+    "feedback": {
+      "syncFailedTitle": "Settings saved; interface update failed",
+      "syncFailedBody": "Your settings have been saved. Retry synchronization to update this page without saving again.",
+      "retrySync": "Retry synchronization",
+      "applyFailedTitle": "Settings saved; some changes could not be applied",
+      "applyFailedBody": "The saved configuration is retained. Check the application logs and restart the affected service after resolving the problem.",
+      "appRestartTitle": "Restart Motrix to apply settings",
+      "appRestartBody": "Your settings are saved. Restart Motrix when convenient."
+    },
+    "connection": {
+      "originMismatchTitle": "The server access address does not match.",
+      "originMismatchBody": "Real-time updates are unavailable. Use the configured server address or ask the administrator to correct it.",
+      "disconnectedTitle": "Real-time updates are disconnected.",
+      "disconnectedBody": "Some information may be delayed. If this persists, check the server connection and proxy configuration."
+    }
+  },
+  "errors": {
+    "task": {
+      "create": {
+        "dedupExhausted": "Too many files with this name already exist (>9999).",
+        "torrentMetaFailed": "Failed to persist torrent metadata."
+      }
+    }
+  },
+  "menu": {
+    "app": {
+      "title": "Motrix",
+      "about": "About Motrix",
+      "preferences": "Settings…",
+      "checkForUpdates": "Check for Updates",
+      "show": "Show Motrix",
+      "hide": "Hide Motrix",
+      "hideOthers": "Hide Others",
+      "unhide": "Show All",
+      "quit": "Quit Motrix"
+    },
+    "file": {
+      "title": "File"
+    },
+    "task": {
+      "title": "Task",
+      "newTask": "New Task…",
+      "newBtTask": "New BitTorrent Task…",
+      "openFile": "Open Torrent File…",
+      "taskList": "Task List",
+      "pauseTask": "Pause",
+      "resumeTask": "Resume",
+      "deleteTask": "Remove Tasks…",
+      "moveTaskUp": "Move Up in Queue",
+      "moveTaskDown": "Move Down in Queue",
+      "pauseAllTask": "Pause All",
+      "resumeAllTask": "Resume All",
+      "selectAllTask": "Select All Tasks",
+      "clearRecentTasks": "Clear Stopped Task Records…"
+    },
+    "edit": {
+      "title": "Edit",
+      "undo": "Undo",
+      "redo": "Redo",
+      "cut": "Cut",
+      "copy": "Copy",
+      "paste": "Paste",
+      "delete": "Delete",
+      "selectAll": "Select All"
+    },
+    "window": {
+      "title": "Window",
+      "reload": "Reload",
+      "close": "Close",
+      "minimize": "Minimize",
+      "zoom": "Zoom",
+      "toggleFullscreen": "Toggle Full Screen",
+      "front": "Bring All to Front"
+    },
+    "help": {
+      "title": "Help",
+      "officialWebsite": "Motrix Website",
+      "manual": "Motrix Help",
+      "changelog": "Release Notes",
+      "reportProblem": "Report a Problem",
+      "toggleDevTools": "Toggle Developer Tools"
+    }
+  },
+  "trackers": {
+    "effective": {
+      "enabled": "Inject curated trackers",
+      "enabledDesc": "Add curated trackers to new public BitTorrent tasks.",
+      "disabled": "Disabled — turn on to view the effective tracker list.",
+      "empty": "No effective trackers yet. Run sync to populate.",
+      "column": {
+        "url": "URL",
+        "health": "Health",
+        "responseTimeMs": "Response (ms)",
+        "lastProbedAt": "Last probed",
+        "source": "Source"
+      }
+    },
+    "blacklist": {
+      "enabled": "Apply blacklist filter",
+      "enabledDesc": "Block connections to Suspicious and Error tracker servers.",
+      "disabled": "Disabled — turn on to view the blacklist.",
+      "empty": "Blacklist is empty.",
+      "summary": "{{count}} URLs in effect",
+      "column": {
+        "url": "URL",
+        "source": "Source"
+      }
+    },
+    "combobox": {
+      "placeholder": "Select sources",
+      "addSourcePlaceholder": "https://example.com/list.txt",
+      "addSource": "Add",
+      "removeSource": "Remove source",
+      "empty": "No sources match.",
+      "builtinBadge": "builtin",
+      "cdnBadge": "CDN",
+      "directBadge": "Direct"
+    },
+    "sync": {
+      "syncing": "Syncing...",
+      "fetching": "Fetching tracker lists…",
+      "probing": "Checking tracker availability…",
+      "applying": "Applying tracker lists…",
+      "failed": "Sync incomplete. Check your network or sources and try again.",
+      "unavailable": "Can’t read sync status. Check your connection and try again.",
+      "details": {
+        "title": "Update details",
+        "scope": "These defaults supplement new public BitTorrent tasks. Existing downloads keep their current trackers.",
+        "sources": "Source status",
+        "candidates": "Candidates",
+        "history": "Update history",
+        "disabled": "Disabled",
+        "noSources": "No enabled sources",
+        "attention": "{{count}} trackers · {{failed}} sources need attention",
+        "summary": "{{count}} trackers · Last successful update: {{time}}",
+        "lastAttempt": "Last check",
+        "nextCheck": "Next check",
+        "autoOff": "Automatic updates off",
+        "enginePending": "Saved; waiting to apply defaults to the download engine.",
+        "sourceResult": "{{count}} addresses · Last success: {{time}}",
+        "retryAt": "Next retry: {{time}}",
+        "evidence": "Connection checks are evidence of reachability, not a guarantee of peers or download speed.",
+        "firstSeen": "First seen: {{time}}",
+        "noCandidates": "No matching candidates",
+        "showMore": "Show more",
+        "run": "{{success}} sources succeeded · {{failed}} failed · +{{added}} / −{{removed}} selected",
+        "noHistory": "No update history",
+        "retry": "Retry failed sources",
+        "state": {
+          "fresh": "Up to date",
+          "cached": "Using last successful cache",
+          "expired": "Cache expired",
+          "pending": "Not checked yet",
+          "failed": "No usable cache"
+        },
+        "failure": {
+          "network": "Connection failed. The previous cache is retained for up to 7 days.",
+          "http": "The source returned an HTTP error.",
+          "invalid": "The response is not a valid tracker list.",
+          "limit": "The source exceeded the size or address limit.",
+          "missing-cache": "The source returned 304 without a usable cache."
+        },
+        "reason": {
+          "selected": "Selected",
+          "capacity": "Reserve",
+          "blacklisted": "Blacklisted",
+          "unsupported": "Unsupported protocol",
+          "cooldown": "Repeated connection failures"
+        },
+        "outcome": {
+          "success": "Completed",
+          "partial": "Partially completed",
+          "failed": "Failed"
+        }
+      }
+    }
+  },
+  "plugins": {
+    "title": "Plugins",
+    "empty": "No plugins installed yet.",
+    "errors_one": "{{count}} error",
+    "errors_other": "{{count}} errors",
+    "status": {
+      "active": "Active",
+      "inactive": "Idle",
+      "disabled": "Disabled",
+      "error": "Error"
+    },
+    "install": {
+      "title": "Add plugin",
+      "github": "GitHub",
+      "github.spec": "GitHub repo (owner/repo[@tag])",
+      "url": "URL",
+      "url.spec": "Bundle URL (.moext)",
+      "local": "Local file",
+      "local.pick": "Pick a .moext file",
+      "lead": "Paste a plugin address, pick a .moext file, or drop a file in the input.",
+      "placeholder": "Paste a GitHub address, a URL, or pick a local .moext file",
+      "detected": {
+        "auto": "Auto",
+        "github": "GitHub",
+        "url": "URL",
+        "local": "File"
+      },
+      "detectedRow": {
+        "ok": "Detected as {{type}}",
+        "localSupported": "Local .moext supported"
+      },
+      "checkAriaLabel": "Check this plugin",
+      "install": "Install plugin",
+      "pickLocal": "Choose a local .moext file",
+      "localUnavailable": "Local file install is unavailable in this host.",
+      "localPrepareFailed": "Could not prepare this plugin file: {{detail}}",
+      "dropHint": "Drop a .moext file here to check this plugin",
+      "dragDisabledHint": "Drag-and-drop is not supported in this environment. Use a GitHub address or a URL.",
+      "warning": "Before installing: only continue if you trust the author and expect it to use the access listed above.",
+      "officialVerified": "Official Motrix signature verified",
+      "officialSignatureInvalid": "The official plugin signature could not be verified. Try refreshing the marketplace.",
+      "officialBuiltinOnly": "This version requires built-in privileges. Install a newer version that supports optional installation.",
+      "builtinAlreadyInstalled": "This plugin is already built in. Use its update action instead.",
+      "hostIncompatible": "This plugin requires Motrix {{required}}; current version: {{current}}. Upgrade or switch to a compatible Motrix version and try again."
+    },
+    "consent": {
+      "installTitle": "Install {{name}} {{version}}?",
+      "upgradeTitle": "Upgrade {{name}} to {{version}}?",
+      "notVerified": "This plugin is not verified. Only install plugins from sources you trust.",
+      "confirm": "Allow and install",
+      "permissions": "Required permissions",
+      "optionalPermissions": "Optional permissions",
+      "hostPermissions": "Host access",
+      "invokesCommands": "Calls commands in other plugins",
+      "calleeMissing": "Not installed",
+      "source": "Source: {{type}} · {{url}}",
+      "broadAccess": {
+        "title": "Broad host access",
+        "body": "This plugin can read and modify downloads from any URL. Only install if you trust the source.",
+        "tag": "Broad"
+      },
+      "diff": {
+        "title": "Changes since last consent",
+        "permissions": "Added permissions",
+        "optionalPermissions": "Added optional permissions",
+        "hostPermissions": "Added host access",
+        "invokesCommands": "New cross-plugin command calls",
+        "publicCommands": "New public commands",
+        "publicCommandsSchema": "Public command schemas changed",
+        "heap": "Memory request",
+        "engines": "Motrix engine version",
+        "source": "Bundle source"
+      }
+    },
+    "detail": {
+      "overview": "Overview",
+      "settings": "Settings",
+      "logs": "Logs",
+      "about": "About",
+      "loading": "Loading…",
+      "back": "All plugins",
+      "author": "Author",
+      "homepage": "Homepage",
+      "uninstall": "Uninstall",
+      "uninstallConfirm": "Uninstall this plugin? Its data will be removed.",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "access": "Access",
+      "advanced": "Advanced",
+      "accessGranted": "What this plugin can already do",
+      "accessOptional": "Optional access",
+      "hero": {
+        "ready": "Ready",
+        "review": "Review access",
+        "attention": "Needs attention",
+        "off": "Turned off",
+        "optional": "Can request more access"
+      },
+      "mini": {
+        "purpose": "Purpose",
+        "access": "Access",
+        "health": "Health"
+      },
+      "healthOk": "All good",
+      "healthIssues_one": "{{count}} issue reported in the last day",
+      "healthIssues_other": "{{count}} issues reported in the last day",
+      "accessNone": "Only its own settings",
+      "accessHosts_one": "Can read {{count}} website",
+      "accessHosts_other": "Can read {{count}} websites",
+      "accessBroad": "Can read any website",
+      "attentionTitle": "This plugin reported a problem",
+      "attentionGeneric": "See logs for details.",
+      "viewIssue": "View issue",
+      "removeTitle": "Remove plugin",
+      "removeDesc": "Removing this plugin also deletes its data stored in Motrix.",
+      "uninstallConfirmTitle": "Uninstall {{name}}?",
+      "uninstallConfirmDesc": "This will remove the plugin and its stored settings from Motrix.",
+      "operations": "Operations",
+      "operationsFailed": "The operation panel could not load. Try again."
+    },
+    "permissions": {
+      "empty": "This plugin requests no permissions.",
+      "granted": "Granted",
+      "denied": "Denied"
+    },
+    "logs": {
+      "verbose": "Verbose mode",
+      "verboseWarning": "Captures full URLs and headers for 1 hour. Use carefully.",
+      "filterLabel": "Log level",
+      "levels": {
+        "all": "All levels",
+        "trace": "Trace",
+        "debug": "Debug",
+        "info": "Info",
+        "warn": "Warning",
+        "error": "Error",
+        "fatal": "Fatal"
+      },
+      "copy": "Copy",
+      "clear": "Clear",
+      "output": "Live output",
+      "entryCount_one": "{{count}} entry",
+      "entryCount_other": "{{count}} entries",
+      "empty": "No log entries yet",
+      "emptyHint": "New plugin activity will appear here automatically.",
+      "emptyFiltered": "No entries match this level."
+    },
+    "lead": "Add small features to Motrix. Keep ones you trust, turn off the rest.",
+    "search": "Find a plugin",
+    "registry": {
+      "availableTitle": "Available plugins",
+      "featured": "Featured",
+      "byAuthor": "by {{name}}",
+      "requires": "Requires Motrix {{range}}",
+      "notInstalled": "Not installed",
+      "notFound": "Plugin “{{id}}” was not found in the registry",
+      "viewOnWebsite": "View on motrix.app",
+      "updated": "updated {{date}}",
+      "featuresTitle": "What it does",
+      "permissionsTitle": "Permissions",
+      "permissionsPreviewNote": "Preview from the registry entry. The actual consent prompt is always based on the manifest inside the plugin package.",
+      "optionalTag": "optional",
+      "install": "Install",
+      "updateAvailable": "Update available",
+      "updateTo": "Update to v{{version}}",
+      "refresh": "Check for updates",
+      "builtinUpdateTitle": "Update builtin plugin",
+      "builtinConsentLead": "This update requests new access:",
+      "revertToBundled": "Revert to bundled version",
+      "restartRequired": "Update installed. Restart Motrix to finish applying it.",
+      "updateInstalled": "Update installed.",
+      "actionFailed": "The action could not be completed."
+    },
+    "searchNoMatch": "No plugins match “{{query}}”",
+    "clearSearch": "Clear search",
+    "tone": {
+      "safe": "Looks safe",
+      "review": "Needs review",
+      "optional": "Optional access",
+      "off": "Off"
+    },
+    "card": {
+      "advancedDetails": "Advanced details",
+      "commandsInvoked": "Commands invoked: {{count}}",
+      "commandsServing": "Commands serving: {{count}}",
+      "primaryAction": {
+        "settings": "Settings",
+        "open": "Open",
+        "reviewAccess": "Review access",
+        "viewIssue": "View issue",
+        "grantAccess": "Grant access",
+        "turnOn": "Turn on"
+      },
+      "plain": {
+        "safe": "This plugin is enabled and ready. It only saves its own settings and does not read any websites.",
+        "reviewBroadHost": "This plugin can read {{hostSummary}}. Keep it on only if you trust it.",
+        "reviewError": "This plugin reported a problem.",
+        "optional": "This plugin works without extra access. You can grant more access later.",
+        "off": "This plugin is turned off."
+      }
+    },
+    "help": {
+      "guidance": {
+        "firstUse": {
+          "title": "Add plugins you trust",
+          "body": "Install from a source you trust, review the requested access, then enable the plugin.",
+          "safety": "Grant website access only for sites you expect the plugin to handle.",
+          "browse": "Discover plugins on Motrix official plugin marketplace"
+        },
+        "ongoing": "Review access before enabling a plugin. Grant website access only for sites you expect it to handle."
+      }
+    },
+    "diagnostics": {
+      "title": "Diagnostics",
+      "intro": "Inspect successful calls between plugins from the last 24 hours.",
+      "callGraph": {
+        "toolbarLabel": "Call graph controls",
+        "modeLabel": "Relationship view",
+        "modes": {
+          "graph": "Graph",
+          "table": "Table"
+        },
+        "filters": {
+          "searchLabel": "Search relationships",
+          "searchPlaceholder": "Find plugin or command",
+          "clearSearch": "Clear search",
+          "pluginsGroup": "Plugins",
+          "commandsGroup": "Commands",
+          "noSuggestions": "No plugin or command suggestions"
+        },
+        "refresh": "Refresh",
+        "refreshing": "Refreshing…",
+        "refreshTooltip": "Load the latest successful calls",
+        "renderGraphTooltip": "Render this large result as a graph",
+        "columns": {
+          "caller": "Caller",
+          "command": "Command",
+          "callee": "Callee",
+          "calls": "Calls",
+          "lastCall": "Last call"
+        },
+        "legend": {
+          "label": "Call volume legend",
+          "fewerCalls": "Fewer calls",
+          "moreCalls": "More calls"
+        },
+        "loading": {
+          "graph": "Loading call history…",
+          "metadata": "Loading plugin details…"
+        },
+        "globalEmpty": {
+          "title": "No successful cross-plugin calls yet",
+          "description": "Built-in plugins may not create cross-plugin traffic by default."
+        },
+        "filteredEmpty": "No successful calls match this search.",
+        "errors": {
+          "graphTitle": "Call history could not be loaded",
+          "graphDescription": "Try loading the successful call history again.",
+          "graphRetry": "Retry call history",
+          "metadataTitle": "Plugin details could not be loaded",
+          "metadataDescription": "Plugin details are required before unavailable plugins can be identified.",
+          "metadataRetry": "Retry plugin details",
+          "layout": "The relationship map could not be arranged.",
+          "layoutRetry": "Arrange map again",
+          "canvasTitle": "The graph canvas could not be displayed",
+          "canvasDescription": "You can retry the canvas or use the complete Table view.",
+          "canvasRetry": "Retry canvas",
+          "canvasTable": "Use Table instead"
+        },
+        "truncated": "Call history may be incomplete because the read budget, retention, or file rotation limited this result.",
+        "statuses": {
+          "active": "Running",
+          "inactive": "Ready but idle",
+          "disabled": "Disabled",
+          "error": "Needs attention",
+          "missing": "Not installed"
+        },
+        "inspector": {
+          "label": "Call graph selection details",
+          "scopeTitle": "Successful calls",
+          "neutralScope": "Select a plugin or connection to inspect successful calls from the last 24 hours.",
+          "pluginId": "Plugin ID",
+          "status": "Status",
+          "incomingCalls": "Incoming calls",
+          "outgoingCalls": "Outgoing calls",
+          "connections": "Connected plugins",
+          "noConnections": "No connected plugins",
+          "openPlugin": "Open plugin",
+          "edgeTitle": "Connection details",
+          "totalCalls": "Total calls",
+          "commands": "Commands"
+        },
+        "tableRegionLabel": "Scrollable command relationships",
+        "tableLabel": "Plugin command relationships",
+        "counts": {
+          "calls_one": "{{count}} successful call",
+          "calls_other": "{{count}} successful calls",
+          "commands_one": "{{count}} command",
+          "commands_other": "{{count}} commands"
+        },
+        "aria": {
+          "graphLabel": "Plugin command relationships",
+          "graphDescription": "{{nodeCount}} plugins and {{pairCount}} relationships from the last 24 hours.",
+          "nodeLabel": "{{name}}, plugin {{id}}, {{status}}, {{incoming}} incoming calls and {{outgoing}} outgoing calls",
+          "edgeLabel": "{{source}} called {{target}} {{calls}} times through {{commands}} commands",
+          "nodeDescription": "Choose a plugin node to inspect it.",
+          "nodeKeyboardInstruction": "Use the arrow keys to move this plugin node.",
+          "nodeMoved": "Plugin node moved {{direction}} to {{x}}, {{y}}.",
+          "directions": {
+            "left": "left",
+            "right": "right",
+            "up": "up",
+            "down": "down"
+          },
+          "edgeDescription": "Choose a call edge to inspect it.",
+          "controls": "Plugin graph view controls",
+          "zoomIn": "Increase graph scale",
+          "zoomOut": "Decrease graph scale",
+          "fitView": "Fit the plugin graph in view",
+          "interactive": "Toggle graph interaction mode",
+          "minimap": "Plugin graph overview",
+          "handle": "Read-only call endpoint"
+        }
+      }
+    },
+    "permission": {
+      "http": {
+        "strong": "Read websites",
+        "plain": "Opens pages this plugin supports.",
+        "cookies": {
+          "strong": "Use website cookies",
+          "plain": "Accesses sites where you are signed in."
+        }
+      },
+      "ffmpeg": {
+        "strong": "Use FFmpeg",
+        "plain": "Processes audio or video.",
+        "requirement": "Processes audio or video. First, <settings>install or select FFmpeg in Settings</settings>."
+      },
+      "notify": {
+        "strong": "Send notifications",
+        "plain": "Shows completion alerts."
+      },
+      "fs": {
+        "task": {
+          "read": {
+            "strong": "Read download files",
+            "plain": "Sees files in a task."
+          },
+          "write": {
+            "strong": "Change download files",
+            "plain": "Can add or update task files."
+          }
+        },
+        "storage": {
+          "strong": "Save plugin files",
+          "plain": "Keeps files for this plugin."
+        }
+      },
+      "storage": {
+        "strong": "Save settings",
+        "plain": "Remembers plugin options."
+      },
+      "notifications": {
+        "strong": "Send notifications",
+        "plain": "Shows plugin alerts."
+      },
+      "network": {
+        "strong": "Read websites",
+        "plain": "Fetches supported pages."
+      },
+      "tasks:read": {
+        "strong": "Read downloads",
+        "plain": "Sees your download list."
+      },
+      "tasks:write": {
+        "strong": "Manage your downloads",
+        "plain": "Can pause, resume, or remove tasks."
+      },
+      "unknown": {
+        "plain": "Unknown permission."
+      },
+      "accessTone": {
+        "required": "Needed",
+        "websiteAccess": "Web access",
+        "offByDefault": "Optional",
+        "allowed": "Allowed",
+        "noAccess": "Off",
+        "grant": "Allow"
+      }
+    }
+  },
+  "plugin": {
+    "ffmpeg": {
+      "destination_phase_disallowed": "ffmpeg cannot write to {{kind}} in the {{phase}} hook. Try writing to plugin storage, or move this call into beforeFinalize.",
+      "staging_quota_exceeded": "ffmpeg temporary space quota exceeded for this task. Lower the output size or raise the limit in Media settings."
+    },
+    "install": {
+      "ffmpeg": {
+        "title": "FFmpeg requirement",
+        "notInstalled": "FFmpeg is not installed on this system.",
+        "versionMismatch": "FFmpeg {{version}} is installed.",
+        "requiredByPlugin": "This plugin requires ffmpeg. Install it and try again.",
+        "optionalDegraded": "This plugin’s media features will be unavailable until ffmpeg is installed."
+      }
+    }
+  },
+  "bridge": {
+    "receiver": {
+      "error": {
+        "invalidPayload": "Invalid request from extension",
+        "invalidUrlScheme": "URL must be http: or https:",
+        "unsupportedKind": "{{kind}} downloads are not supported in this Motrix version",
+        "unsupportedLive": "Live streams cannot be downloaded",
+        "unsupportedMaster": "Extension sent master playlist; expected variant",
+        "unsupportedEncryption": "DRM-protected content cannot be downloaded",
+        "authExpired": "Session expired — refresh the page in your browser and try again",
+        "notFound": "Resource not found (404)",
+        "transientFailure": "Download failed after retries: {{detail}}",
+        "rangeNotSatisfiable": "Resume failed; restart the download",
+        "diskFull": "Disk full",
+        "diskWriteFailed": "Cannot write to disk: {{detail}}",
+        "muxFailed": "ffmpeg failed while combining audio and video",
+        "muxAborted": "Combining cancelled",
+        "cancelled": "Cancelled",
+        "internalError": "Internal error: {{detail}}"
+      }
+    }
+  },
+  "onboarding": {
+    "disclaimer": {
+      "title": "Usage Notice",
+      "language": "Language",
+      "languages": {
+        "english": "English",
+        "chinese": "简体中文"
+      },
+      "summary": "Please read the following before continuing.",
+      "body": "Motrix provides download management only. It does not provide, store, host, or recommend downloadable content. You must ensure that any content you access, use, or share through Motrix is legally authorized and complies with applicable copyright and other laws. You are responsible for any consequences arising from downloading, using, or sharing content. By selecting “Agree & Continue,” you confirm that you have read and understood this notice.",
+      "highlights": {
+        "downloadManagement": "provides download management only",
+        "authorized": "legally authorized",
+        "responsibility": "You are responsible"
+      },
+      "localConsent": "Your choice will be saved on this device.",
+      "agree": "Agree & Continue",
+      "quit": "Quit",
+      "retry": "Retry",
+      "saveFailed": "Couldn’t save your consent. Check disk space and try again."
+    }
+  },
+  "notification": {
+    "taskError": {
+      "title": "{{name}} failed"
+    },
+    "taskComplete": {
+      "title": "{{name}} finished downloading"
+    },
+    "engineFailure": {
+      "title": "Download engine failed"
+    },
+    "engineCompatibility": {
+      "title": "Non-Motrix aria2 detected",
+      "body": "aria2 {{version}} is not the Motrix fork. Connection settings are limited to at most {{limit}}, and SQLite history persistence is unavailable. Restore the bundled aria2_motrix engine for full support."
+    },
+    "engineRestartRequired": {
+      "title": "Restart the download engine to apply settings",
+      "body": "Your settings are saved. Restart the download engine when convenient.",
+      "restartNow": "Restart now"
+    },
+    "dnsFallback": {
+      "title": "{{name}} retried with system DNS",
+      "body": "Motrix couldn’t reach a DNS server, so it switched to system DNS for this session."
+    },
+    "center": {
+      "title": "Notifications",
+      "markAllRead": "Mark all read",
+      "clearAll": "Clear",
+      "empty": "No notifications",
+      "emptyDesc": "Download activity and important app notices will show up here",
+      "unreadDotAria": "Unread notifications",
+      "unreadBadgeAria_one": "{{count}} unread notification",
+      "unreadBadgeAria_other": "{{count}} unread notifications",
+      "rowUnreadAria": "{{title}} (unread)",
+      "toastRegionAria": "Notifications",
+      "removeAria": "Remove {{title}}",
+      "actionFailed": "Couldn’t update notifications. Try again.",
+      "markRead": "Mark as read",
+      "viewTask": "View task",
+      "taskRemoved": "Task removed",
+      "openTaskFailed": "Couldn’t open the task. Try again."
+    }
+  },
+  "applicationMenu": {
+    "signOut": "Sign Out…",
+    "back": "Back",
+    "serverUnavailable": "The server is unavailable. Your session has not been signed out.",
+    "retry": "Retry",
+    "actionFailed": "The action could not be completed. Check the connection and try again.",
+    "clearTitle": "Clear stopped task records?",
+    "clearDescription": "Remove completed, failed, and removed task records captured when this dialog opened. Downloaded files stay on disk.",
+    "clearConfirm": "Clear records",
+    "logoutTitle": "Sign out of this server?",
+    "logoutDescription": "This signs out other tabs using the same browser session. Downloads continue on the server. Unsaved input in those tabs will be discarded.",
+    "logoutConfirm": "Sign out",
+    "discardTitle": "Discard this task draft?",
+    "discardDescription": "Your unsaved links, torrent selection, and settings will be discarded.",
+    "discardConfirm": "Discard"
+  },
+  "directoryPicker": {
+    "title": "Select server folder",
+    "description": "Paths are on the server (inside the container when using Docker).",
+    "back": "Back",
+    "forward": "Forward",
+    "up": "Up one level",
+    "refresh": "Refresh",
+    "goToFolder": "Go to folder",
+    "location": "Location",
+    "viewOptions": "View options",
+    "sortBy": "Sort by",
+    "sortName": "Name",
+    "sortModified": "Date modified",
+    "sortOrder": "Order",
+    "sortAscending": "Ascending",
+    "sortDescending": "Descending",
+    "showHidden": "Show hidden folders",
+    "folders": "Folders",
+    "loading": "Loading folders…",
+    "empty": "No subfolders",
+    "incomplete": "Only part of this folder is shown. Enter an exact path to reach another folder.",
+    "selectFolder": "Select folder",
+    "selectedPath": "Selected folder",
+    "path": "Folder path",
+    "go": "Go",
+    "newFolder": "New folder",
+    "folderName": "Folder name",
+    "create": "Create",
+    "createHelp": "Created folders remain on the server if you cancel selection.",
+    "fallback": "The requested folder is unavailable. Showing {{path}}.",
+    "refreshAfterCreateFailed": "The folder was created, but the list could not be refreshed.",
+    "unknownOutcome": "Creation could not be confirmed. Refresh to check before creating another folder here.",
+    "retry": "Retry",
+    "errors": {
+      "invalidPath": "Enter a valid absolute folder path.",
+      "outsideRoots": "This folder is outside the allowed locations.",
+      "notFound": "This folder no longer exists.",
+      "notDirectory": "This path is not a folder.",
+      "permissionDenied": "You do not have permission to use this folder.",
+      "alreadyExists": "A file or folder with this name already exists.",
+      "invalidName": "Enter a valid folder name.",
+      "tooLarge": "This path or folder name is too long.",
+      "unavailable": "The server could not complete this request. Try again.",
+      "creationOutcomeUnknown": "Creation could not be confirmed. Refresh to check before creating another folder here.",
+      "notFile": "Select a readable regular file.",
+      "unsupportedFileType": "This file extension is not supported."
+    },
+    "places": {
+      "common": "Common places",
+      "allowed": "Allowed locations",
+      "default": "Default folder",
+      "home": "Home",
+      "desktop": "Desktop",
+      "documents": "Documents",
+      "downloads": "Downloads",
+      "root": "File system",
+      "loadFailed": "Some folder locations couldn’t be loaded."
+    },
+    "openFileTitle": "Select a file",
+    "saveFileTitle": "Save a file",
+    "fileDescription": "Browse files on the Motrix server.",
+    "selectFile": "Select file",
+    "saveFile": "Use this filename",
+    "files": "Files and folders",
+    "fileName": "File name",
+    "emptyFiles": "This folder is empty.",
+    "fileErrors": {
+      "invalidPath": "Enter a valid absolute path.",
+      "outsideRoots": "This path is outside the allowed locations.",
+      "notFound": "This path no longer exists.",
+      "permissionDenied": "You do not have permission to use this path.",
+      "invalidName": "Enter a valid file name.",
+      "tooLarge": "This path or file name is too long."
+    },
+    "selectedFilePath": "Selected file",
+    "file": {
+      "chooseOnServer": "Choose a file on the server using this picker.",
+      "singleFile": "Choose one file at a time.",
+      "wrongType": "Choose a file with one of these extensions: {{extensions}}.",
+      "pathUnavailable": "This file’s location is unavailable. Click to choose it instead.",
+      "choose": "Choose a file",
+      "dropHint": "Drop a file here or click to choose",
+      "browseHint": "Click to browse files",
+      "change": "Click to replace"
+    }
+  },
+  "directoryPreferences": {
+    "sectionDescription": "Keep frequently used folders handy.",
+    "manage": "Manage directories",
+    "manageDescription": "Choose favorite folders and manage recent folders.",
+    "title": "Manage directories",
+    "description": "Removing a folder from this list won’t delete it or its files.",
+    "favorites": "Favorite folders",
+    "recent": "Recent folders",
+    "addFavorite": "Add favorite",
+    "removeFavorite": "Remove favorite",
+    "favoriteRecent": "Add to favorites",
+    "removeRecent": "Remove recent folder",
+    "clearRecent": "Clear recent folders",
+    "emptyFavorites": "No favorite folders",
+    "emptyRecent": "No recent folders",
+    "loading": "Loading directories…",
+    "retry": "Retry",
+    "limitHint": "You can save up to {{count}} favorite folders.",
+    "pickerFailed": "The folder picker could not be opened. Try again.",
+    "close": "Close",
+    "history": "Directory history",
+    "emptyHistory": "No favorite or recent folders yet",
+    "errors": {
+      "conflict": "Settings changed in another window. Review your changes and save again.",
+      "invalidPath": "Enter a valid absolute folder path.",
+      "outsideRoots": "This folder is outside the allowed locations.",
+      "notFound": "This folder no longer exists.",
+      "notDirectory": "This path is not a folder.",
+      "permissionDenied": "You do not have permission to use this folder.",
+      "tooLarge": "This folder path is too long.",
+      "unavailable": "Directory records could not be updated. Refresh to check their current state.",
+      "limitReached": "The favorite folder limit has been reached. Remove a favorite before adding another."
+    },
+    "manageAction": "Manage",
+    "alreadyFavorite": "Already in favorites"
+  },
+  "units": {
+    "bytes": {
+      "b": "B",
+      "kb": "KB",
+      "mb": "MB",
+      "gb": "GB",
+      "tb": "TB",
+      "pb": "PB",
+      "eb": "EB",
+      "kib": "KiB",
+      "mib": "MiB",
+      "gib": "GiB",
+      "tib": "TiB",
+      "pib": "PiB",
+      "eib": "EiB"
+    },
+    "perSecond": "{{value}}/s"
+  },
+  "protocol": {
+    "title": "Motrix",
+    "deprecatedScheme": "The mo:// protocol has been retired. Use motrix:// instead.",
+    "deprecatedCommand": "This link action has been retired. Use the controls in Motrix instead.",
+    "unsupportedCommand": "This link command is not supported.",
+    "unsupportedParameters": "This link contains unsupported parameters. Nothing was opened or changed.",
+    "invalidLink": "This Motrix link is invalid.",
+    "invalidSource": "This link must contain one valid HTTP, HTTPS, FTP, or Magnet address.",
+    "waitingMerged": "Waiting tasks are now shown in Active. The Active view has been opened.",
+    "stoppedSplit": "Stopped tasks are now grouped under Completed and Error. All downloads have been opened.",
+    "invalidStatus": "This download category is invalid. All downloads have been opened."
+  },
+  "mediaMerge": {
+    "title": "Merge audio and video",
+    "description": "Bring your video and audio together in one file, without re-encoding.",
+    "videoInput": "Video file",
+    "audioInput": "Audio file",
+    "output": "Output file",
+    "provider": "Plugin",
+    "browse": "Browse…",
+    "browseField": "Browse {{field}}",
+    "required": "Choose a file or enter its full path.",
+    "outputHint": "Save as MP4 or MKV with a new filename. If MP4 is incompatible, try MKV.",
+    "noPlugin": "Install and enable a media merge plugin. FFmpeg must be configured in Settings > Integration > Media Tools.",
+    "serverPaths": "Select files on the Motrix server. Files on this computer are not uploaded.",
+    "start": "Merge",
+    "running": "Merging…",
+    "cancelling": "Cancelling…",
+    "completed": "Merged successfully",
+    "cancelled": "Merge cancelled",
+    "failed": "Merge failed",
+    "invalidSelection": "Select two completed, single-file downloads.",
+    "jobMissing": "This merge is no longer available.",
+    "busy": "Another merge is already running.",
+    "pluginUnavailable": "The media merge plugin is unavailable.",
+    "absolutePaths": "Enter full, absolute file paths.",
+    "invalidFiles": "Choose two non-empty media files.",
+    "sameInput": "Choose two different input files.",
+    "outputFormat": "Use an .mp4 or .mkv output filename.",
+    "outputExists": "The output already exists. Choose a new filename.",
+    "invalidOutput": "The plugin did not produce a valid output file.",
+    "again": "Merge another file",
+    "pluginDisabled": "Enable this plugin to merge files.",
+    "choose": {
+      "videoInput": "Choose video",
+      "audioInput": "Choose audio",
+      "output": "Choose a save location"
+    },
+    "hint": {
+      "videoInput": "The picture for your merged file",
+      "audioInput": "The sound for your merged file",
+      "output": "Save as MP4 or MKV"
+    },
+    "preserveOriginals": "Original files are kept",
+    "format": "Output format"
+  }
+}

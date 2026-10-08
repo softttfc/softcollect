@@ -1,0 +1,701 @@
+import '@testing-library/jest-dom/vitest'
+import '@renderer/lib/i18n'
+import {
+  type PlatformServices,
+  PlatformServicesProvider,
+} from '@renderer/platform/services'
+import { Queries } from '@shared/protocol/queries'
+import type { DownloadTask } from '@shared/types/task'
+import { TaskStatus, TaskType } from '@shared/types/task'
+import { makeDownloadTask } from '@test-utils/task'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from 'react-router'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { DownloadsPage } from './downloads-page'
+import { useDownloadsSelection } from './store'
+import { useDownloadsView } from './view-preferences'
+
+const taskListMock = vi.hoisted(() => {
+  const retry = vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
+  return {
+    retry,
+    current: {
+      tasks: [] as readonly DownloadTask[],
+      status: 'ready' as 'loading' | 'ready' | 'error',
+      hasReadySnapshot: true,
+      revision: 0,
+      retry,
+      hasAnyActive: false,
+      hasAnyPaused: false,
+      hasStopped: false,
+    },
+  }
+})
+
+vi.mock('@renderer/hooks/use-task-list', () => ({
+  useTaskList: () => taskListMock.current,
+  getTaskListSnapshot: () => taskListMock.current,
+  subscribeTaskList: () => () => {},
+}))
+vi.mock('@renderer/hooks/use-global-stats', () => ({
+  useGlobalStats: () => ({ stats: null }),
+}))
+vi.mock('@renderer/hooks/use-task-pieces', () => ({
+  useTaskPieces: () => ({ pieces: null }),
+}))
+vi.mock('@renderer/hooks/use-task-speed-history', () => ({
+  useTaskSpeedHistory: () => ({ history: [] }),
+}))
+vi.mock('@renderer/lib/transport', () => ({
+  transport: {
+    invoke: vi.fn(async (channel: string) =>
+      channel === Queries.GetSpeedLimitState
+        ? {
+            turtle: 'off',
+            effective: { download: 0, upload: 0 },
+            activeReason: 'none',
+          }
+        : { state: 'ready' }
+    ),
+    on: vi.fn(),
+    off: vi.fn(),
+    platform: 'darwin',
+  },
+}))
+
+const testPlatformServices: PlatformServices = {
+  kind: 'electron',
+  pickSaveDir: vi.fn(async () => null),
+  closeHost: vi.fn(),
+  readClipboard: vi.fn(async () => ''),
+  openExternal: vi.fn(),
+  notify: vi.fn(),
+}
+
+function task(
+  id: string,
+  status: TaskStatus,
+  type = TaskType.Http
+): DownloadTask {
+  return makeDownloadTask({
+    id,
+    engineTaskId: `gid-${id}`,
+    name: `task ${id}`,
+    status,
+    type,
+    diskPath: `/tmp/${id}`,
+    finalPath: `/tmp/${id}`,
+    finalName: id,
+  })
+}
+
+function setTaskList(overrides: Partial<typeof taskListMock.current>): void {
+  taskListMock.current = {
+    tasks: [],
+    status: 'ready',
+    hasReadySnapshot: true,
+    revision: taskListMock.current.revision + 1,
+    retry: taskListMock.retry,
+    hasAnyActive: false,
+    hasAnyPaused: false,
+    hasStopped: false,
+    ...overrides,
+  }
+}
+
+function LocationHarness() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  return (
+    <>
+      <output data-testid="location">
+        {location.pathname}
+        {location.search}
+      </output>
+      <button
+        type="button"
+        data-testid="navigate-type"
+        onClick={() => navigate('/downloads/all?type=http')}
+      >
+        navigate type
+      </button>
+      <button
+        type="button"
+        data-testid="navigate-task-b"
+        onClick={() => navigate('/downloads/active?task=b')}
+      >
+        navigate task b
+      </button>
+    </>
+  )
+}
+
+function TestRouter({ initialPath }: { initialPath: string }) {
+  return (
+    <MemoryRouter initialEntries={[initialPath]}>
+      <LocationHarness />
+      <Routes>
+        <Route path="/downloads/:filter" element={<DownloadsPage />} />
+        <Route path="/downloads" element={<DownloadsPage />} />
+      </Routes>
+    </MemoryRouter>
+  )
+}
+
+function renderAt(path: string) {
+  const renderTree = () => (
+    <PlatformServicesProvider services={testPlatformServices}>
+      <TestRouter initialPath={path} />
+    </PlatformServicesProvider>
+  )
+  const view = render(renderTree())
+  return {
+    ...view,
+    refresh: () => view.rerender(renderTree()),
+  }
+}
+
+function selectedIds(): string[] {
+  return [...useDownloadsSelection.getState().committedSelectedIds]
+}
+
+beforeEach(() => {
+  Element.prototype.getAnimations = vi.fn(() => [])
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  )
+  useDownloadsView.setState({
+    inspectorVisible: false,
+    inspectorSnap: 'medium',
+  })
+  taskListMock.retry.mockClear()
+  setTaskList({})
+  useDownloadsSelection.getState().setItems([])
+  useDownloadsSelection.getState().clearSelection()
+})
+
+describe('DownloadsPage', () => {
+  it('updates inspector scroll space when the grid or footer resizes independently', () => {
+    const observers = new Set<{
+      targets: Set<Element>
+      callback: ResizeObserverCallback
+    }>()
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        targets = new Set<Element>()
+        constructor(readonly callback: ResizeObserverCallback) {
+          observers.add(this)
+        }
+        observe(target: Element) {
+          this.targets.add(target)
+        }
+        unobserve(target: Element) {
+          this.targets.delete(target)
+        }
+        disconnect() {
+          observers.delete(this)
+        }
+      }
+    )
+    let gridHeight = 382
+    let footerHeight = 44
+    const rect = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        const height = this.hasAttribute('data-downloads-grid')
+          ? gridHeight
+          : this.dataset.slot === 'panel-shell-footer'
+            ? footerHeight
+            : 500
+        return new DOMRect(0, 0, 700, height)
+      })
+    const notifyResize = (target: Element) => {
+      act(() => {
+        for (const observer of observers) {
+          if (observer.targets.has(target)) {
+            observer.callback(
+              [
+                { target, contentRect: target.getBoundingClientRect() },
+              ] as ResizeObserverEntry[],
+              observer as unknown as ResizeObserver
+            )
+          }
+        }
+      })
+    }
+    let view: ReturnType<typeof renderAt> | undefined
+    try {
+      setTaskList({ tasks: [task('a', TaskStatus.Paused)] })
+      useDownloadsView.setState({ inspectorSnap: 'expanded' })
+      view = renderAt('/downloads/all')
+      act(() => {
+        useDownloadsSelection.getState().select('a')
+        useDownloadsView.getState().setInspectorVisible(true)
+      })
+      const inset = () => {
+        const content = screen
+          .getByTestId('virtual-list-container')
+          .querySelector('[data-slot="scroll-area-content"]')
+        return (content?.lastElementChild as HTMLElement | undefined)?.style
+          .height
+      }
+      expect(inset()).toBe('310px')
+
+      // The compact header finishes animating after the page root stops resizing.
+      gridHeight = 418
+      const grid = screen.getByRole('grid', { name: 'Downloads' })
+      notifyResize(grid)
+      expect(inset()).toBe('331px')
+
+      footerHeight = 56
+      notifyResize(screen.getByRole('contentinfo'))
+      expect(inset()).toBe('319px')
+
+      // Type filters remount the keyed task panel even when its row count is unchanged.
+      fireEvent.click(screen.getByTestId('navigate-type'))
+      const replacementGrid = screen.getByRole('grid', { name: 'Downloads' })
+      expect(replacementGrid).not.toBe(grid)
+      gridHeight = 382
+      notifyResize(replacementGrid)
+      expect(inset()).toBe('310px')
+
+      view.unmount()
+      expect(
+        [...observers].some(
+          (observer) =>
+            observer.targets.has(grid) || observer.targets.has(replacementGrid)
+        )
+      ).toBe(false)
+    } finally {
+      view?.unmount()
+      rect.mockRestore()
+    }
+  })
+
+  it('keeps the toolbar in sync with empty selection and requires an explicit reopen', async () => {
+    setTaskList({
+      tasks: [task('a', TaskStatus.Paused), task('b', TaskStatus.Paused)],
+    })
+    useDownloadsView.setState({ inspectorVisible: true })
+    renderAt('/downloads/all')
+
+    const toggle = screen.getByRole('button', { name: 'Show Inspector' })
+    expect(toggle).toBeDisabled()
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    expect(toggle).toHaveAttribute(
+      'title',
+      'Select a task to view its details.'
+    )
+
+    act(() => useDownloadsSelection.getState().select('a'))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show Inspector' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Hide Inspector' })
+    ).toHaveAttribute('aria-pressed', 'true')
+
+    act(() => useDownloadsSelection.getState().clearSelection())
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    )
+    expect(
+      screen.getByRole('button', { name: 'Show Inspector' })
+    ).toBeDisabled()
+
+    act(() => useDownloadsSelection.getState().select('b'))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show Inspector' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Hide Inspector' }))
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    )
+    act(() => useDownloadsSelection.getState().select('a'))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show Inspector' })).toBeEnabled()
+  })
+
+  it('renders the status title heading and search trigger', () => {
+    renderAt('/downloads/all')
+    expect(
+      screen.getByRole('heading', { name: /downloads/i })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /search downloads/i })
+    ).toBeInTheDocument()
+  })
+
+  it('shows the Glass Motion empty state when only removed tasks remain', () => {
+    setTaskList({ tasks: [task('removed', TaskStatus.Removed)] })
+    const { container } = renderAt('/downloads/all')
+
+    expect(screen.getByText(/no downloads yet/i)).toBeInTheDocument()
+    expect(
+      container.querySelector('[data-slot="cubic-glass-gradient"]')
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /tune glass motion/i })
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText(/no tasks match this filter/i)
+    ).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['active', TaskStatus.Downloading],
+    ['error', TaskStatus.Error],
+    ['completed', TaskStatus.Completed],
+  ] as const)('opens a matching %s task deep link', async (filter, status) => {
+    setTaskList({ tasks: [task('target', status)] })
+    renderAt(`/downloads/${filter}?task=target`)
+
+    await waitFor(() => expect(selectedIds()).toEqual(['target']))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('renders a skeleton for the first loading frame, including empty data', () => {
+    setTaskList({
+      tasks: [],
+      status: 'loading',
+      hasReadySnapshot: false,
+    })
+    renderAt('/downloads/active')
+
+    expect(screen.getByTestId('downloads-loading')).toBeInTheDocument()
+    expect(screen.queryByText('No downloads yet')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    {
+      label: 'loading',
+      status: 'loading' as const,
+      hasReadySnapshot: false,
+      tasks: [] as DownloadTask[],
+      target: 'b',
+    },
+    {
+      label: 'unknown',
+      status: 'ready' as const,
+      hasReadySnapshot: true,
+      tasks: [] as DownloadTask[],
+      target: 'b',
+    },
+    {
+      label: 'removed',
+      status: 'ready' as const,
+      hasReadySnapshot: true,
+      tasks: [task('b', TaskStatus.Removed)],
+      target: 'b',
+    },
+  ])('clears preselected A for a new $label B signature', (state) => {
+    const existing = task('a', TaskStatus.Downloading)
+    useDownloadsSelection.getState().setItems([existing])
+    useDownloadsSelection.getState().select(existing.id)
+    setTaskList(state)
+
+    renderAt(`/downloads/active?task=${state.target}`)
+    expect(selectedIds()).toEqual([])
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('does not clear a normal selection for a type change without task', async () => {
+    const existing = task('a', TaskStatus.Downloading)
+    setTaskList({ tasks: [existing] })
+    useDownloadsSelection.getState().setItems([existing])
+    useDownloadsSelection.getState().select(existing.id)
+    renderAt('/downloads/all')
+
+    fireEvent.click(screen.getByTestId('navigate-type'))
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/downloads/all?type=http'
+      )
+    )
+    expect(selectedIds()).toEqual(['a'])
+  })
+
+  it('shows unavailable before a ready snapshot and retry can recover', async () => {
+    setTaskList({
+      status: 'error',
+      hasReadySnapshot: false,
+      tasks: [],
+    })
+    const view = renderAt('/downloads/active?task=b')
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Tasks unavailable')
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(taskListMock.retry).toHaveBeenCalledOnce()
+
+    setTaskList({
+      status: 'ready',
+      hasReadySnapshot: true,
+      tasks: [task('b', TaskStatus.Downloading)],
+    })
+    view.refresh()
+    await waitFor(() => expect(selectedIds()).toEqual(['b']))
+  })
+
+  it('shows a stale banner with retry while cached data is in error', async () => {
+    setTaskList({
+      status: 'error',
+      hasReadySnapshot: true,
+      tasks: [task('cached', TaskStatus.Downloading)],
+    })
+    renderAt('/downloads/all')
+
+    // A ready snapshot keeps the list on screen, so the failed resync must
+    // be visible somewhere: a slim banner with a manual retry.
+    const banner = screen.getByTestId('downloads-stale-banner')
+    expect(banner).toHaveTextContent(/out of date/i)
+    fireEvent.click(within(banner).getByRole('button', { name: 'Retry' }))
+    expect(taskListMock.retry).toHaveBeenCalledOnce()
+  })
+
+  it('uses cached data while the task store is in error', async () => {
+    setTaskList({
+      status: 'error',
+      hasReadySnapshot: true,
+      tasks: [task('cached', TaskStatus.Error)],
+    })
+    renderAt('/downloads/error?task=cached')
+
+    await waitFor(() => expect(selectedIds()).toEqual(['cached']))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    // The cached snapshot renders the list normally instead of the
+    // data-unavailable banner — the selected task's own Error-status alert
+    // in the inspector (added by Task 10) is expected here, not a regression.
+    expect(screen.queryByText('Tasks unavailable')).not.toBeInTheDocument()
+  })
+
+  it('waits for ready data before opening a delayed task', async () => {
+    setTaskList({
+      status: 'loading',
+      hasReadySnapshot: false,
+      tasks: [],
+    })
+    const view = renderAt('/downloads/active?task=b')
+    expect(selectedIds()).toEqual([])
+
+    setTaskList({
+      tasks: [task('b', TaskStatus.Downloading)],
+      status: 'ready',
+      hasReadySnapshot: true,
+    })
+    view.refresh()
+    await waitFor(() => expect(selectedIds()).toEqual(['b']))
+  })
+
+  it('falls back to All when the status does not match', async () => {
+    setTaskList({ tasks: [task('b', TaskStatus.Completed)] })
+    renderAt('/downloads/active?task=b')
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/downloads/all?task=b'
+      )
+    )
+    await waitFor(() => expect(selectedIds()).toEqual(['b']))
+  })
+
+  it('falls back to All and removes a conflicting type only', async () => {
+    setTaskList({
+      tasks: [task('b', TaskStatus.Downloading, TaskType.Bt)],
+    })
+    renderAt('/downloads/active?type=http&task=b')
+
+    await waitFor(() => {
+      const location = screen.getByTestId('location').textContent
+      expect(location).toBe('/downloads/all?task=b')
+    })
+    await waitFor(() => expect(selectedIds()).toEqual(['b']))
+  })
+
+  it.each([
+    ['unknown', []],
+    ['removed', [task('b', TaskStatus.Removed)]],
+  ] as const)(
+    'replaces a %s task link with all downloads and does not reopen on a later snapshot',
+    async (_label, initialTasks) => {
+      setTaskList({ tasks: initialTasks })
+      useDownloadsView.setState({ inspectorVisible: true })
+      const view = renderAt('/downloads/active?type=bt&q=old&task=b')
+      await waitFor(() =>
+        expect(screen.getByTestId('location').textContent).toBe(
+          '/downloads/all'
+        )
+      )
+      expect(selectedIds()).toEqual([])
+      expect(useDownloadsView.getState().inspectorVisible).toBe(false)
+
+      setTaskList({ tasks: [task('b', TaskStatus.Downloading)] })
+      view.refresh()
+      await act(async () => Promise.resolve())
+      expect(selectedIds()).toEqual([])
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    }
+  )
+
+  it('does not classify an unhydrated task as deleted until a ready snapshot arrives', async () => {
+    setTaskList({ tasks: [], status: 'loading', hasReadySnapshot: false })
+    const view = renderAt('/downloads/active?task=deleted')
+    expect(screen.getByTestId('location').textContent).toBe(
+      '/downloads/active?task=deleted'
+    )
+    setTaskList({ tasks: [], status: 'ready', hasReadySnapshot: true })
+    view.refresh()
+    await waitFor(() =>
+      expect(screen.getByTestId('location').textContent).toBe('/downloads/all')
+    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('closing the Inspector preserves selection and consumes the task deep link', async () => {
+    setTaskList({ tasks: [task('a', TaskStatus.Downloading)] })
+    renderAt('/downloads/active?task=a')
+    await waitFor(() => expect(selectedIds()).toEqual(['a']))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(selectedIds()).toEqual(['a'])
+    expect(useDownloadsView.getState().inspectorVisible).toBe(false)
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/downloads/active'
+      )
+    )
+  })
+
+  it('opens a genuinely new task URL after consuming the first', async () => {
+    setTaskList({
+      tasks: [
+        task('a', TaskStatus.Downloading),
+        task('b', TaskStatus.Downloading),
+      ],
+    })
+    renderAt('/downloads/active?task=a')
+    await waitFor(() => expect(selectedIds()).toEqual(['a']))
+
+    fireEvent.click(screen.getByTestId('navigate-task-b'))
+    await waitFor(() => expect(selectedIds()).toEqual(['b']))
+  })
+
+  it('normal row selection removes stale deep-link ownership', async () => {
+    setTaskList({
+      tasks: [
+        task('a', TaskStatus.Downloading),
+        task('b', TaskStatus.Downloading),
+      ],
+    })
+    renderAt('/downloads/active?task=a')
+    await waitFor(() => expect(selectedIds()).toEqual(['a']))
+
+    act(() => useDownloadsSelection.getState().select('b'))
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/downloads/active'
+      )
+    )
+    expect(selectedIds()).toEqual(['b'])
+  })
+})
+
+describe('Downloads inline search', () => {
+  it('filters the current status view by keyword and type, and clears only the keyword', async () => {
+    setTaskList({
+      tasks: [
+        task('alpha', TaskStatus.Downloading),
+        task('beta', TaskStatus.Paused),
+        task('alpha-done', TaskStatus.Completed),
+        task('alpha-bt', TaskStatus.Downloading, TaskType.Bt),
+      ],
+    })
+    renderAt('/downloads/active?type=http')
+    const user = userEvent.setup()
+    const input = screen.getByRole('textbox', { name: 'Search downloads' })
+    await user.type(input, 'alpha')
+    expect(
+      useDownloadsSelection.getState().items.map((task) => task.id)
+    ).toEqual(['alpha'])
+    expect(useDownloadsView.getState().inspectorVisible).toBe(false)
+    await user.click(screen.getByRole('button', { name: 'Clear search' }))
+    expect(input).toHaveValue('')
+    expect(input).toHaveFocus()
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/downloads/active?type=http'
+    )
+    expect(
+      screen.getByRole('button', { name: /Filters.*Type filter: HTTP/ })
+    ).toBeInTheDocument()
+  })
+
+  it('keeps selection and inspector open when the selected task still matches a query', async () => {
+    setTaskList({
+      tasks: [
+        task('alpha', TaskStatus.Downloading),
+        task('beta', TaskStatus.Paused),
+      ],
+    })
+    renderAt('/downloads/all?task=alpha')
+    await waitFor(() => expect(selectedIds()).toEqual(['alpha']))
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Search downloads' }))
+    await user.type(
+      screen.getByRole('textbox', { name: 'Search downloads' }),
+      'alpha'
+    )
+    expect(selectedIds()).toEqual(['alpha'])
+    expect(useDownloadsView.getState().inspectorVisible).toBe(true)
+    expect(
+      screen.queryByRole('row', { name: 'task beta' })
+    ).not.toBeInTheDocument()
+    expect(screen.getByTestId('location')).not.toHaveTextContent('task=')
+  })
+
+  it('clears a conflicting query to reveal an explicit task deep link', async () => {
+    setTaskList({ tasks: [task('alpha', TaskStatus.Paused)] })
+    renderAt('/downloads/all?q=missing&type=bt&task=alpha')
+    await waitFor(() => expect(selectedIds()).toEqual(['alpha']))
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/downloads/all?task=alpha'
+    )
+    expect(useDownloadsView.getState().inspectorVisible).toBe(true)
+  })
+
+  it('Escape clears text first, then collapses the empty field and returns focus', async () => {
+    setTaskList({ tasks: [task('alpha', TaskStatus.Downloading)] })
+    renderAt('/downloads/all')
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Search downloads' }))
+    const input = screen.getByRole('textbox', { name: 'Search downloads' })
+    expect(input).toHaveFocus()
+    await user.type(input, 'missing')
+    await user.keyboard('{Escape}')
+    expect(input).toHaveValue('')
+    expect(input).toHaveFocus()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Search downloads' })
+    ).toHaveFocus()
+  })
+})

@@ -1,0 +1,366 @@
+import { CopyButton } from '@renderer/components/desktop-kit/copy-button'
+import {
+  ChevronDownIcon,
+  OpenFileIcon,
+  PauseIcon,
+  RemoveIcon,
+  ResumeIcon,
+  RetryIcon,
+  RevealFolderIcon,
+  SeedStartIcon,
+  StopIcon,
+} from '@renderer/components/icons'
+import { MagnetFileSelectionButton } from '@renderer/components/task/magnet-file-selection-button'
+import { Button } from '@renderer/components/ui/button'
+import { toast } from '@renderer/components/ui/toast'
+import { useModifierKeys } from '@renderer/hooks/use-modifier-keys'
+import { rtlMirror } from '@renderer/lib/task-status-ui'
+import { transport } from '@renderer/lib/transport'
+import { cn } from '@renderer/lib/utils'
+import { Commands } from '@shared/protocol/commands'
+import type { DownloadTask } from '@shared/types/task'
+import { TaskStatus } from '@shared/types/task'
+import { canOpenTaskFile } from '@shared/types/task-actions'
+import type React from 'react'
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { canRevealTaskFolder } from './can-reveal-task-folder'
+import { copyTaskUrls } from './task-copy-url'
+import { useTaskActions } from './use-task-actions'
+
+export interface TaskInspectorActionBarProps {
+  selected: readonly DownloadTask[]
+  onClose: () => void
+  resizeHandle?: React.ReactNode
+}
+
+/**
+ * Click-time copy with an explicit failure path: a failed detail fetch must
+ * abort the copy and tell the user, never silently write a tracker-less
+ * magnet and report success. Re-throw so CopyButton keeps its idle state.
+ */
+async function copyTaskUrl(
+  task: DownloadTask,
+  onFailure: () => void
+): Promise<void> {
+  try {
+    await copyTaskUrls([task])
+  } catch (error) {
+    onFailure()
+    throw error
+  }
+}
+
+interface CountedButtonProps {
+  label: string
+  total: number
+  count: number
+  tooltipSingle: string
+  tooltipBatch: string
+  icon: React.ReactNode
+  variant?: 'outline' | 'destructive'
+  destructive?: boolean
+  disabled?: boolean
+  onClick: (e: React.MouseEvent) => void
+}
+
+function CountedButton({
+  label,
+  total,
+  count,
+  tooltipSingle,
+  tooltipBatch,
+  icon,
+  variant = 'outline',
+  destructive,
+  disabled,
+  onClick,
+}: CountedButtonProps) {
+  const tooltip = total === 1 ? tooltipSingle : tooltipBatch
+  return (
+    <Button
+      size="xs"
+      variant={variant}
+      className={cn(destructive && 'text-destructive')}
+      disabled={disabled}
+      title={tooltip}
+      onClick={onClick}
+    >
+      {icon}
+      {label}
+      {total > 1 && count > 0 && (
+        <span className="tabular-nums ms-0.5">({count})</span>
+      )}
+    </Button>
+  )
+}
+
+function OpenTaskFileButton({ task }: { task: DownloadTask }) {
+  const { t } = useTranslation()
+  const [opening, setOpening] = useState(false)
+  const open = async () => {
+    if (opening) return
+    setOpening(true)
+    try {
+      await transport.invoke(Commands.OpenTaskFile, { taskId: task.id })
+    } catch (error) {
+      toast.add({
+        title: t('panel.downloads.action.openFileFailed'),
+        description: error instanceof Error ? error.message : String(error),
+        type: 'error',
+      })
+    } finally {
+      setOpening(false)
+    }
+  }
+  return (
+    <Button
+      size="xs"
+      variant="outline"
+      disabled={opening}
+      onClick={() => void open()}
+    >
+      <OpenFileIcon />
+      {t('panel.downloads.action.openFile')}
+    </Button>
+  )
+}
+
+function FinalizingActionBar({
+  task,
+  onClose,
+  resizeHandle,
+}: {
+  task: DownloadTask
+  onClose: () => void
+  resizeHandle?: React.ReactNode
+}) {
+  const { t } = useTranslation()
+  const reason = t('panel.downloads.action.finalizingTooltip')
+  return (
+    <div className="flex shrink-0 items-center gap-2 border-b border-border/50 px-4 py-2">
+      <Button size="xs" variant="outline" disabled title={reason}>
+        <PauseIcon />
+        {t('panel.downloads.action.pause')}
+      </Button>
+      {__MOTRIX_TARGET__ === 'electron' && canRevealTaskFolder(task) && (
+        <Button
+          size="xs"
+          variant="outline"
+          onClick={() =>
+            transport.invoke(Commands.RevealInFolder, { taskId: task.id })
+          }
+        >
+          <RevealFolderIcon />
+          {t('panel.downloads.action.openFolder')}
+        </Button>
+      )}
+      <CopyButton
+        size="xs"
+        variant="outline"
+        onClick={() =>
+          copyTaskUrl(task, () =>
+            toast.add({
+              title: t('panel.downloads.action.copyUrlFailed'),
+              type: 'error',
+            })
+          )
+        }
+      >
+        {t('panel.downloads.action.copyUrl')}
+      </CopyButton>
+      {resizeHandle}
+      <Button
+        size="xs"
+        variant="outline"
+        className="ms-auto text-destructive"
+        disabled
+        title={reason}
+      >
+        <RemoveIcon />
+        {t('panel.downloads.action.remove')}
+      </Button>
+      <Button
+        size="icon-xs"
+        variant="ghost"
+        aria-label={t('common.close')}
+        onClick={onClose}
+      >
+        <ChevronDownIcon />
+      </Button>
+    </div>
+  )
+}
+
+export function TaskInspectorActionBar({
+  selected,
+  onClose,
+  resizeHandle,
+}: TaskInspectorActionBarProps) {
+  const { t } = useTranslation()
+  const { shift, alt } = useModifierKeys()
+  const single = selected.length === 1 ? selected[0] : null
+  const actions = useTaskActions(selected)
+
+  if (single && single.status === TaskStatus.Finalizing) {
+    return (
+      <FinalizingActionBar
+        task={single}
+        onClose={onClose}
+        resizeHandle={resizeHandle}
+      />
+    )
+  }
+
+  return (
+    <div className="flex shrink-0 items-center gap-2 border-b border-border/50 px-4 py-2">
+      {actions.pauseCount > 0 && (
+        <CountedButton
+          label={t('panel.downloads.action.pause')}
+          total={actions.total}
+          count={actions.pauseCount}
+          tooltipSingle={t('panel.downloads.action.pause')}
+          tooltipBatch={t('panel.downloads.action.pauseTooltipBatch', {
+            n: actions.pauseCount,
+            total: actions.total,
+          })}
+          icon={<PauseIcon />}
+          onClick={() => void actions.onPause()}
+        />
+      )}
+      {actions.resumeCount > 0 && (
+        <CountedButton
+          label={t('panel.downloads.action.resume')}
+          total={actions.total}
+          count={actions.resumeCount}
+          tooltipSingle={t('panel.downloads.action.resume')}
+          tooltipBatch={t('panel.downloads.action.resumeTooltipBatch', {
+            n: actions.resumeCount,
+            total: actions.total,
+          })}
+          icon={<ResumeIcon className={rtlMirror} />}
+          onClick={() => void actions.onResume()}
+        />
+      )}
+      {actions.retryCount > 0 && (
+        <CountedButton
+          label={t('panel.downloads.action.retry')}
+          total={actions.total}
+          count={actions.retryCount}
+          tooltipSingle={
+            alt && actions.total === 1
+              ? t('panel.downloads.action.retryWithDialog')
+              : t('panel.downloads.action.retry')
+          }
+          tooltipBatch={t('panel.downloads.action.retryTooltipBatch', {
+            n: actions.retryCount,
+            total: actions.total,
+          })}
+          icon={<RetryIcon />}
+          onClick={(e) => void actions.onRetry({ alt: e.altKey })}
+        />
+      )}
+      {actions.reseedCount > 0 && (
+        <CountedButton
+          label={t('panel.downloads.action.reseed')}
+          total={actions.total}
+          count={actions.reseedCount}
+          tooltipSingle={
+            alt && actions.total === 1
+              ? t('panel.downloads.action.retryWithDialog')
+              : t('panel.downloads.action.reseed')
+          }
+          tooltipBatch={t('panel.downloads.action.reseedTooltipBatch', {
+            n: actions.reseedCount,
+            total: actions.total,
+          })}
+          icon={<SeedStartIcon />}
+          onClick={(e) => void actions.onReseed({ alt: e.altKey })}
+        />
+      )}
+      {actions.stopSeedingCount > 0 && (
+        <CountedButton
+          label={t('panel.downloads.action.stopSeeding')}
+          total={actions.total}
+          count={actions.stopSeedingCount}
+          tooltipSingle={t('panel.downloads.action.stopSeeding')}
+          tooltipBatch={t('panel.downloads.action.stopSeedingTooltipBatch', {
+            n: actions.stopSeedingCount,
+            total: actions.total,
+          })}
+          icon={<StopIcon />}
+          onClick={() => void actions.onStopSeeding()}
+        />
+      )}
+
+      {single && single.status === TaskStatus.MetadataReady && (
+        <MagnetFileSelectionButton task={single} />
+      )}
+
+      {single &&
+        __MOTRIX_TARGET__ === 'electron' &&
+        canOpenTaskFile(single) && <OpenTaskFileButton task={single} />}
+      {single &&
+        __MOTRIX_TARGET__ === 'electron' &&
+        canRevealTaskFolder(single) && (
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() =>
+              transport.invoke(Commands.RevealInFolder, {
+                taskId: single.id,
+              })
+            }
+          >
+            <RevealFolderIcon />
+            {t('panel.downloads.action.openFolder')}
+          </Button>
+        )}
+      {single && (
+        <CopyButton
+          size="xs"
+          variant="outline"
+          onClick={() =>
+            copyTaskUrl(single, () =>
+              toast.add({
+                title: t('panel.downloads.action.copyUrlFailed'),
+                type: 'error',
+              })
+            )
+          }
+        >
+          {t('panel.downloads.action.copyUrl')}
+        </CopyButton>
+      )}
+
+      <CountedButton
+        label={t('panel.downloads.action.remove')}
+        total={actions.total}
+        count={actions.removeCount}
+        tooltipSingle={
+          shift
+            ? t('panel.downloads.action.removeWithFilesShift')
+            : t('panel.downloads.action.remove')
+        }
+        tooltipBatch={t('panel.downloads.action.removeTooltipBatch', {
+          n: actions.removeCount,
+          total: actions.total,
+        })}
+        icon={<RemoveIcon />}
+        destructive
+        onClick={(e) => actions.onRemove({ shift: e.shiftKey })}
+      />
+
+      {resizeHandle}
+      <Button
+        size="icon-xs"
+        variant="ghost"
+        className="ms-auto"
+        aria-label={t('common.close')}
+        onClick={onClose}
+      >
+        <ChevronDownIcon />
+      </Button>
+    </div>
+  )
+}

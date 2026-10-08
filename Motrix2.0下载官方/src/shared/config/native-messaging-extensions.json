@@ -1,0 +1,8 @@
+{
+  "chromium": [
+    "lggbokfckofcgjndaboioakcmincinpo",
+    "efcflljngohddnmfmebiamigoikmdfbf"
+  ],
+  "firefox": ["motrix-extension@motrix.app"],
+  "safari": ["app.motrix.safari.extension"]
+}

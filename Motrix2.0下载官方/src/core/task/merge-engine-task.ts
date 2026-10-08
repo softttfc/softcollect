@@ -1,0 +1,130 @@
+import type { DownloadTask } from '@shared/types/task'
+import { TaskStatus, TransitionPhase } from '@shared/types/task'
+import { shareRatio } from '@shared/utils/share-ratio'
+import { applyTerminalTransition } from './apply-terminal-transition'
+import { unsettledBtUpload } from './bt-upload-settlement'
+import { isCompletedDirectOutput } from './completed-direct-task-policy'
+import { nonZeroMerge } from './non-zero-merge'
+import { syncTerminalInstanceStatus } from './task-instance'
+
+/**
+ * Pure merge; this module never persists and never builds an occurrence.
+ * Its callers (`reconcileTask` -> `commitTaskUpdate` in `actions/shared.ts`)
+ * commit the merged result through `commitTaskUpdate`, whose `terminalCause`
+ * defaults to `'engine'` when the caller doesn't override it — this IS the
+ * "cause: 'engine'" path the plan attributes to this file.
+ */
+export function mergeEngineTask(
+  existing: DownloadTask,
+  engineTask: DownloadTask,
+  now = Date.now()
+): DownloadTask {
+  // Engine session replay and delayed notifications cannot reopen durable
+  // direct history. Explicit re-add changes ownership/state before merging.
+  if (
+    existing.engineTaskId === engineTask.engineTaskId &&
+    isCompletedDirectOutput(existing)
+  ) {
+    return existing
+  }
+  const protected_ = nonZeroMerge(existing, engineTask)
+  // progress is a derived value, not an independent field. Recomputing
+  // from the already-protected mirror keeps progress consistent with
+  // totalBytes/downloadedBytes — and prevents engine zeros from
+  // clobbering progress on paused tasks while the byte counts hold.
+  const progress =
+    protected_.totalBytes > 0
+      ? protected_.downloadedBytes / protected_.totalBytes
+      : 0
+  // uploadedBytes is derived: baseline + current gid's uploadLength.
+  // The engine snapshot's `uploadedBytes` is `Number(raw.uploadLength)`
+  // (per `translateRawToTask`), i.e. just the current gid's contribution.
+  // The persistent baseline lives on `existing` and is bumped only at
+  // gid swap points (finalize reseed, restart reAdd) — never here.
+  const uploadedBytes =
+    existing.uploadedBytesBaseline +
+    unsettledBtUpload(
+      existing.instances,
+      engineTask.engineTaskId,
+      engineTask.uploadedBytes
+    )
+  // A non-idle transition phase means the application owns the lifecycle
+  // state until its filesystem + persistence transaction commits. aria2 can
+  // report Completed while HTTP finalize is still renaming `.motrix`, or a
+  // live row can coexist with a quarantined recovery error. Keep merging
+  // metrics, but do not let that engine snapshot publish a status ahead of
+  // the application-owned transition.
+  const nextStatus =
+    existing.transitionPhase !== TransitionPhase.Idle
+      ? existing.status
+      : protected_.status
+  const terminalFields = applyTerminalTransition(
+    existing,
+    nextStatus,
+    {
+      finishedAt: protected_.finishedAt,
+      errorMessage: protected_.errorMessage,
+      errorCode: protected_.errorCode,
+    },
+    now
+  )
+  const bt = protected_.bt ?? existing.bt
+  const merged: DownloadTask = {
+    ...existing,
+    ...terminalFields,
+    progress,
+    totalBytes: protected_.totalBytes,
+    sizeWhenDone: protected_.sizeWhenDone,
+    downloadedBytes: protected_.downloadedBytes,
+    downloadSpeed: protected_.downloadSpeed,
+    uploadSpeed: protected_.uploadSpeed,
+    etaSeconds: protected_.etaSeconds,
+    connections: protected_.connections,
+    pieceLength: protected_.pieceLength,
+    uploadedBytes,
+    uploadedBytesBaseline: existing.uploadedBytesBaseline,
+    fileCount: protected_.fileCount,
+    infoHash: protected_.infoHash ?? existing.infoHash,
+    uris: protected_.uris.length > 0 ? protected_.uris : existing.uris,
+    bt: bt
+      ? { ...bt, ratio: shareRatio(uploadedBytes, protected_.totalBytes) }
+      : undefined,
+    updatedAt: now,
+  }
+  if (
+    merged.status === TaskStatus.Completed ||
+    merged.status === TaskStatus.Error
+  ) {
+    // The candidate must not mutate live instances before persistence succeeds.
+    merged.instances = existing.instances.map((instance) => ({ ...instance }))
+    syncTerminalInstanceStatus(merged, merged.status)
+  }
+  return merged
+}
+
+export function hasEngineTaskDelta(
+  before: DownloadTask,
+  after: DownloadTask
+): boolean {
+  return (
+    before.status !== after.status ||
+    before.progress !== after.progress ||
+    before.totalBytes !== after.totalBytes ||
+    before.sizeWhenDone !== after.sizeWhenDone ||
+    before.downloadedBytes !== after.downloadedBytes ||
+    before.downloadSpeed !== after.downloadSpeed ||
+    before.uploadSpeed !== after.uploadSpeed ||
+    before.etaSeconds !== after.etaSeconds ||
+    before.connections !== after.connections ||
+    before.pieceLength !== after.pieceLength ||
+    before.uploadedBytes !== after.uploadedBytes ||
+    before.fileCount !== after.fileCount ||
+    before.errorMessage !== after.errorMessage ||
+    before.errorCode !== after.errorCode ||
+    before.finishedAt !== after.finishedAt ||
+    before.infoHash !== after.infoHash ||
+    before.bt?.peers !== after.bt?.peers ||
+    before.bt?.seeds !== after.bt?.seeds ||
+    before.bt?.ratio !== after.bt?.ratio
+  )
+}

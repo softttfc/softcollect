@@ -1,0 +1,1152 @@
+import path from 'node:path'
+import type { Aria2RpcClient } from '@core/engine/aria2/aria2-rpc-client'
+import type { DnsFallbackConsumer } from '@core/engine/aria2/dns-fallback'
+import { dnsModeToAsyncDns } from '@core/engine/aria2/dns-fallback'
+import type { EngineAdapter } from '@core/engine/engine-adapter'
+import type { EngineSupervisor } from '@core/engine/engine-supervisor'
+import { ENGINE_READY_TIMEOUT_MS } from '@core/engine/engine-supervisor'
+import type { EventBus } from '@core/events/event-bus'
+import type { GeoIPManager } from '@core/geoip/geo-ip-manager'
+import { createUpdateGeoIPDatabaseHandler } from '@core/geoip/update-geo-ip-database'
+import { getLogger } from '@core/logger'
+import { publishEngineRestartRequired } from '@core/notifications/engine-restart-required'
+import type { NotificationCenter } from '@core/notifications/notification-center'
+import type { CapabilityHost } from '@core/plugin/capabilities/interface'
+import { ManualMediaMerge } from '@core/plugin/commands/manual-media-merge'
+import { pluginSecretFields } from '@core/plugin/configuration-schema'
+import type { GrantsManager } from '@core/plugin/grants/grants-manager'
+import type { HookAuditLog } from '@core/plugin/hooks/audit-log'
+import type { HookOrchestrator } from '@core/plugin/hooks/hook-orchestrator'
+import type { ActivationDispatcher } from '@core/plugin/host/activation-dispatcher'
+import type { PluginHost } from '@core/plugin/host/plugin-host'
+import type { PluginInstaller } from '@core/plugin/install/plugin-installer'
+import { PluginEngineVersionTooOld } from '@core/plugin/manifest/errors'
+import type { PluginRegistry } from '@core/plugin/plugin-registry'
+import type { RegistryClient } from '@core/plugin/registry/registry-client'
+import { scanForUpdates } from '@core/plugin/registry/update-scan'
+import type { PluginStateStore } from '@core/plugin/state/plugin-state-store'
+import {
+  type AppliedDownloadProxyPolicy,
+  UNAVAILABLE_APPLIED_DOWNLOAD_PROXY_POLICY,
+} from '@core/proxy/applied-download-proxy-policy'
+import type { MotrixDatabase } from '@core/session/motrix-database'
+import type { SessionManager } from '@core/session/session-manager'
+import { applySavedSettings } from '@core/settings/apply-saved-settings'
+import { createDirectoryPreferencesHandlers } from '@core/settings/directory-preferences'
+import { createSaveDownloadsSettingsHandler } from '@core/settings/downloads-settings'
+import { createSaveGeneralSettingsHandler } from '@core/settings/general-settings'
+import type { SettingsManager } from '@core/settings/settings-manager'
+import {
+  clearStoppedTasks,
+  pauseAllTasks,
+  pauseTask,
+  reAddTask,
+  removeTask,
+  resumeAllTasks,
+  resumeTask,
+  runBulkTaskAction,
+  stopSeedingTask,
+  toBulkTaskCommandResult,
+} from '@core/task/actions'
+import { moveTasks } from '@core/task/actions/move-tasks'
+import type {
+  TaskActionDeps,
+  TaskTransitionRecordInput,
+} from '@core/task/actions/shared'
+import {
+  acquireBtInfoHashAdmission,
+  inspectBtDuplicate,
+  taskCreateConflictResult,
+} from '@core/task/bt-duplicate-policy'
+import { parseBtFileLayout } from '@core/task/bt-storage-layout'
+import {
+  type CreateTaskDeps,
+  handleCreateTask,
+} from '@core/task/create-task-handler'
+import { DirectResourceValidatorService } from '@core/task/direct-resource-validator'
+import type { FileCleanupService } from '@core/task/file-cleanup-service'
+import type { FinalNamePicker } from '@core/task/final-name-picker'
+import type { MediaMetaStore } from '@core/task/media-meta-store'
+import type { OccurrenceDispatcher } from '@core/task/occurrences/occurrence-dispatcher'
+import { createSetSelectedFilesHandler } from '@core/task/set-selected-files'
+import {
+  admitTaskCreateRequest,
+  taskCreateSourceFailure,
+} from '@core/task/source-admission'
+import { createTaskDirectoryHistory } from '@core/task/task-directory-history'
+import type { TaskManager } from '@core/task/task-manager'
+import type { TorrentMetaStore } from '@core/task/torrent-meta-store'
+import type { MagnetTracker } from '@core/torrent/magnet-tracker'
+import { swapMagnetMetadataForBt } from '@core/torrent/swap-magnet-metadata-for-bt'
+import type { TrackerManager } from '@core/tracker'
+import { AppError, ErrorCode } from '@shared/errors'
+import { Commands } from '@shared/protocol/commands'
+import { Events } from '@shared/protocol/events'
+import type { CommandHandlerMap } from '@shared/protocol/handler-types'
+import { taskCreateRequestSchema } from '@shared/schemas/add-task'
+import {
+  removeTasksPayloadSchema,
+  taskIdsPayloadSchema,
+} from '@shared/schemas/bulk-task-command'
+import { languagePreferenceSchema } from '@shared/schemas/locale'
+import { moveTasksPayloadSchema } from '@shared/schemas/move-tasks'
+import { checkPluginUpdatesPayloadSchema } from '@shared/schemas/plugin-update'
+import { removeTaskPayloadSchema } from '@shared/schemas/remove-task'
+import {
+  taskTrackerApplySchema,
+  taskTrackerEditSchema,
+} from '@shared/schemas/task-tracker'
+import { EngineRecoveryAction } from '@shared/types/engine'
+import type { PluginInstallCompatibilityFailure } from '@shared/types/plugin-install'
+import type { ProxySettings } from '@shared/types/settings'
+import type { DownloadTask } from '@shared/types/task'
+import { TaskStatus } from '@shared/types/task'
+import { canRetryMagnetMetadata } from '@shared/types/task-actions'
+import type { TaskActivityRecorder } from '@shared/types/task-activity'
+import type { TaskOccurrence } from '@shared/types/task-occurrence'
+import { z } from 'zod'
+import type { ServerDownloadPathPolicy } from '../download-path-policy'
+import type { ServerPluginInstallService } from '../plugin/install-service'
+import type { createServerProxyApplier } from '../proxy/wiring'
+import type { ServerDirectoryService } from '../server-directory-service'
+
+export interface ServerCommandContext {
+  supervisor: EngineSupervisor
+  settingsManager: SettingsManager
+  applyLocale?: (language: string) => Promise<void>
+  geoipManager: Pick<GeoIPManager, 'triggerUpdate'>
+  /** Session latch of the auto DNS fallback — reset when dnsMode changes. */
+  dnsFallback?: Pick<DnsFallbackConsumer, 'reset'>
+  /**
+   * Late-binds the DNS fallback consumer's task retry to the same
+   * `reAddTask` deps bundle the ReAddTasks command uses, so the two
+   * paths cannot drift. Called synchronously during handler construction.
+   */
+  bindTaskRetry?: (fn: (taskId: string) => Promise<unknown>) => void
+  recoverFinalization?: (taskId: string) => Promise<void>
+  rpcClient: Aria2RpcClient
+  adapter: EngineAdapter
+  trackerManager: TrackerManager
+  bridgeControl?: {
+    setEnabled(enabled: boolean): Promise<void>
+    restart(): Promise<void>
+  }
+  aria2BinaryPath: string
+  finalNamePicker: FinalNamePicker
+  mediaMetaStore: MediaMetaStore
+  torrentMetaStore: TorrentMetaStore
+  taskManager: TaskManager
+  fileCleanupService: FileCleanupService
+  eventBus: EventBus
+  proxyApplier: ReturnType<typeof createServerProxyApplier>
+  appliedDownloadProxyPolicy: AppliedDownloadProxyPolicy
+  motrixDatabase: MotrixDatabase
+  notificationCenter: NotificationCenter
+  taskPersistence: Pick<SessionManager, 'runExclusivePersistence'>
+  pluginRegistry: PluginRegistry
+  registryClient: RegistryClient
+  hostVersion: string
+  pluginStateStore: PluginStateStore
+  pluginHost: PluginHost
+  pluginInstaller: PluginInstaller
+  pluginInstallService: ServerPluginInstallService
+  pluginGrants: GrantsManager
+  capabilityHost: CapabilityHost
+  pluginActivation: ActivationDispatcher
+  hookAuditLog?: HookAuditLog
+  hookOrchestrator?: HookOrchestrator
+  magnetTracker: MagnetTracker
+  activityRecorder: TaskActivityRecorder
+  persistTask?: NonNullable<TaskActionDeps['persistTask']>
+  persistTaskWithPluginMetadata?: NonNullable<
+    CreateTaskDeps['persistTaskWithPluginMetadata']
+  >
+  /**
+   * Persist a task and (when non-null) its terminal occurrence in a single
+   * durable transaction — used INSTEAD OF `persistTask` whenever a status
+   * transition qualifies for one. Optional; absence degrades pauseTask/
+   * resumeTask to plain `persistTask` (no occurrence emitted).
+   */
+  persistTaskWithOccurrence?: (
+    task: DownloadTask,
+    occurrence: TaskOccurrence | null
+  ) => Promise<void>
+  /** Delivers a just-committed terminal occurrence to in-process consumers. */
+  occurrenceDispatcher?: Pick<OccurrenceDispatcher, 'dispatch'>
+  recordTransition?: (input: TaskTransitionRecordInput) => void | Promise<void>
+  deleteParentTasks?: NonNullable<TaskActionDeps['deleteParentTasks']>
+  runTaskMutation: NonNullable<TaskActionDeps['runTaskMutation']>
+  parentTaskCreated?: (
+    task: DownloadTask,
+    persistParent: () => void | Promise<void>
+  ) => Promise<void>
+  /** Coalesced / immediate TaskUpdated publication (TaskUpdatePublisher). */
+  publishTaskUpdate: TaskActionDeps['publishTaskUpdate']
+  publishTaskUpdateNow: TaskActionDeps['publishTaskUpdateNow']
+  downloadPathPolicy: ServerDownloadPathPolicy
+  serverDirectoryService: Pick<
+    ServerDirectoryService,
+    'create' | 'resolvePreferenceDirectory'
+  >
+}
+
+export function buildServerCommandHandlers(
+  ctx: ServerCommandContext
+): CommandHandlerMap {
+  const {
+    supervisor,
+    settingsManager,
+    geoipManager,
+    dnsFallback,
+    bindTaskRetry,
+    adapter,
+    trackerManager,
+    bridgeControl,
+    finalNamePicker,
+    mediaMetaStore,
+    torrentMetaStore,
+    taskManager,
+    fileCleanupService,
+    eventBus,
+    proxyApplier,
+    appliedDownloadProxyPolicy,
+    motrixDatabase,
+    notificationCenter,
+    taskPersistence,
+    pluginRegistry,
+    registryClient,
+    hostVersion,
+    pluginStateStore,
+    pluginHost,
+    pluginInstaller,
+    pluginInstallService,
+    pluginGrants,
+    capabilityHost,
+    pluginActivation,
+    hookAuditLog,
+    hookOrchestrator,
+    magnetTracker,
+    activityRecorder,
+    persistTask: injectedPersistTask,
+    persistTaskWithPluginMetadata,
+    persistTaskWithOccurrence,
+    occurrenceDispatcher,
+    recordTransition,
+    deleteParentTasks: injectedDeleteParentTasks,
+    runTaskMutation,
+    parentTaskCreated: injectedParentTaskCreated,
+    publishTaskUpdate,
+    publishTaskUpdateNow,
+    downloadPathPolicy,
+  } = ctx
+
+  const persistTask =
+    injectedPersistTask ?? (async (_task: DownloadTask) => undefined)
+  const deleteParentTasks =
+    injectedDeleteParentTasks ??
+    (async (
+      _taskIds: readonly string[],
+      deleteParents: () => void | Promise<void>
+    ) => {
+      await deleteParents()
+    })
+  const parentTaskCreated =
+    injectedParentTaskCreated ??
+    (async (_task: DownloadTask, persistParent: () => void | Promise<void>) => {
+      await persistParent()
+    })
+
+  const createDeps: CreateTaskDeps = {
+    adapter,
+    directResourceValidator: new DirectResourceValidatorService(),
+    directResourceProxyPolicy:
+      appliedDownloadProxyPolicy ?? UNAVAILABLE_APPLIED_DOWNLOAD_PROXY_POLICY,
+    settingsManager,
+    finalNamePicker,
+    torrentMetaStore,
+    taskManager,
+    eventBus,
+    publishTaskUpdate,
+    activityRecorder,
+    orchestrator: hookOrchestrator,
+    auditLog: hookAuditLog,
+    db: motrixDatabase.database,
+    persistTask,
+    persistTaskWithPluginMetadata,
+    parentTaskCreated,
+    rollbackTaskCreation: (taskId: string) =>
+      taskPersistence.runExclusivePersistence(() =>
+        deleteParentTasks([taskId], () => {
+          motrixDatabase.deleteTask(taskId)
+        })
+      ),
+    runTaskMutation,
+    waitForEngineReady: () =>
+      supervisor.waitUntilReady(ENGINE_READY_TIMEOUT_MS),
+    assertEngineReady: () => supervisor.assertReady(),
+    prepareSaveDir: (requested: string) =>
+      downloadPathPolicy.prepareSaveDir(requested),
+  }
+
+  const log = getLogger('server:commands')
+
+  // Shared by the singular AND plural task command handlers below — one
+  // deps bundle per action family so the two arities cannot drift.
+  const pauseResumeDeps = {
+    onPauseRequested: (taskId: string) =>
+      trackerManager.noteTaskControl?.(taskId, true),
+    onResumeRequested: (taskId: string) =>
+      trackerManager.noteTaskControl?.(taskId, false),
+    taskManager,
+    adapter,
+    eventBus,
+    log,
+    persistTask,
+    persistTaskWithOccurrence,
+    occurrenceDispatcher,
+    recordTransition,
+    runTaskMutation,
+    publishTaskUpdate,
+    publishTaskUpdateNow,
+  }
+  const stopSeedingDeps = {
+    taskManager,
+    adapter,
+    eventBus,
+    log,
+    persist: persistTask,
+    persistTaskWithOccurrence,
+    occurrenceDispatcher,
+    recordTransition,
+    runTaskMutation,
+    publishTaskUpdate,
+    publishTaskUpdateNow,
+  }
+  const reAddDeps = {
+    recoverFinalization: ctx.recoverFinalization,
+    taskManager,
+    adapter,
+    eventBus,
+    log,
+    torrentMetaStore,
+    persistTask,
+    recordTransition,
+    runTaskMutation,
+    publishTaskUpdate,
+    publishTaskUpdateNow,
+    getDirectResourceProxyOptions: () => {
+      const snapshot = (
+        appliedDownloadProxyPolicy ?? UNAVAILABLE_APPLIED_DOWNLOAD_PROXY_POLICY
+      ).snapshot()
+      return snapshot
+        ? { ...snapshot, userAgent: settingsManager.getEngine().userAgent }
+        : null
+    },
+    directResourceProxyPolicy:
+      appliedDownloadProxyPolicy ?? UNAVAILABLE_APPLIED_DOWNLOAD_PROXY_POLICY,
+  }
+  createDeps.reuseExistingBt = (taskId) => reAddTask(taskId, reAddDeps)
+  // The DNS fallback consumer retries through the same deps bundle as
+  // Commands.ReAddTasks so the automatic and user-initiated paths match.
+  bindTaskRetry?.((id) => reAddTask(id, reAddDeps))
+  const removeDeps = {
+    taskManager,
+    adapter,
+    log,
+    fileCleanupService,
+    mediaMetaStore,
+    torrentMetaStore,
+    eventBus,
+    db: motrixDatabase,
+    magnetTracker,
+    taskPersistence,
+    deleteParentTasks,
+    runTaskMutation,
+    publishTaskUpdate,
+    publishTaskUpdateNow,
+  }
+
+  // Plan C: plugins with `onTaskType:*` / `onProtocol:*` activation events
+  // are not activated at startup. Activate just-in-time when a task arrives
+  // so their beforeCreate hooks can run for the request.
+  async function activatePluginsForTask(
+    taskType: 'http' | 'bt' | 'magnet',
+    url: string
+  ): Promise<void> {
+    try {
+      await pluginActivation.dispatch({ kind: 'taskAdded', taskType, url })
+    } catch (err) {
+      log.warn(
+        { err, taskType, url },
+        'plugin taskAdded dispatch failed; continuing'
+      )
+    }
+  }
+
+  const updatePluginConfigSchema = z.object({
+    pluginId: z.string().min(1),
+    patch: z.record(z.string(), z.unknown()),
+  })
+  const engineRecoverySchema = z.object({
+    action: z.enum(EngineRecoveryAction),
+    expectedPid: z.number().int().positive().optional(),
+  })
+  const directoryPreferences = createDirectoryPreferencesHandlers(
+    settingsManager,
+    (value) => ctx.serverDirectoryService.resolvePreferenceDirectory(value)
+  )
+  const directoryHistory = createTaskDirectoryHistory({
+    recordRecent: (path) =>
+      directoryPreferences.mutate({ action: 'recordRecent', path }),
+  })
+
+  const manualMediaMerge = new ManualMediaMerge({
+    createLog: (pluginId) => capabilityHost.createLog(pluginId),
+    registry: pluginRegistry,
+    host: pluginHost,
+    tasks: taskManager,
+    authorizePath: (file) =>
+      ctx.serverDirectoryService.resolvePreferenceDirectory(path.dirname(file)),
+  })
+
+  return {
+    [Commands.GetMediaMergeState]: async () => manualMediaMerge.state(),
+    [Commands.GetMediaMergeSelection]: async (value: unknown) =>
+      manualMediaMerge.selection(value),
+    [Commands.StartMediaMerge]: async (value: unknown) =>
+      manualMediaMerge.start(value),
+    [Commands.GetMediaMergeJob]: async (value: unknown) =>
+      manualMediaMerge.get(value),
+    [Commands.CancelMediaMerge]: async (value: unknown) =>
+      manualMediaMerge.cancel(value),
+    [Commands.InstallFfmpeg]: async (payload: unknown) => {
+      z.undefined().parse(payload)
+      return { ok: false, error: 'unsupported' }
+    },
+    [Commands.CreateServerDirectory]: async (request: unknown) =>
+      ctx.serverDirectoryService.create(request),
+    [Commands.SetDisclaimerLanguage]: async (payload: unknown) => {
+      const language = languagePreferenceSchema.parse(payload)
+      await settingsManager.setDisclaimerLanguage(language)
+      await ctx.applyLocale?.(language)
+      return { ok: true }
+    },
+
+    [Commands.AcceptDisclaimer]: async () => {
+      await settingsManager.acceptDisclaimer()
+      trackerManager.applySyncScheduleChange()
+      return { ok: true }
+    },
+
+    [Commands.AddMagnetTask]: async (params: {
+      uri: string
+      selectedFiles: number[]
+      saveDir: string
+    }) => {
+      await activatePluginsForTask('magnet', params.uri)
+      return handleCreateTask(
+        {
+          type: 'bt',
+          payload: { kind: 'magnet', uri: params.uri },
+          selectedFiles: params.selectedFiles,
+          saveDir: params.saveDir || settingsManager.getApp().defaultSaveDir,
+        },
+        createDeps
+      )
+    },
+
+    [Commands.AddTorrentTask]: async (params: {
+      base64: string
+      selectedFiles: number[]
+      saveDir: string
+    }) => {
+      await activatePluginsForTask('bt', '')
+      return handleCreateTask(
+        {
+          type: 'bt',
+          payload: { kind: 'torrent-base64', base64: params.base64 },
+          selectedFiles: params.selectedFiles,
+          saveDir: params.saveDir || settingsManager.getApp().defaultSaveDir,
+        },
+        createDeps
+      )
+    },
+
+    [Commands.ReopenMagnetFileSelection]: async (taskId: string) => {
+      const selection = await magnetTracker.getFileSelection(taskId)
+      return { ok: true, selection: selection ?? null }
+    },
+
+    [Commands.CreateTask]: directoryHistory.wrap(async (request: unknown) => {
+      try {
+        request = admitTaskCreateRequest(request)
+      } catch (error) {
+        const failure = taskCreateSourceFailure(error)
+        if (failure) return failure
+        throw error
+      }
+      const parsed = taskCreateRequestSchema.safeParse(request)
+      if (parsed.success) {
+        const req = parsed.data
+        if (req.type === 'http') {
+          if (!req.uris[0].startsWith('ftp:'))
+            await activatePluginsForTask('http', req.uris[0] ?? '')
+        } else if (req.payload.kind === 'magnet') {
+          await activatePluginsForTask('magnet', req.payload.uri)
+          if (
+            req.selectedFiles.length === 0 &&
+            settingsManager.getApp().magnetFileSelection
+          ) {
+            const saveDir = await downloadPathPolicy.prepareSaveDir(
+              req.saveDir || settingsManager.getApp().defaultSaveDir
+            )
+            let taskId: string
+            try {
+              taskId = await magnetTracker.submit(req.payload.uri, saveDir)
+            } catch (error) {
+              const conflict =
+                taskCreateSourceFailure(error) ??
+                taskCreateConflictResult(error)
+              if (conflict) return conflict
+              throw error
+            }
+            if (!taskId) return { ok: true }
+            const existing = taskManager.getById(taskId)
+            if (
+              existing?.status === TaskStatus.Completed ||
+              existing?.status === TaskStatus.Error
+            ) {
+              await reAddTask(taskId, reAddDeps)
+              const owner = taskManager.getById(taskId) ?? existing
+              return {
+                outcome: 'rechecked',
+                gid: owner.engineTaskId,
+                taskId,
+              }
+            }
+            return {
+              outcome:
+                existing?.status === TaskStatus.FetchingMetadata
+                  ? 'created'
+                  : 'reused',
+              gid: existing?.engineTaskId ?? '',
+              taskId,
+            }
+          }
+        } else {
+          await activatePluginsForTask('bt', '')
+          // Plan B Task 3: user confirmed file selection for a magnet
+          // whose metadata resolved. Swap the persisted
+          // magnet_metadata_resolution instance for a fresh bt_download
+          // instance in place so task identity / Downloads list slot
+          // survive (no duplicate row appears).
+          if (req.payload.kind === 'torrent-base64' && req.existingTaskId) {
+            const saveDir = await downloadPathPolicy.prepareSaveDir(req.saveDir)
+            const layout = await parseBtFileLayout(
+              Buffer.from(req.payload.base64, 'base64')
+            ).catch(() => null)
+            const releaseAdmission = layout
+              ? await acquireBtInfoHashAdmission(layout.infoHash)
+              : null
+            try {
+              const admission = layout
+                ? inspectBtDuplicate(taskManager.getAll(), {
+                    infoHash: layout.infoHash,
+                    saveDir,
+                    selectedFiles: req.selectedFiles,
+                    duplicatePolicy: req.duplicatePolicy,
+                    excludeTaskId: req.existingTaskId,
+                  })
+                : { action: 'create' as const }
+              if (admission.action === 'conflict') {
+                return { outcome: 'conflict', conflict: admission.conflict }
+              }
+              if (admission.action === 'reuse') {
+                await removeTask(
+                  req.existingTaskId,
+                  { deleteWithFiles: false },
+                  removeDeps
+                )
+                if (admission.recheck) {
+                  await reAddTask(admission.task.id, reAddDeps)
+                }
+                const owner =
+                  taskManager.getById(admission.task.id) ?? admission.task
+                return {
+                  outcome: admission.recheck ? 'rechecked' : 'reused',
+                  gid: owner.engineTaskId,
+                  taskId: owner.id,
+                }
+              }
+              try {
+                return await swapMagnetMetadataForBt(
+                  {
+                    taskId: req.existingTaskId,
+                    base64: req.payload.base64,
+                    selectedFiles: req.selectedFiles,
+                    saveDir,
+                    name: req.displayName,
+                    duplicatePolicy: req.duplicatePolicy,
+                  },
+                  {
+                    db: motrixDatabase,
+                    taskManager,
+                    adapter,
+                    magnetTracker,
+                    finalNamePicker,
+                    torrentMetaStore,
+                    publishTaskUpdate,
+                    publishTaskUpdateNow,
+                    recordTransition,
+                    runTaskMutation,
+                    runExclusivePersistence: (operation) =>
+                      taskPersistence.runExclusivePersistence(operation),
+                  }
+                )
+              } catch (error) {
+                const conflict =
+                  taskCreateSourceFailure(error) ??
+                  taskCreateConflictResult(error)
+                if (conflict) return conflict
+                throw error
+              }
+            } finally {
+              releaseAdmission?.()
+            }
+          }
+        }
+      }
+      try {
+        return await handleCreateTask(request, createDeps)
+      } catch (error) {
+        const conflict =
+          taskCreateSourceFailure(error) ?? taskCreateConflictResult(error)
+        if (conflict) return conflict
+        throw error
+      }
+    }),
+
+    [Commands.PauseTask]: async (taskId: string) => {
+      await pauseTask(taskId, pauseResumeDeps)
+      return { ok: true }
+    },
+
+    [Commands.ResumeTask]: async (taskId: string) => {
+      await resumeTask(taskId, pauseResumeDeps)
+      return { ok: true }
+    },
+
+    // Plural task commands (option C): one IPC request per multi-select
+    // action from the web renderer. Same handlers as desktop.
+    [Commands.MoveTasks]: async (rawPayload: unknown) =>
+      moveTasks(moveTasksPayloadSchema.parse(rawPayload), pauseResumeDeps),
+
+    [Commands.PauseAllTasks]: async () =>
+      toBulkTaskCommandResult(await pauseAllTasks(pauseResumeDeps)),
+    [Commands.ResumeAllTasks]: async () =>
+      toBulkTaskCommandResult(await resumeAllTasks(pauseResumeDeps)),
+    [Commands.ClearStoppedTasks]: async (rawPayload: unknown) =>
+      clearStoppedTasks(removeDeps, taskIdsPayloadSchema.parse(rawPayload)),
+
+    [Commands.PauseTasks]: async (rawPayload: unknown) => {
+      const taskIds = taskIdsPayloadSchema.parse(rawPayload)
+      return toBulkTaskCommandResult(
+        await runBulkTaskAction(taskIds, pauseResumeDeps, pauseTask)
+      )
+    },
+
+    [Commands.ResumeTasks]: async (rawPayload: unknown) => {
+      const taskIds = taskIdsPayloadSchema.parse(rawPayload)
+      return toBulkTaskCommandResult(
+        await runBulkTaskAction(taskIds, pauseResumeDeps, resumeTask)
+      )
+    },
+
+    [Commands.StopSeedingTasks]: async (rawPayload: unknown) => {
+      const taskIds = taskIdsPayloadSchema.parse(rawPayload)
+      return toBulkTaskCommandResult(
+        await runBulkTaskAction(taskIds, stopSeedingDeps, (id) =>
+          stopSeedingTask(id, stopSeedingDeps)
+        )
+      )
+    },
+
+    [Commands.ReAddTasks]: async (rawPayload: unknown) => {
+      const taskIds = taskIdsPayloadSchema.parse(rawPayload)
+      return toBulkTaskCommandResult(
+        await runBulkTaskAction(taskIds, reAddDeps, (id) =>
+          reAddTask(id, reAddDeps)
+        )
+      )
+    },
+
+    [Commands.RetryTasks]: async (rawPayload: unknown) => {
+      const taskIds = taskIdsPayloadSchema.parse(rawPayload)
+      return toBulkTaskCommandResult(
+        await runBulkTaskAction(taskIds, reAddDeps, async (id) => {
+          const task = taskManager.getById(id)
+          if (task && canRetryMagnetMetadata(task)) {
+            await magnetTracker.retryMetadata(id)
+            return
+          }
+          await reAddTask(id, reAddDeps)
+        })
+      )
+    },
+
+    [Commands.RemoveTasks]: async (rawPayload: unknown) => {
+      const { taskIds, deleteWithFiles } =
+        removeTasksPayloadSchema.parse(rawPayload)
+      return toBulkTaskCommandResult(
+        await runBulkTaskAction(taskIds, removeDeps, (id) =>
+          removeTask(id, { deleteWithFiles }, removeDeps)
+        )
+      )
+    },
+
+    [Commands.StopSeedingTask]: async (taskId: string) => {
+      await stopSeedingTask(taskId, stopSeedingDeps)
+      return { ok: true }
+    },
+
+    [Commands.ReAddTask]: async (taskId: string) => {
+      await reAddTask(taskId, reAddDeps)
+      return { ok: true }
+    },
+
+    [Commands.RemoveTask]: async (rawPayload: unknown) => {
+      const { taskId, deleteWithFiles } =
+        removeTaskPayloadSchema.parse(rawPayload)
+      await removeTask(taskId, { deleteWithFiles }, removeDeps)
+      return { ok: true }
+    },
+
+    [Commands.SetSelectedFiles]: createSetSelectedFilesHandler({
+      taskManager,
+      engine: adapter,
+      db: motrixDatabase,
+      eventBus,
+      runTaskMutation,
+    }),
+
+    [Commands.RestartEngine]: async () => {
+      await supervisor.restart()
+      return { ok: true }
+    },
+
+    [Commands.RecoverEngine]: async (payload: unknown) => {
+      return supervisor.recover(engineRecoverySchema.parse(payload))
+    },
+
+    [Commands.MutateDirectoryPreferences]: directoryPreferences.mutate,
+
+    [Commands.SaveDownloadsSettings]: createSaveDownloadsSettingsHandler(
+      settingsManager,
+      {
+        resolveFavorite: (value) =>
+          ctx.serverDirectoryService.resolvePreferenceDirectory(value),
+        resolveDefaultDirectory: async (value) =>
+          downloadPathPolicy.prepareSaveDir(
+            await ctx.serverDirectoryService.resolvePreferenceDirectory(value)
+          ),
+        apply: async (oldEngine, result) => {
+          await supervisor.applyDefaultSaveDir(
+            settingsManager.getApp().defaultSaveDir
+          )
+          await supervisor.applyEngineSettings(
+            oldEngine,
+            settingsManager.getEngine()
+          )
+          if (result.requiresRestart)
+            publishEngineRestartRequired(
+              { eventBus, notificationCenter, log },
+              result.changedRestartKeys ?? []
+            )
+        },
+      }
+    ),
+
+    [Commands.SaveGeneralSettings]: createSaveGeneralSettingsHandler(
+      settingsManager,
+      {
+        resolveFavorite: (value) =>
+          ctx.serverDirectoryService.resolvePreferenceDirectory(value),
+        resolveDefaultDirectory: async (value) => {
+          const existing =
+            await ctx.serverDirectoryService.resolvePreferenceDirectory(value)
+          return downloadPathPolicy.prepareSaveDir(existing)
+        },
+        applySavedApp: async (patch) => {
+          if (patch.defaultSaveDir !== undefined) {
+            await supervisor.applyDefaultSaveDir(
+              settingsManager.getApp().defaultSaveDir
+            )
+          }
+        },
+      }
+    ),
+
+    [Commands.UpdateSettings]: async (partial: unknown) => {
+      const saveDirPatch = z
+        .object({
+          app: z
+            .object({ defaultSaveDir: z.string().optional() })
+            .passthrough()
+            .optional(),
+        })
+        .passthrough()
+        .safeParse(partial)
+      let validatedPartial = partial
+      if (
+        saveDirPatch.success &&
+        saveDirPatch.data.app?.defaultSaveDir !== undefined
+      ) {
+        const defaultSaveDir = await downloadPathPolicy.prepareSaveDir(
+          saveDirPatch.data.app.defaultSaveDir
+        )
+        validatedPartial = {
+          ...saveDirPatch.data,
+          app: { ...saveDirPatch.data.app, defaultSaveDir },
+        }
+      }
+      const proxySubmitted =
+        typeof validatedPartial === 'object' &&
+        validatedPartial !== null &&
+        Object.hasOwn(validatedPartial, 'proxy')
+      const oldFull = settingsManager.get()
+      const result = await settingsManager.update(
+        validatedPartial as Parameters<typeof settingsManager.update>[0]
+      )
+      return applySavedSettings(
+        result,
+        async () => {
+          const newFull = settingsManager.get()
+
+          const proxySettingsChanged = proxyChanged(
+            oldFull.proxy,
+            newFull.proxy
+          )
+          if (
+            proxySettingsChanged ||
+            proxySubmitted ||
+            appliedDownloadProxyPolicy.snapshot() === null
+          ) {
+            await appliedDownloadProxyPolicy.applyTransition(() => {
+              const latestProxy = settingsManager.get().proxy
+              // Re-check after acquiring the writer, then reassert the entire
+              // latest proxy state. Incremental command-local diffs lose updates
+              // when concurrent commands modify different proxy scopes.
+              return proxyChanged(newFull.proxy, latestProxy)
+                ? Promise.resolve({ downloadProxy: 'unchanged' } as const)
+                : proxyApplier.applyAll(latestProxy)
+            })
+          }
+
+          if (
+            oldFull.app.language !== newFull.app.language ||
+            typeof (partial as { app?: { language?: unknown } } | null)?.app
+              ?.language === 'string'
+          ) {
+            await ctx.applyLocale?.(settingsManager.get().app.language)
+          }
+
+          if (oldFull.app.defaultSaveDir !== newFull.app.defaultSaveDir) {
+            await supervisor.applyDefaultSaveDir(newFull.app.defaultSaveDir)
+          }
+
+          if (
+            oldFull.app.browserBridgeEnabled !==
+            newFull.app.browserBridgeEnabled
+          ) {
+            await bridgeControl?.setEnabled(newFull.app.browserBridgeEnabled)
+          }
+          if (oldFull.bridge.fixedPort !== newFull.bridge.fixedPort) {
+            await bridgeControl?.restart()
+          }
+
+          if (
+            oldFull.tracker.sourcesEnabled !== newFull.tracker.sourcesEnabled
+          ) {
+            await trackerManager.applySourcesChange(
+              newFull.tracker.sourcesEnabled
+            )
+          }
+
+          if (
+            oldFull.tracker.blacklistEnabled !==
+            newFull.tracker.blacklistEnabled
+          ) {
+            await trackerManager.applyBlacklistChange(
+              newFull.tracker.blacklistEnabled
+            )
+          }
+
+          if (
+            JSON.stringify(oldFull.tracker.sources) !==
+              JSON.stringify(newFull.tracker.sources) ||
+            JSON.stringify(oldFull.tracker.blacklistSources) !==
+              JSON.stringify(newFull.tracker.blacklistSources) ||
+            oldFull.tracker.maxTrackerCount !==
+              newFull.tracker.maxTrackerCount ||
+            oldFull.tracker.probeEnabled !== newFull.tracker.probeEnabled ||
+            oldFull.tracker.minSuccessRate !== newFull.tracker.minSuccessRate ||
+            oldFull.tracker.healthyThresholdMs !==
+              newFull.tracker.healthyThresholdMs
+          ) {
+            await trackerManager.applySelectionChange()
+          }
+
+          if (
+            oldFull.tracker.autoSync !== newFull.tracker.autoSync ||
+            oldFull.tracker.syncIntervalHours !==
+              newFull.tracker.syncIntervalHours
+          ) {
+            trackerManager.applySyncScheduleChange()
+          }
+
+          await supervisor.applyEngineSettings(oldFull.engine, newFull.engine)
+
+          if (oldFull.engine.dnsMode !== newFull.engine.dnsMode) {
+            await supervisor.applyAsyncDns(
+              dnsModeToAsyncDns(newFull.engine.dnsMode)
+            )
+            // Mode changes re-arm the auto fallback so a later switch back to
+            // 'auto' starts optimistic again.
+            dnsFallback?.reset()
+          }
+
+          if (result.requiresRestart) {
+            publishEngineRestartRequired(
+              { eventBus, notificationCenter, log },
+              result.changedRestartKeys
+            )
+          }
+
+          return result
+        },
+        (err) =>
+          log.warn({ err }, 'settings saved but runtime application failed')
+      )
+    },
+
+    [Commands.UpdateGeoIPDatabase]: createUpdateGeoIPDatabaseHandler({
+      geoipManager,
+    }),
+
+    [Commands.RequestDefaultTorrentHandler]: async () => ({ ok: false }),
+
+    [Commands.RetryTrackerSources]: async () =>
+      trackerManager.syncAndCurate('retry'),
+
+    [Commands.SyncTrackers]: async () => trackerManager.syncAndCurate(),
+
+    [Commands.ApplyTaskTrackerPlan]: async (raw: unknown) => {
+      const { taskId, engineGid, fingerprint } =
+        taskTrackerApplySchema.parse(raw)
+      await trackerManager.applyTaskTrackerPlan(taskId, engineGid, fingerprint)
+    },
+
+    [Commands.SetTaskBtTracker]: async (raw: unknown) => {
+      const { taskId, engineGid, trackers } = taskTrackerEditSchema.parse(raw)
+      const task = taskManager.getByEngineTaskId(engineGid)
+      if (!task || task.id !== taskId) throw new Error('Tracker task changed')
+      await trackerManager.setBtTracker(taskId, engineGid, trackers)
+    },
+
+    [Commands.SyncTaskBtTracker]: async (params: { engineGid: string }) => {
+      const task = taskManager.getByEngineTaskId(params.engineGid)
+      if (!task) return
+      const isPrivate = task.bt?.isPrivate ?? true
+      await trackerManager.syncBtTracker(task.id, params.engineGid, isPrivate)
+    },
+
+    [Commands.EnablePlugin]: async (id: string) => {
+      pluginStateStore.setEnabled(id, true)
+      // Sync the in-memory IndexedPlugin.state so Queries.ListPlugins and
+      // downstream gating (PluginHost.activate, ActivationDispatcher,
+      // CrossPluginInvoker) see the new enabled flag without a process
+      // restart.
+      pluginRegistry.refreshState(id)
+      const state = pluginStateStore.get(id)
+      eventBus.emit(Events.PluginStatusChanged, {
+        id,
+        status: state?.status ?? 'inactive',
+        enabled: true,
+      })
+      eventBus.emit(Events.ContributionIndexChanged)
+      return { ok: true }
+    },
+
+    [Commands.DisablePlugin]: async (id: string) => {
+      await pluginHost.disable(id, 'plugin.user_disabled', 'disabled', {
+        recordError: false,
+      })
+      const state = pluginStateStore.get(id)
+      eventBus.emit(Events.PluginStatusChanged, {
+        id,
+        status: state?.status ?? 'disabled',
+        enabled: false,
+      })
+      eventBus.emit(Events.ContributionIndexChanged)
+      return { ok: true }
+    },
+
+    [Commands.UpdatePluginConfig]: async (payload: unknown) => {
+      const parsed = updatePluginConfigSchema.parse(payload)
+      const indexed = pluginRegistry.get(parsed.pluginId)
+      if (!indexed) {
+        throw new AppError(
+          ErrorCode.PluginManifestInvalid,
+          `unknown plugin: ${parsed.pluginId}`
+        )
+      }
+
+      const secretFields = pluginSecretFields(indexed.manifest)
+
+      // Build effective patch with secrets encrypted.
+      const prior = settingsManager.get().plugins[parsed.pluginId] ?? {}
+      const effective: Record<string, unknown> = {}
+      const changes: Array<{ key: string; value: unknown; previous: unknown }> =
+        []
+      for (const [key, value] of Object.entries(parsed.patch)) {
+        let stored: unknown = value
+        if (secretFields.has(key) && typeof value === 'string') {
+          if (!capabilityHost.secrets.available()) {
+            throw new AppError(
+              ErrorCode.PluginRuntimeFault,
+              'secret store unavailable; cannot persist secret field'
+            )
+          }
+          stored = await capabilityHost.secrets.encrypt(value)
+        }
+        effective[key] = stored
+        changes.push({ key, value: stored, previous: prior[key] })
+      }
+
+      const nextConfig = { ...prior, ...effective }
+      await settingsManager.update({
+        plugins: { [parsed.pluginId]: nextConfig },
+      })
+
+      // Emit + fire in-VM listeners.
+      eventBus.emit(Events.PluginConfigChanged, {
+        pluginId: parsed.pluginId,
+        changes,
+      })
+      capabilityHost.configFor(parsed.pluginId).applyExternalChange(changes)
+
+      return { ok: true }
+    },
+
+    [Commands.CheckPluginUpdates]: async (payload: unknown) => {
+      const parsed = checkPluginUpdatesPayloadSchema.parse(payload)
+      if (parsed?.force) await registryClient.refresh()
+      const entries = await registryClient.list(hostVersion)
+      return scanForUpdates(pluginRegistry.list(), entries).filter(
+        (update) => update.channel === 'community'
+      )
+    },
+
+    [Commands.InstallPlugin]: async (payload: unknown) => {
+      try {
+        const result = await pluginInstallService.stage(payload, pluginHost)
+        if (result.committed && result.pluginId) {
+          eventBus.emit(Events.PluginInstalled, { pluginId: result.pluginId })
+        } else {
+          eventBus.emit(Events.PluginInstallConsentRequested, {
+            stagingId: result.stagingId,
+            consent: result.consent,
+          })
+        }
+        return result
+      } catch (error) {
+        if (error instanceof PluginEngineVersionTooOld) {
+          return {
+            incompatible: {
+              required: error.required,
+              hostVersion: error.hostVersion,
+            },
+          } satisfies PluginInstallCompatibilityFailure
+        }
+        throw error
+      }
+    },
+
+    [Commands.ConfirmPluginInstall]: async (payload: unknown) => {
+      const parsed = z
+        .object({
+          stagingId: z.string().min(1),
+          grants: z.record(z.string(), z.enum(['granted', 'denied'])),
+        })
+        .parse(payload)
+      const { pluginId } = await pluginInstaller.commit(
+        parsed.stagingId,
+        parsed.grants,
+        pluginHost
+      )
+      eventBus.emit(Events.PluginInstalled, { pluginId })
+      return { ok: true, pluginId }
+    },
+
+    [Commands.CancelPluginInstall]: async (payload: unknown) => {
+      const parsed = z.object({ stagingId: z.string().min(1) }).parse(payload)
+      await pluginInstaller.cancel(parsed.stagingId)
+      return { ok: true }
+    },
+
+    [Commands.UpdatePluginGrants]: async (payload: unknown) => {
+      const parsed = z
+        .object({
+          pluginId: z.string().min(1),
+          patch: z.record(z.string(), z.enum(['granted', 'denied'])),
+        })
+        .parse(payload)
+      const grants = await pluginGrants.updateGrants(
+        parsed.pluginId,
+        parsed.patch
+      )
+      return { ok: true, grants }
+    },
+
+    [Commands.UninstallPlugin]: async (payload: unknown) => {
+      const parsed = z.object({ pluginId: z.string().min(1) }).parse(payload)
+      await pluginInstaller.uninstall(parsed.pluginId, pluginHost)
+      await settingsManager.removePluginConfig(parsed.pluginId)
+      eventBus.emit(Events.PluginUninstalled, { pluginId: parsed.pluginId })
+      return { ok: true }
+    },
+
+    [Commands.ClearPluginLogs]: async (payload: unknown) => {
+      const parsed = z.object({ pluginId: z.string().min(1) }).parse(payload)
+      capabilityHost.clearLog(parsed.pluginId)
+      return { ok: true }
+    },
+
+    [Commands.SetPluginLogVerbose]: async (payload: unknown) => {
+      const parsed = z
+        .object({ pluginId: z.string().min(1), verbose: z.boolean() })
+        .parse(payload)
+      capabilityHost.setLogVerbose(parsed.pluginId, parsed.verbose)
+      return { ok: true }
+    },
+
+    [Commands.MarkNotificationRead]: async (id: string) =>
+      notificationCenter.markRead(id),
+
+    [Commands.MarkAllNotificationsRead]: async () =>
+      notificationCenter.markAllRead(),
+
+    [Commands.DeleteNotification]: async (id: string) =>
+      notificationCenter.delete(id),
+
+    [Commands.ClearNotifications]: async () => notificationCenter.clear(),
+
+    // Electron-scoped commands (window chrome, tray, dialog, deep-links,
+    // auto-updater, NAT) are intentionally omitted; the web renderer
+    // handles them locally or renders a no-op.
+  }
+}
+
+function proxyChanged(a: ProxySettings, b: ProxySettings): boolean {
+  return JSON.stringify(a) !== JSON.stringify(b)
+}

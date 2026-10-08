@@ -1,0 +1,74 @@
+/**
+ * Central registry for external URLs used across main and renderer —
+ * help menu links, docs deep-links, issue tracker. Keep all hardcoded
+ * public URLs here so migrations (domain change, docs restructure,
+ * locale-specific redirects) only touch one file.
+ */
+export const EXTERNAL_URLS = {
+  browserExtension: {
+    chrome:
+      'https://chromewebstore.google.com/detail/motrix-extension/lggbokfckofcgjndaboioakcmincinpo',
+    edge: 'https://microsoftedge.microsoft.com/addons/detail/motrix-extension/efcflljngohddnmfmebiamigoikmdfbf',
+    firefox: 'https://addons.mozilla.org/en-US/firefox/addon/motrix-extension/',
+    // Safari packages use their own release tags; latest points to Chromium/Firefox.
+    safari:
+      'https://github.com/motrixapp/motrix-extension/releases?q=safari&expanded=true',
+    development:
+      'https://github.com/motrixapp/motrix-extension#manual-browser-workflow-development',
+  },
+  github: {
+    repository: 'https://github.com/agalwood/Motrix/',
+    author: 'https://github.com/agalwood/',
+    issues: 'https://github.com/agalwood/Motrix/issues/',
+    ffmpegStaticReleases:
+      'https://github.com/motrixapp/ffmpeg-static/releases/latest',
+  },
+  motrix: {
+    home: 'https://motrix.app/',
+    acknowledgments: 'https://motrix.app/acknowledgments',
+    plugins: 'https://motrix.app/plugins',
+    changelog: 'https://motrix.app/changelog/',
+    releaseNotes: 'https://motrix.app/release-notes/',
+    manual: {
+      home: 'https://motrix.app/manual/',
+      ffmpeg: {
+        en: 'https://motrix.app/manual/ffmpeg/',
+        zh: 'https://motrix.app/zh/manual/ffmpeg/',
+      },
+      linuxAutostart: {
+        en: 'https://motrix.app/manual/linux-autostart/',
+        zh: 'https://motrix.app/zh/manual/linux-autostart/',
+      },
+      downloadPerformance: {
+        en: 'https://motrix.app/manual/download-performance/',
+        zh: 'https://motrix.app/zh/manual/download-performance/',
+      },
+      natTroubleshooting: {
+        en: 'https://motrix.app/manual/port-mapping/',
+        zh: 'https://motrix.app/zh/manual/port-mapping/',
+      },
+      advancedProxy: 'https://motrix.app/manual/advanced-proxy',
+      defaultApplication: 'https://motrix.app/manual/default-application',
+    },
+  },
+} as const
+
+export function getFfmpegManualUrl(language: string): string {
+  const locale = language.toLowerCase().startsWith('zh') ? 'zh' : 'en'
+  return EXTERNAL_URLS.motrix.manual.ffmpeg[locale]
+}
+
+export function getNatTroubleshootingUrl(language: string): string {
+  const locale = language.toLowerCase().startsWith('zh') ? 'zh' : 'en'
+  return EXTERNAL_URLS.motrix.manual.natTroubleshooting[locale]
+}
+
+export function getDownloadPerformanceUrl(language: string): string {
+  const locale = language.toLowerCase().startsWith('zh') ? 'zh' : 'en'
+  return EXTERNAL_URLS.motrix.manual.downloadPerformance[locale]
+}
+
+export function getLinuxAutostartUrl(language: string): string {
+  const locale = language.toLowerCase().startsWith('zh') ? 'zh' : 'en'
+  return EXTERNAL_URLS.motrix.manual.linuxAutostart[locale]
+}

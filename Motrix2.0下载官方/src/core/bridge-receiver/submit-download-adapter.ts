@@ -1,0 +1,281 @@
+import type { DownloadCookie } from '@core/engine/engine-adapter'
+import type { CreateRequestReceipt } from '@core/task/create-request-id'
+import {
+  filenameFromResourceUrl,
+  sanitizeRemoteFilename,
+} from '@core/task/direct-resource-validator'
+import {
+  admitDownloadSources,
+  admitHttpSource,
+} from '@core/task/source-admission'
+import {
+  type DownloadSubmitParams,
+  ErrorCodes,
+  makeMdxpError,
+} from '@motrix/mdxp'
+import { type Browser, makeSessionKey } from '@shared/protocol/bridge'
+import type { BridgeSourceMeta, SourceMeta } from '@shared/types/task'
+import { stripHopByHopHeaders } from './header-replay'
+import { ensureMediaExtension } from './pipelines/media-final-name'
+
+export interface AdapterDeps {
+  /** Read the current receiver-side default directory for each submission. */
+  getDefaultSaveDir: () => string
+  resolveSaveDir?: (selected: string) => Promise<string>
+  /** FinalNamePicker shim — wraps existing picker so tests can stub. */
+  pickName: (saveDir: string, desired: string) => Promise<string>
+  /** newTaskId injection — defaults to a uuid mint in production wiring. */
+  mintTaskId: () => string
+}
+
+export interface AdaptedDirect {
+  taskId: string
+  saveDir: string
+  finalName: string
+  /** The client supplied no usable filename; discover it during creation. */
+  discoverFilename?: true
+  kind: 'direct'
+  primaryUrl: string
+  sanitizedHeaders: Record<string, string>
+  cookies: readonly DownloadCookie[]
+  sourceMeta: BridgeSourceMeta
+  pageUrl: string
+}
+
+export interface AdaptedMagnet {
+  kind: 'magnet'
+  saveDir: string
+  uri: string
+  sourceMeta: BridgeSourceMeta
+}
+
+export interface AdaptedHls {
+  kind: 'hls'
+  taskId: string
+  saveDir: string
+  finalName: string
+  manifestUrl: string
+  sanitizedHeaders: Record<string, string>
+  container: 'mp4' | 'mkv' | 'ts'
+  sourceMeta: BridgeSourceMeta
+  durationSec?: number
+}
+
+export interface AdaptedDash extends Omit<AdaptedHls, 'kind' | 'container'> {
+  kind: 'dash'
+  container: 'mp4' | 'mkv'
+}
+
+export interface AdaptedMux {
+  receipt?: CreateRequestReceipt
+  kind: 'mux'
+  taskId: string
+  saveDir: string
+  finalName: string
+  videoUrl: string
+  audioUrl: string
+  sanitizedHeaders: Record<string, string>
+  container: 'mp4' | 'mkv'
+  /** BridgeSourceMeta for bridge-originated mux tasks; null for desktop
+   *  Add-Task path (where no extension session context exists). */
+  sourceMeta: SourceMeta
+  durationSec?: number
+}
+
+export interface AdaptInput {
+  extensionId: string
+  browser: Browser
+}
+
+/**
+ * Pipeline-agnostic preprocessing for SubmitDownload payloads (spec §3.1).
+ */
+export class SubmitDownloadAdapter {
+  constructor(private readonly deps: AdapterDeps) {}
+
+  async adapt(
+    params: DownloadSubmitParams,
+    input: AdaptInput
+  ): Promise<
+    AdaptedDirect | AdaptedMagnet | AdaptedHls | AdaptedDash | AdaptedMux
+  > {
+    params = structuredClone(params)
+    if (params.selection.kind === 'mux') {
+      params.selection.video.url = admitHttpSource(
+        params.selection.video.url,
+        'input'
+      )
+      params.selection.audio.url = admitHttpSource(
+        params.selection.audio.url,
+        'input'
+      )
+    } else if (params.selection.kind === 'magnet') {
+      params.selection.uri = admitDownloadSources(
+        [params.selection.uri],
+        'input',
+        ['magnet']
+      )[0].sourceUrl
+    } else {
+      const source = admitDownloadSources(
+        [params.selection.primary.url],
+        'input',
+        ['http', 'https']
+      )[0]
+      params.selection.primary.url =
+        params.selection.kind === 'direct'
+          ? source.sourceUrl
+          : source.requestUrl
+    }
+
+    const { selection, source, meta } = params
+    // Keep name selection and every async pipeline step in the same directory.
+    let saveDir: string
+    if (params.saveDir === undefined) saveDir = this.deps.getDefaultSaveDir()
+    else {
+      if (!this.deps.resolveSaveDir) {
+        throw makeMdxpError(
+          ErrorCodes.CapabilityNotSupported,
+          'Directory selection is unsupported'
+        )
+      }
+      saveDir = await this.deps.resolveSaveDir(params.saveDir)
+    }
+
+    if (selection.kind === 'magnet') {
+      return {
+        kind: 'magnet',
+        saveDir,
+        uri: selection.uri,
+        sourceMeta: this.makeSourceMeta('magnet', input, source, meta),
+      }
+    }
+
+    if (selection.kind === 'hls' || selection.kind === 'dash') {
+      const taskId = this.deps.mintTaskId()
+      // Append the container extension BEFORE the dedup pick — the picked
+      // name must be the name that lands on disk, or the collision counter
+      // is computed against a string that never exists.
+      const finalName = await this.deps.pickName(
+        saveDir,
+        ensureMediaExtension(
+          sanitizeFilename(meta.suggestedFilename),
+          selection.container
+        )
+      )
+      const sanitizedHeaders = stripHopByHopHeaders(selection.primary.headers)
+      const base = {
+        taskId,
+        saveDir,
+        finalName,
+        manifestUrl: selection.primary.url,
+        sanitizedHeaders,
+        sourceMeta: this.makeSourceMeta(selection.kind, input, source, meta),
+        ...(meta.durationSec != null ? { durationSec: meta.durationSec } : {}),
+      }
+      if (selection.kind === 'dash') {
+        return {
+          kind: 'dash',
+          ...base,
+          container: selection.container,
+        }
+      }
+      return {
+        kind: 'hls',
+        ...base,
+        container: selection.container,
+      }
+    }
+
+    if (selection.kind === 'mux') {
+      const taskId = this.deps.mintTaskId()
+      // Same as hls/dash: extension first, then the dedup pick.
+      const finalName = await this.deps.pickName(
+        saveDir,
+        ensureMediaExtension(
+          sanitizeFilename(meta.suggestedFilename),
+          selection.container
+        )
+      )
+      return {
+        kind: 'mux',
+        taskId,
+        saveDir,
+        finalName,
+        videoUrl: selection.video.url,
+        audioUrl: selection.audio.url,
+        sanitizedHeaders: stripHopByHopHeaders(selection.video.headers),
+        container: selection.container,
+        sourceMeta: this.makeSourceMeta('mux', input, source, meta),
+        ...(meta.durationSec != null ? { durationSec: meta.durationSec } : {}),
+      }
+    }
+
+    // selection.kind === 'direct'
+    const primaryUrl = selection.primary.url
+    const sanitized = sanitizeRemoteFilename(meta.suggestedFilename)
+    const taskId = this.deps.mintTaskId()
+    const finalName = await this.deps.pickName(
+      saveDir,
+      sanitized ?? filenameFromResourceUrl(primaryUrl) ?? 'download'
+    )
+    const sanitizedHeaders = stripHopByHopHeaders(selection.primary.headers)
+
+    return {
+      taskId,
+      saveDir,
+      finalName,
+      kind: 'direct',
+      ...(sanitized ? {} : { discoverFilename: true as const }),
+      primaryUrl,
+      sanitizedHeaders,
+      // Export only the engine-neutral fields. SameSite describes browser
+      // navigation context and is not part of the engine's cookie contract.
+      cookies: selection.primary.cookies.map((cookie) => ({
+        name: cookie.name,
+        value: cookie.value,
+        domain: cookie.domain,
+        path: cookie.path,
+        hostOnly: !cookie.domain.startsWith('.'),
+        secure: cookie.secure,
+        httpOnly: cookie.httpOnly,
+        ...(cookie.expiresAt === undefined
+          ? {}
+          : { expiresAt: Math.max(0, Math.floor(cookie.expiresAt)) }),
+      })),
+      sourceMeta: this.makeSourceMeta('direct', input, source, meta),
+      pageUrl: source.pageUrl,
+    }
+  }
+
+  private makeSourceMeta(
+    kind: BridgeSourceMeta['kind'],
+    input: AdaptInput,
+    source: DownloadSubmitParams['source'],
+    meta: DownloadSubmitParams['meta']
+  ): BridgeSourceMeta {
+    const sessionKey = makeSessionKey(input.browser, input.extensionId)
+    return {
+      kind,
+      extensionId: input.extensionId,
+      browser: input.browser,
+      sessionKey,
+      pageUrl: source.pageUrl,
+      pageTitle: source.pageTitle,
+      qualityLabel: meta.qualityLabel,
+      durationSec: meta.durationSec ?? null,
+      submittedAt: Date.now(),
+    }
+  }
+}
+
+// Chars forbidden in cross-platform filenames: < > : " / \ | ? * and C0 controls (U+0000-U+001F).
+// biome-ignore lint/complexity/useRegexLiterals: RegExp constructor avoids noControlCharactersInRegex
+const FILENAME_BAD = new RegExp('[<>:"/\\\\|?*\\u0000-\\u001F]', 'g')
+const MAX_FILENAME = 200
+
+export function sanitizeFilename(input: string): string {
+  const cleaned = input.replace(FILENAME_BAD, '_')
+  return cleaned.length > MAX_FILENAME
+    ? cleaned.slice(0, MAX_FILENAME)
+    : cleaned
+}

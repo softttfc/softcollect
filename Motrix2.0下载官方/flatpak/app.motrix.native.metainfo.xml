@@ -1,0 +1,551 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>app.motrix.native</id>
+
+  <name>Motrix</name>
+  <summary>Full-featured download manager</summary>
+
+  <developer id="app.motrix">
+    <name>Motrix Project</name>
+  </developer>
+
+  <project_license>MIT</project_license>
+  <metadata_license>CC0-1.0</metadata_license>
+
+  <recommends>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </recommends>
+
+  <categories>
+    <category>Network</category>
+    <category>FileTransfer</category>
+  </categories>
+
+  <description>
+    <p>
+      Motrix is a full-featured download manager that supports HTTP, FTP,
+      BitTorrent and Magnet downloads.
+    </p>
+    <ul>
+      <li>Simple and clear user interface</li>
+      <li>BitTorrent and Magnet support with selective file download</li>
+      <li>Daily automatic tracker list refresh</li>
+      <li>UPnP and NAT-PMP port mapping</li>
+      <li>Up to 10 concurrent tasks, up to 64 threads per task</li>
+      <li>User-Agent spoofing</li>
+      <li>System tray for quick operation</li>
+      <li>Light and dark themes</li>
+      <li>Optional removal of files when removing tasks</li>
+      <li>Internationalization</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">app.motrix.native.desktop</launchable>
+
+  <url type="homepage">https://motrix.app/</url>
+  <url type="bugtracker">https://github.com/agalwood/Motrix/issues</url>
+  <url type="help">https://motrix.app/manual/</url>
+  <url type="vcs-browser">https://github.com/agalwood/Motrix</url>
+
+  <content_rating type="oars-1.1"/>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#34d058</color>
+    <color type="primary" scheme_preference="dark">#1f6f3a</color>
+  </branding>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>Active downloads view</caption>
+      <image>https://raw.githubusercontent.com/agalwood/Motrix/main/screenshots/motrix-downloads-en-light.webp</image>
+    </screenshot>
+    <screenshot>
+      <caption>Active downloads view (dark theme)</caption>
+      <image>https://raw.githubusercontent.com/agalwood/Motrix/main/screenshots/motrix-downloads-en-dark.webp</image>
+    </screenshot>
+  </screenshots>
+
+  <releases>
+    <release version="2.0.0-beta.46" date="2026-10-02">
+      <description>
+        <p>
+          Adds verified FFmpeg installation with button progress and clearer
+          executable paths, safe Motrix deep links, shutdown after downloads
+          finish, Hungarian localization, Safari extension discovery, and
+          download, NAT, and inspector fixes.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.45" date="2026-10-02">
+      <description>
+        <p>
+          Adds verified one-click FFmpeg installation, safe Motrix deep links,
+          shutdown after downloads finish, Hungarian localization, Safari
+          extension discovery, and download, NAT, and inspector fixes.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.44" date="2026-09-29">
+      <description>
+        <p>
+          Distinguishes zero, unknown, and inapplicable download metrics,
+          fixes Safari helper signing order, and includes the Safari desktop
+          bootstrap with improved registration after macOS upgrades.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.43" date="2026-09-29">
+      <description>
+        <p>
+          Packages the Safari desktop bootstrap in signed macOS builds,
+          improves registration after upgrades, and avoids repeated bootstrap
+          requests when a running bridge refuses nonce issuance.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.42" date="2026-09-29">
+      <description>
+        <p>
+          Adds recoverable Tracker refreshes and task updates, fixes desktop
+          notification modes and Linux startup guidance, localizes information
+          units, and improves download controls and file completion reliability.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.41" date="2026-09-27">
+      <description>
+        <p>
+          Adds 25 interface languages with right-to-left support, improves
+          preferences and desktop notifications, and fixes download recovery,
+          Windows long paths, torrent metadata, and file publication across
+          local disks and network filesystems.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.40" date="2026-09-21">
+      <description>
+        <p>
+          Improves Dashboard charts and task controls, defaults desktop file
+          removal to Trash, publishes verified Flatpak bundles, and fixes media
+          progress, Server task updates, browser filenames, and NAT lifecycle errors.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.39" date="2026-09-15">
+      <description>
+        <p>
+          Adds a Server directory picker and application menu, improves download
+          controls and BitTorrent seeding, recovers conflicting magnet session
+          identities, fixes macOS Menu Bar Only mode, and refreshes dependencies.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.38" date="2026-09-13">
+      <description>
+        <p>
+          Preserves macOS menu-bar icon position, supports Windows SMB download
+          finalization and recovery, refreshes dependencies, and includes clearer
+          settings validation, tracker synchronization, and connection feedback.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.36" date="2026-09-11">
+      <description>
+        <p>
+          Improves interrupted download finalization recovery, adds opt-in
+          AppImage browser launch integration and system-aware size and speed
+          units, isolates browser registration failures, and improves browser
+          save-directory updates, Linux tray themes, and login startup window
+          preferences.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.35" date="2026-09-08">
+      <description>
+        <p>
+          Improves download task controls, completion progress, and inspector
+          visibility, adds native Arch Linux packages, and links the published
+          Firefox extension.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.34" date="2026-09-08">
+      <description>
+        <p>
+          Improves BitTorrent resilience when HTTP Web Seeds fail, gives slow
+          magnet metadata discovery more time, restores missed file-selection
+          prompts, and adds an optional automatic download fallback for
+          unconfirmed magnet selections.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.33" date="2026-09-07">
+      <description>
+        <p>
+          Settings links to the published Chrome and Edge extensions, Firefox
+          development builds, and trusted extension store pages. This release
+          adds a reduced-motion preference, updates aria2 to 1.37.0-motrix.14
+          for durable task cookies, and improves completed-task recovery,
+          save-directory restoration, and large-file finalization.
+        </p>
+      </description>
+    </release>
+    <!-- Update this list on every release; Flathub linter requires the most
+         recent version listed here to match the manifest's source tag. -->
+    <release version="2.0.0-beta.32" date="2026-09-05">
+      <description>
+        <p>
+          Restores Windows desktop and browser-extension startup after an
+          unclean shutdown, and preserves optional branded artwork in the
+          isolated Windows release installer build.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.31" date="2026-09-04">
+      <description>
+        <p>
+          Improves durable download finalization, Docker Extension startup,
+          startup theme and fullscreen behavior, browser hand-off connection
+          settings, first-run styling, and Windows installer branding.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.30" date="2026-09-03">
+      <description>
+        <p>
+          Closes five security advisories across Fastify and development
+          tooling, upgrades the desktop runtime to Electron 44, and refreshes
+          the application, test, and build dependencies. macOS 13 or later is
+          now required.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.29" date="2026-09-02">
+      <description>
+        <p>
+          Adds secure local and remote Motrix Extension pairing, completes
+          Desktop and Server RPC parity, and introduces durable plugin hook
+          execution and crash-safe finalization. This release also updates the
+          bundled aria2 engine and hardens Native Messaging integration.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.28" date="2026-08-28">
+      <description>
+        <p>
+          Direct-download naming and finalization are more reliable, empty RPC
+          passwords are supported, and SOCKS5 can carry ordinary and
+          BitTorrent-associated HTTP traffic through an authenticated local
+          bridge while peers, DHT, and UDP trackers stay direct. This release
+          also improves Windows CLI, NAT, torrent associations, and Snap edge
+          publication.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.27" date="2026-08-27">
+      <description>
+        <p>
+          Protected beta tags now publish verified amd64 and arm64 Snap builds
+          to latest/edge. This release also adds Server GeoIP support, aligns
+          aria2 defaults and BitTorrent preview behavior, improves Windows
+          integration and cross-platform fonts, and fixes several packaging
+          and desktop details.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.26" date="2026-08-25">
+      <description>
+        <p>
+          Interrupted HTTP and FTP downloads now resume only after Motrix
+          verifies their checkpoints and remote resource identity. Windows and
+          Linux gain safer default-app controls, new installs use the platform
+          Downloads directory, localized Settings controls fit their content,
+          and built-in User-Agent presets are refreshed.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.25" date="2026-08-24">
+      <description>
+        <p>
+          Carries the beta.24 user-facing changes and corrects the protected
+          AppImage no-FUSE smoke test to verify electron-builder's actual
+          motrix.desktop entry before publication.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.24" date="2026-08-24">
+      <description>
+        <p>
+          BitTorrent and Magnet tasks now preserve authoritative file metadata,
+          avoid long staging paths, and reuse compatible existing content while
+          reporting explicit destination or selection conflicts. AppImage
+          delivery, Windows caption controls, activity labels, and New Task
+          file-filter tooltips are also improved.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.23" date="2026-08-23">
+      <description>
+        <p>
+          Downloads can now use either the local completion time or the
+          server-provided modification time. Appearance settings and tray
+          behavior follow macOS, Windows, and Linux conventions more closely,
+          Settings controls use a more consistent compact layout, and the New
+          Task window can shrink correctly on Windows.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.22" date="2026-08-22">
+      <description>
+        <p>
+          Bundled aria2 is updated to 1.37.0-motrix.10. Motrix now detects
+          non-Motrix aria2 builds before spawning them, warns the user, and
+          applies a durable 16-connection compatibility limit. This beta also
+          fixes engine task-adoption races, adds a lightweight desktop mode,
+          and improves the New Task window's clipboard and sizing behavior.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.21" date="2026-08-22">
+      <description>
+        <p>
+          Release assembly now accepts the AppImage-first Linux metadata
+          emitted by electron-builder and normalizes updater compatibility
+          fields to the DEB package. This recovery beta also includes system
+          CA trust-store support, aria2 1.37.0-motrix.6, performance profiles,
+          reliable settings and engine recovery, structured log redaction,
+          and opt-in AppImage desktop integration from beta.20.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.20" date="2026-08-22">
+      <description>
+        <p>
+          Linux HTTPS downloads now use the system CA trust store without
+          disabling certificate verification, and desktop, Server, Docker,
+          and Flatpak packages use aria2 1.37.0-motrix.6. Download performance
+          profiles support up to 64 connections, settings persist reliably,
+          and structured logs redact sensitive data. AppImage publishing is
+          restored for x64 and arm64 with opt-in desktop integration, while
+          tracker recovery, NAT retries, and desktop window controls are more
+          reliable. Windows packages remain unsigned, and prerelease Snap
+          runs stop after source validation.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.19" date="2026-08-19">
+      <description>
+        <p>
+          The in-app updater now hands off to the installer reliably even when
+          windows hide to the tray. New Task autofills downloadable links from
+          the clipboard, each pasted link line becomes an independent task,
+          and removing tasks never pre-selects file deletion. Plugin HTTP
+          access is limited to declared hosts, HTTP downloads show piece
+          progress, and tray and window-control behavior is corrected across
+          platforms. Windows packages remain unsigned, and prerelease Snap
+          runs stop after source validation.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.18" date="2026-08-17">
+      <description>
+        <p>
+          The bundled aria2 engine is updated to 1.37.0-motrix.4. Network
+          settings now offer automatic, system, and built-in DNS resolution;
+          automatic mode falls back to the system resolver for the session and
+          retries an affected task once when the engine cannot contact a DNS
+          server. Traditional Chinese is now available. Windows packages
+          remain unsigned, and prerelease Snap runs stop after source
+          validation.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.17" date="2026-08-16">
+      <description>
+        <p>
+          Docker Hub repository-description mutation is no longer part of the
+          artifact release authority. Anonymous signature verification now
+          hands the verified digest directly to the native public runtime
+          matrix. Native fan-out, cross-registry index, provenance, SBOM,
+          signature, runtime, recovery, and alias-last gates remain
+          fail-closed. Windows packages remain unsigned. Prerelease Snap runs
+          stop after source validation.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.16" date="2026-08-16">
+      <description>
+        <p>
+          The desktop packages, GitHub prerelease, R2 update feed, native
+          platform builds, matching Docker Hub/GHCR index, provenance, SBOM,
+          and anonymous signature checks completed. A subsequent Docker Hub
+          repository-description request returned HTTP 403, so the final
+          native public runtime matrix was skipped. Stable aliases remained
+          unchanged. Windows packages were unsigned; the prerelease Snap run
+          stopped after source validation.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.15" date="2026-08-16">
+      <description>
+        <p>
+          The desktop packages, GitHub prerelease, and R2 update feed completed.
+          Native amd64 and arm64 Server builds pushed only untagged staged
+          digests. Both arm64 registry smokes passed before metadata validation
+          rejected Docker Buildx's flat single-platform image configuration;
+          the amd64 smoke separately timed out in its local BitTorrent fixture.
+          No beta.15 container tag or final index was published or signed, and
+          stable aliases remained unchanged. Windows packages were unsigned;
+          the prerelease Snap run stopped after source validation.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.14" date="2026-08-16">
+      <description>
+        <p>
+          The GitHub prerelease and R2 update feed completed. Native amd64 and
+          arm64 Server builds without QEMU pushed only untagged staged digests,
+          then failed closed because the runner Docker clients did not support
+          the image-inspect platform flag. No beta.14 container tag, final
+          index, signature, public provenance or SBOM verification, or final
+          runtime smoke completed; stable aliases remained unchanged. Windows
+          packages were published unsigned. The prerelease Snap run stopped
+          after source validation.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.13" date="2026-08-16">
+      <description>
+        <p>
+          Partially distributed Motrix Turbo beta. All desktop builds,
+          Finalize jobs, assembly, the GitHub prerelease, and the R2 update
+          feed completed. The combined container build failed in the emulated
+          arm64 dependency-install layer and remained active until canceled;
+          no beta.13 container tag, signature, public artifact verification,
+          or runtime smoke completed. Windows packages were published
+          unsigned. Prerelease Snap stopped after source validation.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.12" date="2026-08-16">
+      <description>
+        <p>
+          Published Motrix Turbo beta. All five desktop builds, all three
+          Finalize jobs, assembly, the GitHub prerelease, and the R2 update
+          feed completed. Immutable amd64/arm64 Server images were published
+          to Docker Hub and GHCR. The overall workflow remained unsuccessful
+          because its final anonymous provenance check expected an obsolete
+          builder URL. Prerelease Snap stopped after source validation.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.11" date="2026-08-16">
+      <description>
+        <p>
+          Unpublished Motrix Turbo beta attempt. All five desktop builds and
+          all three Finalize jobs succeeded. Assembly then rejected a Linux
+          updater source manifest containing a metadata-identical duplicate
+          RPM entry before creating the release bundle. GitHub Release, R2,
+          and container publication did not run. The prerelease Snap workflow
+          stopped after source validation, and external distribution remained
+          zero.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.10" date="2026-08-16">
+      <description>
+        <p>
+          Unpublished Motrix Turbo beta attempt. All five desktop builds and
+          all three Finalize jobs succeeded. Assembly rejected the real macOS
+          updater manifest shape before creating a release bundle. GitHub
+          Release, R2, and container publication did not run. The prerelease
+          Snap workflow stopped after source validation, and external
+          distribution remained zero.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.9" date="2026-08-16">
+      <description>
+        <p>
+          Unpublished Motrix Turbo beta attempt. All five desktop builds
+          succeeded. Unsigned Windows and Apple Silicon finalization completed,
+          while Intel macOS finalization stopped in the signing runtime before
+          producing its final package set. Assembly, GitHub Release, R2, and
+          container publication did not run. The prerelease Snap workflow
+          stopped after source validation, and external distribution remained
+          zero.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.8" date="2026-08-16">
+      <description>
+        <p>
+          Unpublished Motrix Turbo beta attempt. All five desktop builds and
+          both strict Snap builds succeeded. Unsigned Windows Builder
+          completed, but final verification could not resolve @electron/asar
+          before scanning; macOS finalization was canceled without running
+          while awaiting approval. The
+          amd64 Snap upload required personal-files allow-installation review,
+          arm64 was not uploaded, latest/edge did not change, and external
+          distribution remained zero.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.7" date="2026-08-16">
+      <description>
+        <p>
+          Unpublished Motrix Turbo beta attempt. The macOS and Windows
+          Finalize gates did not pass, and both release workflows were
+          canceled. No GitHub Release, R2 update feed, container image, or
+          public Snap distribution was published; external distribution
+          remained zero.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.6" date="2026-08-15">
+      <description>
+        <p>
+          Unpublished Motrix Turbo beta attempt. All five desktop builds and
+          both strict Snap builds succeeded, but an empty Electron Builder
+          binary custom-directory value produced an invalid NSIS tool URL
+          during unsigned Windows finalization. Snap publication was canceled
+          while the amd64 upload was processing; latest/edge did not change,
+          and no external distribution was published.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.5" date="2026-08-15">
+      <description>
+        <p>
+          Unpublished Motrix Turbo beta attempt. All five desktop builds and
+          both strict Snap builds succeeded, but macOS finalization did not
+          run, unsigned Windows finalization was canceled, and Snap
+          publication could not load js-yaml before Store credential access.
+          No external distribution was published.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.4" date="2026-08-15">
+      <description>
+        <p>
+          Unpublished Motrix Turbo beta attempt. All five desktop builds
+          succeeded and the Windows LF digest fix held, but finalization
+          rejected a unique 2,434-entry DFS manifest that was not in full-path
+          dictionary order. No external distribution was published.
+        </p>
+      </description>
+    </release>
+    <release version="2.0.0-beta.3" date="2026-08-15">
+      <description>
+        <p>
+          Unpublished Motrix Turbo beta attempt. Four non-Windows builds and
+          both Snap architectures succeeded; Windows signing-input creation
+          failed closed after CRLF checkout conversion changed digest-pinned
+          control bytes. No external distribution was published.
+        </p>
+      </description>
+    </release>
+  </releases>
+</component>

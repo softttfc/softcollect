@@ -1,0 +1,520 @@
+import { execFile } from 'node:child_process'
+import { chmod, lstat, mkdir, readFile, rm } from 'node:fs/promises'
+import { dirname, isAbsolute, join, posix } from 'node:path'
+import { promisify } from 'node:util'
+import writeFileAtomic from 'write-file-atomic'
+import type { AppImageNativeHost } from './appimage-native-host'
+
+const execFileAsync = promisify(execFile)
+
+/**
+ * Writes Native Messaging host manifest files for Chrome, Edge, Firefox, and
+ * (on Linux) unbranded Chromium at OS-specific locations each browser scans.
+ *
+ * Chromium-family browsers expect `allowed_origins` with full
+ * `chrome-extension://<id>/` URLs; Firefox expects a plain `allowed_extensions`
+ * ID array. The host binary path is identical across browsers.
+ *
+ * On macOS/Linux each browser reads a host manifest from its own directory.
+ * On Windows discovery is registry-based: we emit the JSON files under a
+ * private Motrix folder and register a per-browser HKCU key whose default
+ * value points at the matching JSON file (Chrome, Edge, and Firefox each use
+ * a separate registry hive, e.g. Google\Chrome vs Microsoft\Edge).
+ */
+
+export type Platform = 'darwin' | 'linux' | 'win32'
+
+export interface ManifestPaths {
+  chrome: string
+  firefox: string
+  edge?: string
+  /**
+   * Unbranded Chromium (e.g. Debian/Ubuntu `chromium` packages). Linux only:
+   * on Windows Chromium has no stable HKCU vendor key we register, and on
+   * macOS the unbranded browser is not a supported target.
+   */
+  chromium?: string
+}
+
+export interface RegistryEntry {
+  /** Registry hive; Native Messaging hosts are registered per-user under HKCU. */
+  hive: 'HKCU'
+  /** Backslash-separated key path under the hive, ending at the host name. */
+  keyPath: string
+  /** Default-value data: absolute path to the host manifest JSON file. */
+  value: string
+}
+
+export type RegistryView = '32' | '64'
+
+const MANIFEST_NAME = 'app.motrix.bridge.json'
+const MANIFEST_HOST_NAME = 'app.motrix.bridge'
+const MANIFEST_DESCRIPTION = 'Motrix browser download bridge'
+const WINDOWS_REGISTRY_VIEWS: RegistryView[] = ['32', '64']
+const FLATPAK_COMPANION_BINARY = 'motrix-flatpak-native-host'
+export const DEVELOPMENT_HOST_CONFIG_NAME = 'motrix-native-host.dev.json'
+
+interface ManifestOwnership {
+  allowed_extensions?: unknown
+  allowed_origins?: unknown
+  description?: unknown
+  name?: unknown
+  path?: unknown
+  type?: unknown
+}
+
+function isNonEmptyStringArray(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((entry) => typeof entry === 'string' && entry.length > 0)
+  )
+}
+
+function isFlatpakCompanionManifest(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false
+  const manifest = value as ManifestOwnership
+  if (
+    manifest.name === MANIFEST_HOST_NAME &&
+    manifest.description === MANIFEST_DESCRIPTION &&
+    manifest.type === 'stdio' &&
+    typeof manifest.path === 'string' &&
+    !manifest.path.includes('\0') &&
+    posix.isAbsolute(manifest.path) &&
+    posix.normalize(manifest.path) === manifest.path &&
+    manifest.path.endsWith(
+      `/motrix/native-messaging/${FLATPAK_COMPANION_BINARY}`
+    )
+  ) {
+    const keys = Object.keys(value).sort().join(',')
+    const chromiumKeys = 'allowed_origins,description,name,path,type'
+    const firefoxKeys = 'allowed_extensions,description,name,path,type'
+    return (
+      (keys === chromiumKeys &&
+        isNonEmptyStringArray(manifest.allowed_origins) &&
+        manifest.allowed_origins.every(
+          (origin) =>
+            origin.startsWith('chrome-extension://') && origin.endsWith('/')
+        )) ||
+      (keys === firefoxKeys &&
+        isNonEmptyStringArray(manifest.allowed_extensions))
+    )
+  }
+  return false
+}
+
+function isOwnedManifest(value: unknown, hostBinaryPath: string): boolean {
+  if (typeof value !== 'object' || value === null) return false
+  const manifest = value as ManifestOwnership
+  return (
+    manifest.name === MANIFEST_HOST_NAME && manifest.path === hostBinaryPath
+  )
+}
+
+export function computeManifestPaths(
+  platform: Platform,
+  home: string,
+  windowsRoamingAppData?: string,
+  env: NodeJS.ProcessEnv = {}
+): ManifestPaths {
+  if (platform === 'darwin') {
+    return {
+      chrome: `${home}/Library/Application Support/Google/Chrome/NativeMessagingHosts/${MANIFEST_NAME}`,
+      firefox: `${home}/Library/Application Support/Mozilla/NativeMessagingHosts/${MANIFEST_NAME}`,
+      edge: `${home}/Library/Application Support/Microsoft Edge/NativeMessagingHosts/${MANIFEST_NAME}`,
+    }
+  }
+  if (platform === 'linux') {
+    const config =
+      env.XDG_CONFIG_HOME && isAbsolute(env.XDG_CONFIG_HOME)
+        ? env.XDG_CONFIG_HOME
+        : `${home}/.config`
+    const chromeConfig =
+      env.CHROME_CONFIG_HOME && isAbsolute(env.CHROME_CONFIG_HOME)
+        ? env.CHROME_CONFIG_HOME
+        : config
+    return {
+      chrome: `${chromeConfig}/google-chrome/NativeMessagingHosts/${MANIFEST_NAME}`,
+      chromium: `${chromeConfig}/chromium/NativeMessagingHosts/${MANIFEST_NAME}`,
+      firefox: `${home}/.mozilla/native-messaging-hosts/${MANIFEST_NAME}`,
+      edge: `${config}/microsoft-edge/NativeMessagingHosts/${MANIFEST_NAME}`,
+    }
+  }
+  // win32: registry-based discovery. Use the resolved Roaming AppData known
+  // folder when available because enterprise folder redirection can move it
+  // outside the user's home directory.
+  const roamingAppData = windowsRoamingAppData ?? `${home}/AppData/Roaming`
+  const manifestDir = join(roamingAppData, 'Motrix', 'bridge', 'manifests')
+  return {
+    chrome: join(manifestDir, 'chrome.json'),
+    edge: join(manifestDir, 'edge.json'),
+    firefox: join(manifestDir, 'firefox.json'),
+  }
+}
+
+/**
+ * Native Messaging host registry entries to register on Windows. Returns an
+ * empty list on macOS/Linux (which use file-based discovery). Each entry's
+ * default value points at the host manifest JSON the installer writes, so the
+ * Chrome and Edge keys resolve to their own files independently — Edge does not
+ * read Chrome's registry key reliably (only the first key found is honoured).
+ */
+export function computeRegistryEntries(
+  platform: Platform,
+  paths: ManifestPaths
+): RegistryEntry[] {
+  if (platform !== 'win32') return []
+  // Chrome, Firefox, and Edge each discover the host through their own HKCU
+  // key; only the vendor segment and the target JSON file differ per browser.
+  const hosts: Array<[vendor: string, manifest: string | undefined]> = [
+    ['Google\\Chrome', paths.chrome],
+    ['Mozilla', paths.firefox],
+    ['Microsoft\\Edge', paths.edge],
+  ]
+  return hosts.flatMap(([vendor, manifest]): RegistryEntry[] =>
+    manifest
+      ? [
+          {
+            hive: 'HKCU',
+            keyPath: `SOFTWARE\\${vendor}\\NativeMessagingHosts\\${MANIFEST_HOST_NAME}`,
+            value: manifest,
+          },
+        ]
+      : []
+  )
+}
+
+/**
+ * Default registry writer: sets the key's default value via `reg.exe add`.
+ * Injectable through InstallerOptions.registryWriter so tests can record
+ * entries without touching the real registry.
+ */
+async function regAddDefaultValue(
+  entry: RegistryEntry,
+  view: RegistryView
+): Promise<void> {
+  await execFileAsync('reg', [
+    'add',
+    `${entry.hive}\\${entry.keyPath}`,
+    '/ve',
+    '/t',
+    'REG_SZ',
+    '/d',
+    entry.value,
+    '/f',
+    `/reg:${view}`,
+  ])
+}
+
+function quotePowerShellLiteral(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`
+}
+
+/**
+ * Deletes a Native Messaging registry key through the .NET registry API.
+ * DeleteSubKeyTree(..., false) is idempotent for a missing key while access
+ * and other real failures remain terminating PowerShell errors.
+ */
+async function regDeleteKey(
+  entry: RegistryEntry,
+  view: RegistryView
+): Promise<void> {
+  const registryView = view === '32' ? 'Registry32' : 'Registry64'
+  const keyPath = quotePowerShellLiteral(entry.keyPath)
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    `$baseKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::CurrentUser, [Microsoft.Win32.RegistryView]::${registryView})`,
+    'try {',
+    `  $baseKey.DeleteSubKeyTree(${keyPath}, $false)`,
+    '} finally {',
+    '  $baseKey.Dispose()',
+    '}',
+  ].join('\n')
+  await execFileAsync('powershell.exe', [
+    '-NoLogo',
+    '-NoProfile',
+    '-NonInteractive',
+    '-Command',
+    script,
+  ])
+}
+
+export interface InstallerOptions {
+  appImage?: AppImageNativeHost | null
+  env?: NodeJS.ProcessEnv
+  /** Absolute path to the Native Messaging host executable. */
+  hostBinaryPath: string
+  /**
+   * Root used when resolving manifest output locations. In production this is
+   * `os.homedir()`; tests inject a temp dir to avoid touching the real home.
+   */
+  manifestRoot: string
+  platform: Platform
+  /**
+   * Resolved Windows Roaming AppData known folder. Production passes
+   * `app.getPath('appData')`; tests may inject a redirected location.
+   */
+  windowsRoamingAppData?: string
+  /**
+   * Writes one Windows registry entry and view. Defaults to `reg.exe`; tests
+   * inject a recorder to avoid touching the registry. Only invoked on win32.
+   */
+  registryWriter?: (entry: RegistryEntry, view: RegistryView) => Promise<void>
+  /**
+   * Deletes one Windows registry entry and view. Defaults to the PowerShell
+   * .NET registry API; tests inject a recorder to avoid touching the registry.
+   */
+  registryDeleter?: (entry: RegistryEntry, view: RegistryView) => Promise<void>
+  /**
+   * Whether Motrix owns the host browser manifests. Flatpak uses `external`:
+   * `/app` is not executable by a host browser, and a separate host-side
+   * companion must own both the launcher and manifests.
+   */
+  registrationMode?: 'managed' | 'external'
+  /**
+   * Development-only bridge directory selected by Electron. When present,
+   * sync writes an owner-only sidecar beside the development host executable
+   * so a browser-spawned host resolves the same isolated user-data profile.
+   */
+  developmentBridgeDataDir?: string
+}
+
+export interface SyncArgs {
+  /** Chromium-family extension IDs (Chrome / Edge). */
+  chromium: string[]
+  /** Firefox extension IDs (typically `name@vendor` form). */
+  firefox: string[]
+}
+
+export interface NativeMessagingRegistrationFailure {
+  browser: keyof ManifestPaths
+  path: string
+  operation: 'manifest' | 'registry'
+  registryView?: RegistryView
+  error: unknown
+}
+
+export interface NativeMessagingSyncResult {
+  failures: NativeMessagingRegistrationFailure[]
+}
+
+interface ChromiumManifest {
+  name: string
+  description: string
+  path: string
+  type: 'stdio'
+  allowed_origins: string[]
+}
+
+interface FirefoxManifest {
+  name: string
+  description: string
+  path: string
+  type: 'stdio'
+  allowed_extensions: string[]
+}
+
+export class NativeMessagingInstaller {
+  constructor(private readonly opts: InstallerOptions) {}
+
+  get preserveOnStartupFailure(): boolean {
+    return this.opts.appImage != null
+  }
+
+  async syncManifests(args: SyncArgs): Promise<NativeMessagingSyncResult> {
+    if (this.opts.appImage) {
+      await this.opts.appImage.sync(args)
+      return { failures: [] }
+    }
+    if (this.opts.registrationMode === 'external') return { failures: [] }
+
+    await this.writeDevelopmentHostConfig()
+
+    const paths = computeManifestPaths(
+      this.opts.platform,
+      this.opts.manifestRoot,
+      this.opts.windowsRoamingAppData,
+      this.opts.env
+    )
+
+    const chromiumManifest: ChromiumManifest = {
+      name: MANIFEST_HOST_NAME,
+      description: MANIFEST_DESCRIPTION,
+      path: this.opts.hostBinaryPath,
+      type: 'stdio',
+      allowed_origins: args.chromium.map((id) => `chrome-extension://${id}/`),
+    }
+    const firefoxManifest: FirefoxManifest = {
+      name: MANIFEST_HOST_NAME,
+      description: MANIFEST_DESCRIPTION,
+      path: this.opts.hostBinaryPath,
+      type: 'stdio',
+      allowed_extensions: args.firefox,
+    }
+    const failures: NativeMessagingRegistrationFailure[] = []
+    const writeRegistry = this.opts.registryWriter ?? regAddDefaultValue
+    const registryEntries = computeRegistryEntries(this.opts.platform, paths)
+    // Each browser owns an independent registration. A denied directory or
+    // conflicting manifest must not disable the other browsers or the bridge.
+    for (const browser of ['chrome', 'chromium', 'edge', 'firefox'] as const) {
+      const path = paths[browser]
+      if (!path) continue
+      try {
+        await this.writeJson(
+          path,
+          browser === 'firefox' ? firefoxManifest : chromiumManifest
+        )
+      } catch (error) {
+        failures.push({ browser, path, operation: 'manifest', error })
+        // Never advertise a manifest that this attempt could not update.
+        continue
+      }
+      for (const entry of registryEntries.filter(
+        (item) => item.value === path
+      )) {
+        // Both registry views are independent, too. A failed 32-bit update
+        // must not prevent the 64-bit view or later browsers from updating.
+        for (const registryView of WINDOWS_REGISTRY_VIEWS) {
+          try {
+            await writeRegistry(entry, registryView)
+          } catch (error) {
+            failures.push({
+              browser,
+              path: `${entry.hive}\\${entry.keyPath}`,
+              operation: 'registry',
+              registryView,
+              error,
+            })
+          }
+        }
+      }
+    }
+    return { failures }
+  }
+
+  async unregister(): Promise<void> {
+    if (this.opts.appImage) return this.opts.appImage.suspend()
+    if (this.opts.registrationMode === 'external') return
+
+    const paths = computeManifestPaths(
+      this.opts.platform,
+      this.opts.manifestRoot,
+      this.opts.windowsRoamingAppData,
+      this.opts.env
+    )
+    const registryEntries = computeRegistryEntries(this.opts.platform, paths)
+    const deleteRegistry = this.opts.registryDeleter ?? regDeleteKey
+    const manifestPaths = [
+      paths.chrome,
+      paths.chromium,
+      paths.edge,
+      paths.firefox,
+    ].filter((filePath): filePath is string => filePath !== undefined)
+    // Drain every removal before reporting failures so disable/re-enable
+    // cannot race a removal left running by a rejected Promise.all.
+    const results = await Promise.allSettled([
+      ...registryEntries.flatMap((entry) =>
+        WINDOWS_REGISTRY_VIEWS.map((view) => deleteRegistry(entry, view))
+      ),
+      ...manifestPaths.map((filePath) => this.removeOwnedManifest(filePath)),
+      this.removeDevelopmentHostConfig(),
+    ])
+    const errors = results.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason] : []
+    )
+    if (errors.length > 0) {
+      throw new AggregateError(errors, 'Native Messaging cleanup failed')
+    }
+  }
+
+  private developmentHostConfigPath(): string | null {
+    return this.opts.developmentBridgeDataDir
+      ? join(dirname(this.opts.hostBinaryPath), DEVELOPMENT_HOST_CONFIG_NAME)
+      : null
+  }
+
+  private async writeDevelopmentHostConfig(): Promise<void> {
+    const filePath = this.developmentHostConfigPath()
+    if (!filePath) return
+
+    await mkdir(dirname(filePath), { recursive: true })
+    await writeFileAtomic(
+      filePath,
+      JSON.stringify({
+        bridgeDataDir: this.opts.developmentBridgeDataDir,
+      }),
+      { mode: 0o600 }
+    )
+    if (this.opts.platform !== 'win32') {
+      await chmod(filePath, 0o600)
+    }
+  }
+
+  private async removeDevelopmentHostConfig(): Promise<void> {
+    const filePath = this.developmentHostConfigPath()
+    if (filePath) await rm(filePath, { force: true })
+  }
+
+  private async writeJson(filePath: string, obj: object): Promise<void> {
+    if (this.opts.platform === 'linux') {
+      try {
+        const stat = await lstat(filePath)
+        if (!stat.isFile() || stat.isSymbolicLink())
+          throw new Error('Native Messaging manifest conflict')
+        const existing = await this.readManifest(filePath)
+        if (isFlatpakCompanionManifest(existing)) return
+        if (!isOwnedManifest(existing, this.opts.hostBinaryPath))
+          throw new Error('Native Messaging manifest conflict')
+      } catch (error) {
+        if (
+          !(
+            typeof error === 'object' &&
+            error !== null &&
+            'code' in error &&
+            error.code === 'ENOENT'
+          )
+        )
+          throw error
+      }
+    }
+    await mkdir(dirname(filePath), { recursive: true })
+    await writeFileAtomic(filePath, JSON.stringify(obj, null, 2), {
+      mode: 0o600,
+    })
+  }
+
+  private async removeOwnedManifest(filePath: string): Promise<void> {
+    if (this.opts.platform === 'win32') {
+      await rm(filePath, { force: true })
+      return
+    }
+    try {
+      if (!(await lstat(filePath)).isFile()) return
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+      throw error
+    }
+    const manifest = await this.readManifest(filePath)
+    if (isOwnedManifest(manifest, this.opts.hostBinaryPath)) {
+      await rm(filePath, { force: true })
+    }
+  }
+
+  private async readManifest(filePath: string): Promise<unknown> {
+    try {
+      return JSON.parse(await readFile(filePath, 'utf-8'))
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code?: unknown }).code === 'ENOENT'
+      ) {
+        return null
+      }
+      // Malformed or unreadable files are not treated as owned during
+      // unregister. Linux sync also treats these as conflicts.
+      return null
+    }
+  }
+}

@@ -608,6 +608,19 @@ describe('SessionManager', () => {
       )
     })
 
+    it('rejects revoked plugin results after payload preparation and before database persistence', async () => {
+      const candidate = createTask({ id: 'plugin-revoked-candidate' })
+      const beforeCommit = vi.fn(() => {
+        throw new Error('security revoked')
+      })
+      await expect(
+        session.persistTaskWithPluginMetadata(candidate, [], beforeCommit)
+      ).rejects.toThrow('security revoked')
+      expect(beforeCommit).toHaveBeenCalledOnce()
+      expect(db.persistTaskWithPluginMetadata).not.toHaveBeenCalled()
+      expect(taskManager.getById(candidate.id)).toBeUndefined()
+    })
+
     it('emits a stable admission-rejected event after the terminal transaction commits', async () => {
       const task = createTask({
         id: 'm-post-rejected',
@@ -4485,4 +4498,34 @@ it('restores an existing paused direct BT download with internal engine metadata
   } finally {
     fs.rmSync(root, { recursive: true, force: true })
   }
+})
+
+it('quarantines a durable pending migration GID during restore and later authoritative polls', async () => {
+  const manager = new TaskManager()
+  const db = createMockDb()
+  const gid = '1122334455667788'
+  seedAsPair(db, {
+    motrixId: 'pending-legacy',
+    gid: null,
+    type: TaskType.Bt,
+    status: TaskStatus.Paused,
+    infoHash: 'a'.repeat(40),
+    diskPath: '/original/bundle',
+    finalPath: '/original/bundle',
+    payload: {
+      legacyImport: { version: 99 },
+      legacyBtActivation: { engineTaskId: gid },
+    },
+  })
+  const adapter = createMockAdapter()
+  const rpc = createMockRpc({
+    activeTasks: [
+      createRawStatus({ gid, status: 'paused', infoHash: 'a'.repeat(40) }),
+    ],
+  })
+  await new SessionManager(manager, rpc, db, adapter).restore()
+  expect(manager.getAll().map((task) => task.id)).toEqual(['pending-legacy'])
+  expect(manager.isEngineTaskIdRetired(gid)).toBe(true)
+  expect(adapter.addTorrent).not.toHaveBeenCalled()
+  expect(adapter.forceRemoveTask).not.toHaveBeenCalled()
 })

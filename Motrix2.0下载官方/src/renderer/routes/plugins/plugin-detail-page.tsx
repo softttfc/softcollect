@@ -45,14 +45,15 @@ import {
   hasPluginOperations,
   PluginOperations,
 } from './components/plugin-operations'
+import { PluginSecurityNotice } from './components/plugin-security-notice'
 import { PluginSettingsForm } from './components/plugin-settings-form'
 import { PluginStatusDot } from './components/plugin-status-dot'
 import { RegistryDetailPanel } from './components/registry-detail-panel'
+import { RegistryInstallAction } from './components/registry-install-action'
 import { UninstallSection } from './components/uninstall-section'
 import { usePluginDetail } from './hooks/use-plugin-detail'
 import { usePlugins } from './hooks/use-plugins'
 import { useRegistryEntry, useRegistryUpdates } from './hooks/use-registry'
-import { PluginInstallDialog } from './plugin-install-dialog'
 import { type UpdateChannel, usePluginsStore } from './store'
 
 type DetailTab = 'operations' | 'overview' | 'settings' | 'access' | 'logs'
@@ -182,7 +183,7 @@ export function PluginDetailPage() {
             <span className="shrink-0">
               <PluginStatusDot
                 status={listEntry.status}
-                enabled={listEntry.enabled}
+                enabled={listEntry.enabled && !listEntry.security}
               />
             </span>
           </div>
@@ -196,13 +197,15 @@ export function PluginDetailPage() {
             <Switch
               id="plugin-detail-enabled"
               aria-label={t('plugins.detail.enabled')}
-              checked={listEntry.enabled}
+              checked={listEntry.enabled && !listEntry.security}
+              disabled={!!listEntry.security}
               onCheckedChange={toggleEnabled}
             />
           </div>
         }
         contentClassName="min-h-0 px-6 pb-6"
       >
+        <PluginSecurityNotice decision={listEntry.security} />
         <Tabs
           value={tab}
           onValueChange={(v) => setTab(v as DetailTab)}
@@ -247,52 +250,60 @@ export function PluginDetailPage() {
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              {(isElectron || update?.channel !== 'builtin') && (
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      update ? (
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => {
-                            setUpdateChannel(update.channel)
-                            setUpdateOpen(true)
-                          }}
-                          aria-label={t('plugins.registry.updateTo', {
+              {update?.channel === 'community' ? (
+                <RegistryInstallAction
+                  key={id}
+                  pluginId={id}
+                  updateVersion={update.latestVersion}
+                />
+              ) : (
+                (isElectron || update?.channel !== 'builtin') && (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        update ? (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => {
+                              setUpdateChannel(update.channel)
+                              setUpdateOpen(true)
+                            }}
+                            aria-label={t('plugins.registry.updateTo', {
+                              version: update.latestVersion,
+                            })}
+                            data-testid="plugin-update-btn"
+                          >
+                            <PluginUpdateIcon className="size-4 text-foreground" />
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => void refresh()}
+                            disabled={refreshing}
+                            aria-label={t('plugins.registry.refresh')}
+                            data-testid="plugin-detail-refresh-btn"
+                          >
+                            <RefreshIcon
+                              className={cn(
+                                'size-4 text-foreground',
+                                refreshing && 'animate-spin'
+                              )}
+                            />
+                          </Button>
+                        )
+                      }
+                    />
+                    <TooltipContent side="bottom">
+                      {update
+                        ? t('plugins.registry.updateTo', {
                             version: update.latestVersion,
-                          })}
-                          data-testid="plugin-update-btn"
-                        >
-                          <PluginUpdateIcon className="size-4 text-foreground" />
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => void refresh()}
-                          disabled={refreshing}
-                          aria-label={t('plugins.registry.refresh')}
-                          data-testid="plugin-detail-refresh-btn"
-                        >
-                          <RefreshIcon
-                            className={cn(
-                              'size-4 text-foreground',
-                              refreshing && 'animate-spin'
-                            )}
-                          />
-                        </Button>
-                      )
-                    }
-                  />
-                  <TooltipContent side="bottom">
-                    {update
-                      ? t('plugins.registry.updateTo', {
-                          version: update.latestVersion,
-                        })
-                      : t('plugins.registry.refresh')}
-                  </TooltipContent>
-                </Tooltip>
+                          })
+                        : t('plugins.registry.refresh')}
+                    </TooltipContent>
+                  </Tooltip>
+                )
               )}
               {platform.kind === 'electron' &&
                 listEntry.source?.type === 'builtin-update' && (
@@ -477,20 +488,13 @@ export function PluginDetailPage() {
         </Tabs>
       </PanelShell>
 
-      {updateChannel !== null &&
-        (updateChannel === 'builtin' ? (
-          <BuiltinUpdateDialog
-            pluginId={id}
-            open={updateOpen}
-            onOpenChange={setUpdateOpen}
-          />
-        ) : (
-          <PluginInstallDialog
-            open={updateOpen}
-            onOpenChange={setUpdateOpen}
-            fixedSource={{ sourceType: 'registry', pluginId: id }}
-          />
-        ))}
+      {updateChannel === 'builtin' && (
+        <BuiltinUpdateDialog
+          pluginId={id}
+          open={updateOpen}
+          onOpenChange={setUpdateOpen}
+        />
+      )}
     </>
   )
 }

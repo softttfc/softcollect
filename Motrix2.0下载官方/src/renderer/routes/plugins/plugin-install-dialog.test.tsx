@@ -16,6 +16,7 @@ interface MockInstallState {
   startInstall: ReturnType<typeof vi.fn>
   confirm: ReturnType<typeof vi.fn>
   cancel: ReturnType<typeof vi.fn>
+  resetPresentation: ReturnType<typeof vi.fn>
 }
 
 const state: MockInstallState = {
@@ -26,6 +27,7 @@ const state: MockInstallState = {
   startInstall: vi.fn(),
   confirm: vi.fn(),
   cancel: vi.fn(),
+  resetPresentation: vi.fn(),
 }
 
 vi.mock('./hooks/use-plugin-install', () => ({
@@ -65,6 +67,7 @@ beforeEach(() => {
   state.startInstall = vi.fn()
   state.confirm = vi.fn().mockResolvedValue(true)
   state.cancel = vi.fn()
+  state.resetPresentation = vi.fn()
 })
 
 describe('PluginInstallDialog', () => {
@@ -75,19 +78,20 @@ describe('PluginInstallDialog', () => {
     expect(screen.queryByText('X')).toBeNull()
   })
 
-  it('Install button is disabled while consent is null', () => {
+  it('does not offer commit before consent is ready', () => {
     render(<PluginInstallDialog open onOpenChange={vi.fn()} />)
-    const install = screen.getByRole('button', { name: 'Install plugin' })
-    expect(install).toBeDisabled()
+    expect(screen.queryByTestId('install-commit-btn')).toBeNull()
   })
 
   it('renders InlineConsentPanel when consent is loaded', () => {
     state.consent = consent
     state.stagingId = 's1'
     render(<PluginInstallDialog open onOpenChange={vi.fn()} />)
-    expect(screen.getByText('X')).toBeInTheDocument()
-    expect(screen.getByText(/Before installing/)).toBeInTheDocument()
-    const install = screen.getByRole('button', { name: 'Install plugin' })
+    expect(
+      screen.getByRole('heading', { name: 'Install X 1.0?' })
+    ).toBeInTheDocument()
+    expect(screen.getByText(/This plugin is not verified/)).toBeInTheDocument()
+    const install = screen.getByRole('button', { name: 'Allow and install' })
     expect(install).toBeEnabled()
   })
 
@@ -95,7 +99,7 @@ describe('PluginInstallDialog', () => {
     state.consent = consent
     state.stagingId = 's1'
     render(<PluginInstallDialog open onOpenChange={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Install plugin' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Allow and install' }))
     expect(state.confirm).toHaveBeenCalled()
   })
 

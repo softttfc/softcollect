@@ -113,6 +113,10 @@ const PERMISSION_AUDIENCE: Record<
     tone: 'optional',
     toneLabelKey: 'plugins.permission.accessTone.required',
   },
+  metadata: {
+    tone: 'optional',
+    toneLabelKey: 'plugins.permission.accessTone.required',
+  },
   storage: {
     tone: 'optional',
     toneLabelKey: 'plugins.permission.accessTone.required',
@@ -269,6 +273,23 @@ export function computePluginAudience(
   grants: GrantsMap | undefined,
   hasSettingsSchema: boolean = false
 ): Audience {
+  if (plugin.security) {
+    const titleKey =
+      plugin.security.reason === 'pending' ||
+      plugin.security.reason === 'unavailable'
+        ? 'plugins.status.disabled'
+        : 'plugins.security.blocked'
+    return {
+      tone: 'review',
+      toneLabel: t(titleKey),
+      plain: t(`plugins.security.${plugin.security.reason}`),
+      heroHeadline: t(titleKey),
+      primaryAction: {
+        kind: 'open',
+        label: t('plugins.card.primaryAction.open'),
+      },
+    }
+  }
   const errored = plugin.errorCount > 0
   const tone = deriveTone(plugin, hostPermissions, grants)
   return {

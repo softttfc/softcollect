@@ -1,10 +1,16 @@
 import path from 'node:path'
+import type { EngineAdapter } from '@core/engine/engine-adapter'
+import {
+  hasLegacyImport,
+  isInactiveLegacyTask,
+} from '@core/legacy-import/legacy-task-policy'
 import { newEngineTaskId } from '@core/lib/ids'
 import type { HookAuditLog } from '@core/plugin/hooks/audit-log'
 import type { HookOrchestrator } from '@core/plugin/hooks/hook-orchestrator'
 import type { StagedMetadataOp } from '@core/plugin/hooks/staged-effects'
 import { AppError, DownloadErrorCode, ErrorCode } from '@shared/errors'
 import { Events } from '@shared/protocol/events'
+import { legacyBtActivationSchema } from '@shared/schemas/legacy-bt-activation'
 import type {
   BeforeFinalizeContextDTO,
   PluginHookTask,
@@ -94,6 +100,7 @@ export interface FinalizeTaskDeps {
   publishTaskUpdate: () => void
   publishTaskUpdateNow: () => void
   adapter: {
+    verifyLegacyBtBinding?: EngineAdapter['verifyLegacyBtBinding']
     removeDownloadResult(engineTaskId: string): Promise<void>
     forceRemoveTask(engineTaskId: string): Promise<void>
     getUploadLength(engineTaskId: string): Promise<number>
@@ -169,6 +176,7 @@ export interface FinalizeArtifactCommitRequest {
   replacement?: { pluginId: string; stagedPath: string }
   metadataOps: readonly StagedMetadataOp[]
   contributors: readonly string[]
+  beforeCommit?: () => void
   fileRebase?: { sourceRoot: string; targetRoot: string }
 }
 
@@ -189,6 +197,49 @@ async function finalizeTaskSerialized(
   const publishedTask = getTaskOrWarn(deps, taskId, 'finalizeTask')
   if (!publishedTask) return
   const task = structuredClone(publishedTask)
+  if (hasLegacyImport(task)) {
+    if (isInactiveLegacyTask(task)) return
+    // An authorized in-place task never renames, deletes unselected files, or
+    // creates a seeding replacement. Keep its original GID and provenance.
+    const live = await deps.adapter.getTaskStatus(task.engineTaskId)
+    if (
+      !live ||
+      live.status !== TaskStatus.Completed ||
+      live.engineTaskId !== task.engineTaskId ||
+      live.infoHash !== task.infoHash ||
+      live.totalBytes <= 0 ||
+      live.downloadedBytes < live.totalBytes
+    )
+      return
+    const intent = legacyBtActivationSchema.safeParse(
+      task.instances[0]?.payload.legacyBtActivation
+    )
+    if (
+      !intent.success ||
+      task.engineTaskId !== intent.data.engineTaskId ||
+      task.finalPath !== intent.data.targetPath ||
+      !(await deps.adapter.verifyLegacyBtBinding?.({
+        engineTaskId: intent.data.engineTaskId,
+        saveDir: intent.data.saveDir,
+        infoHash: intent.data.expected.infoHash ?? '',
+        files: intent.data.files,
+        selectedFiles: intent.data.selectedFiles,
+        trackers: intent.data.trackers,
+        isPrivate: intent.data.isPrivate,
+      }))
+    )
+      return
+    const previous = task.status
+    Object.assign(task, applyTerminalTransition(task, TaskStatus.Completed))
+    task.downloadedBytes = live.downloadedBytes
+    task.totalBytes = live.totalBytes
+    task.progress = 1
+    for (const instance of task.instances)
+      instance.status = TaskStatus.Completed
+    await persistTaskTransition(task, previous, deps)
+    deps.publishTaskUpdateNow()
+    return
+  }
 
   const alreadyOutputReady =
     getBtDirectStorageLayout(task)?.finalized !== false &&
@@ -331,6 +382,7 @@ async function finalizeHttp(
   }
 
   try {
+    finalizeOutcome.beforeCommit?.()
     await deps.fs.renameAtomic(renameSource, desiredFinalPath)
   } catch (e) {
     const cause = (e as Error).message
@@ -417,6 +469,7 @@ async function commitHttpArtifactDurably(
     replacement: finalizeOutcome.replacement,
     metadataOps: finalizeOutcome.metadataOps,
     contributors: finalizeOutcome.contributors,
+    beforeCommit: finalizeOutcome.beforeCommit,
     fileRebase: {
       sourceRoot: renameSource,
       targetRoot: desiredFinalPath,
@@ -633,6 +686,7 @@ async function finalizeBt(
         replacement: finalizeOutcome.replacement,
         metadataOps: finalizeOutcome.metadataOps,
         contributors: finalizeOutcome.contributors,
+        beforeCommit: finalizeOutcome.beforeCommit,
         fileRebase: {
           sourceRoot: renameSource,
           targetRoot: publishedFinalPath,
@@ -654,6 +708,7 @@ async function finalizeBt(
     }
   } else {
     try {
+      finalizeOutcome.beforeCommit?.()
       await deps.fs.renameAtomic(renameSource, publishedFinalPath)
     } catch (e) {
       const cause = (e as Error).message
@@ -1043,11 +1098,14 @@ async function finalizeBtInPlace(
       targetPath: task.finalPath,
       metadataOps: outcome.metadataOps,
       contributors: outcome.contributors,
+      beforeCommit: outcome.beforeCommit,
     })
     deps.taskManager.set(task.id, structuredClone(task))
     await recordTaskTransition(task, previousStatus, deps, completedAt)
     if (occurrence) await deps.occurrenceDispatcher?.dispatch(occurrence)
   } else {
+    // A policy check alone needs no file mutation lease. The commit still
+    // revalidates it while the unchanged engine identity continues seeding.
     outcome.commit(() => {})
     await persistTaskTransition(task, previousStatus, deps, completedAt)
   }
@@ -1288,6 +1346,7 @@ interface BeforeFinalizeOutcomeCommit {
   replacement?: { pluginId: string; stagedPath: string }
   metadataOps: readonly StagedMetadataOp[]
   contributors: readonly string[]
+  beforeCommit?: () => void
   /**
    * Runs the staged metadata commit (if a db handle is wired) wrapping the
    * supplied sync callback inside the same SQLite transaction. When no db
@@ -1349,10 +1408,15 @@ async function runBeforeFinalize(
   })
   const db = deps.db
   const staged = result.staged
+  const beforeCommit = staged.hasPolicyChecks
+    ? staged.assertPolicyCurrent.bind(staged)
+    : undefined
+  beforeCommit?.()
   return {
     aborted: false,
     finalFilePath: result.finalFilePath,
     replacement: result.replacement,
+    beforeCommit,
     metadataOps:
       typeof result.staged.allMetadataOps === 'function'
         ? result.staged.allMetadataOps()
@@ -1368,6 +1432,7 @@ async function runBeforeFinalize(
       ]),
     ].sort(),
     commit: (cb: () => void) => {
+      beforeCommit?.()
       if (db) {
         staged.commitMetadata(db, task.id, cb)
       } else {

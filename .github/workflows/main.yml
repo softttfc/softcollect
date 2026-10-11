@@ -41,7 +41,8 @@ jobs:
           declare -A repos=( 
                [iptv-api]="https://github.com/Guovin/iptv-api.git" 
             [TVBox_live]="https://github.com/Supprise0901/TVBox_live.git" 
-             [clash]="https://github.com/clash-download/Clash.git"  
+             [clash]="https://github.com/clash-download/Clash.git" 
+              [clash-verge-rev]="https://github.com/clash-verge-rev/clash-verge-rev.git"  
             [fanqiang]="https://github.com/free-nodes/fanqiang.git"  
             [tvbox-source-aggregator]="https://github.com/riowang88/tvbox-source-aggregator.git" 
             [MusicFree]="https://github.com/maotoumao/MusicFree.git" 

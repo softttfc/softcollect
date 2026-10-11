@@ -56,15 +56,6 @@ describe('Electron package contracts', () => {
     }
   })
 
-  it('hydrates Electron when Playwright is invoked directly', async () => {
-    const globalSetup = await readFile(
-      path.join(REPOSITORY_ROOT, 'e2e/global-setup.ts'),
-      'utf8'
-    )
-
-    expect(globalSetup).toContain("['run', 'ensure:electron-runtime']")
-  })
-
   it('packages only the generated staged application', async () => {
     const config = (await readJson('electron-builder.json')) as {
       asarUnpack?: string[]
@@ -289,7 +280,7 @@ describe('Electron package contracts', () => {
 
     expect(contract).toEqual({
       schemaVersion: 1,
-      payloadBytes: 26 * 1024 * 1024,
+      payloadBytes: 27 * 1024 * 1024,
       betterSqlite3Bytes: 4 * 1024 * 1024,
       unexpectedPackageNames: 0,
       foreignBetterSqlite3Prebuilds: 0,

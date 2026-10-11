@@ -424,14 +424,6 @@ describe('buildCommandHandlers', () => {
     )
   })
 
-  it('returns a map keyed by Commands channels', () => {
-    // @ts-expect-error — fake ctx is partial; handler map keys are what we care about
-    const handlers = buildCommandHandlers(fakeCtx())
-    expect(handlers[Commands.ParseTorrent]).toBeInstanceOf(Function)
-    expect(handlers[Commands.AddTorrentTask]).toBeInstanceOf(Function)
-    expect(handlers[Commands.AddMagnetTask]).toBeInstanceOf(Function)
-  })
-
   it('routes RetryTasks for unresolved magnet metadata to MagnetTracker', async () => {
     const ctx = fakeCtx()
     vi.mocked(ctx.taskManager.getById).mockReturnValue({
@@ -3013,4 +3005,38 @@ describe('manual media merge logging', () => {
       })
     )
   })
+})
+
+describe('plugin diagnostic mode command', () => {
+  it.each([true, false])(
+    'returns authoritative state after setting verbose=%s',
+    async (verbose) => {
+      const state = { verbose, expiresAt: verbose ? 3_610_000 : null }
+      const setLogVerbose = vi.fn()
+      const getLogState = vi.fn(() => state)
+      const handlers = buildCommandHandlers({
+        ...fakeCtx(),
+        capabilityHost: { setLogVerbose, getLogState },
+      } as unknown as CommandContext)
+      await expect(
+        handlers[Commands.SetPluginLogVerbose]?.({
+          pluginId: 'alice.demo',
+          verbose,
+        })
+      ).resolves.toEqual(state)
+      expect(setLogVerbose).toHaveBeenCalledWith('alice.demo', verbose)
+      expect(getLogState).toHaveBeenCalledWith('alice.demo')
+      setLogVerbose.mockClear()
+      for (const payload of [
+        null,
+        {},
+        { pluginId: 'alice.demo', verbose: 'true' },
+      ]) {
+        await expect(
+          handlers[Commands.SetPluginLogVerbose]?.(payload)
+        ).rejects.toThrow()
+      }
+      expect(setLogVerbose).not.toHaveBeenCalled()
+    }
+  )
 })

@@ -417,12 +417,6 @@ describe('buildServerQueryHandlers — GetTaskActivity parity', () => {
 })
 
 describe('buildServerQueryHandlers — GetTaskDetail parity', () => {
-  it('exposes GetTaskDetail (mirrors the Electron shell)', () => {
-    // @ts-expect-error partial ctx for test
-    const handlers = buildServerQueryHandlers(makeCtx())
-    expect(handlers[Queries.GetTaskDetail]).toBeInstanceOf(Function)
-  })
-
   it('returns the task by id', async () => {
     const task = { id: 't1' }
     const ctx = makeCtx({
@@ -758,5 +752,26 @@ describe('directory location query validation', () => {
     ).toEqual({ ok: false, error: { code: 'invalidPath' } })
     expect(getApp).not.toHaveBeenCalled()
     expect(locations).not.toHaveBeenCalled()
+  })
+})
+
+describe('plugin diagnostic state query', () => {
+  it('returns host expiry and rejects invalid plugin requests', async () => {
+    const state = { verbose: true, expiresAt: 3_610_000 }
+    const getLogState = vi.fn(() => state)
+    const handlers = buildServerQueryHandlers({
+      capabilityHost: { getLogState },
+    } as unknown as ServerQueryContext)
+    await expect(
+      handlers[Queries.GetPluginLogState]?.({ pluginId: 'alice.demo' })
+    ).resolves.toEqual(state)
+    expect(getLogState).toHaveBeenCalledWith('alice.demo')
+    getLogState.mockClear()
+    for (const payload of [null, {}, { pluginId: '' }]) {
+      await expect(
+        handlers[Queries.GetPluginLogState]?.(payload)
+      ).rejects.toThrow()
+    }
+    expect(getLogState).not.toHaveBeenCalled()
   })
 })

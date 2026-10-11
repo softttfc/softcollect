@@ -248,11 +248,11 @@ describe('Snap build workflow contract', () => {
       'pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413'
     )
     expect(asRecord(setupPnpm?.with, 'pnpm setup inputs')).toEqual({
-      version: '12.8.1',
+      version: '12.10.1',
       run_install: false,
     })
     expect(stringField(setupNode as LooseRecord, 'uses')).toBe(
-      'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'
+      'actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1'
     )
     expect(asRecord(setupNode?.with, 'Node setup inputs')).toEqual({
       'node-version': 24,

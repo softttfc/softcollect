@@ -908,7 +908,14 @@
         "moveQueueTop": "Move to Front",
         "moveQueueBottom": "Move to Back",
         "copyError": "Copy error information",
-        "errorReport": "{{name}}\nTask ID: {{id}}\n{{details}}"
+        "errorReport": "{{name}}\nTask ID: {{id}}\n{{details}}",
+        "redownload": "Re-download",
+        "redownloadWithDialog": "Re-download with options... (Alt+Click)",
+        "redownloadTooltipBatch": "Re-download {{n}} of {{total}} selected",
+        "redownloadOverwriteTitle": "File Already Exists",
+        "redownloadOverwriteDescription": "“{{name}}” already exists in the download directory. Re-downloading will overwrite or rename it. Do you want to continue?",
+        "redownloadCredentialsExpired": "Original request options have expired. Please review and submit.",
+        "redownloadStarted": "Re-download started"
       },
       "titleCount": "{{shown}} shown · {{total}} total",
       "type": {
@@ -1587,6 +1594,7 @@
         "turtle_off": "Standard",
         "turtle_on": "Low speed",
         "turtle_auto": "Automatic",
+        "unitFor": "Unit for {{field}}",
         "baseSection": "Standard limits",
         "baseSectionDesc": "Used for everyday downloads and respected in every mode.",
         "baseDownload": "Download",

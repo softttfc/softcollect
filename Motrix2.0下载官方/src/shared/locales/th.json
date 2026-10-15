@@ -876,7 +876,14 @@
         "selectFilesFailed": "เปิดหน้าต่างเลือกไฟล์ไม่ได้",
         "singleTaskFailed": "{{name}}: {{reason}}",
         "stopSeeding": "หยุดปล่อยไฟล์",
-        "stopSeedingTooltipBatch": "หยุดปล่อยไฟล์ {{n}} จาก {{total}} งานที่เลือก"
+        "stopSeedingTooltipBatch": "หยุดปล่อยไฟล์ {{n}} จาก {{total}} งานที่เลือก",
+        "redownload": "Re-download",
+        "redownloadWithDialog": "Re-download with options... (Alt+Click)",
+        "redownloadTooltipBatch": "Re-download {{n}} of {{total}} selected",
+        "redownloadOverwriteTitle": "File Already Exists",
+        "redownloadOverwriteDescription": "“{{name}}” already exists in the download directory. Re-downloading will overwrite or rename it. Do you want to continue?",
+        "redownloadCredentialsExpired": "Original request options have expired. Please review and submit.",
+        "redownloadStarted": "Re-download started"
       },
       "column": {
         "connections": "เพียร์",
@@ -2088,6 +2095,7 @@
         "bandwidthUsed": "Motrix ใช้ได้สูงสุด {{motrix}}%",
         "baseDownload": "ดาวน์โหลด",
         "baseDownloadDesc": "ความเร็วดาวน์โหลดสูงสุดสำหรับการใช้งานทั่วไป",
+        "unitFor": "หน่วยของ {{field}}",
         "baseSection": "ขีดจำกัดมาตรฐาน",
         "baseSectionDesc": "ใช้สำหรับการดาวน์โหลดทั่วไปและมีผลในทุกโหมด",
         "baseUpload": "อัปโหลด",

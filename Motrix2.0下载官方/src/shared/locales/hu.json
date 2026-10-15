@@ -908,7 +908,14 @@
         "moveQueueTop": "A sor elejére",
         "moveQueueBottom": "A sor végére",
         "copyError": "Hibainformáció másolása",
-        "errorReport": "{{name}}\nFeladatazonosító: {{id}}\n{{details}}"
+        "errorReport": "{{name}}\nFeladatazonosító: {{id}}\n{{details}}",
+        "redownload": "Re-download",
+        "redownloadWithDialog": "Re-download with options... (Alt+Click)",
+        "redownloadTooltipBatch": "Re-download {{n}} of {{total}} selected",
+        "redownloadOverwriteTitle": "File Already Exists",
+        "redownloadOverwriteDescription": "“{{name}}” already exists in the download directory. Re-downloading will overwrite or rename it. Do you want to continue?",
+        "redownloadCredentialsExpired": "Original request options have expired. Please review and submit.",
+        "redownloadStarted": "Re-download started"
       },
       "titleCount": "{{shown}} megjelenítve · összesen {{total}}",
       "type": {
@@ -1587,6 +1594,7 @@
         "turtle_off": "Normál",
         "turtle_on": "Alacsony sebesség",
         "turtle_auto": "Automatikus",
+        "unitFor": "{{field}} mértékegysége",
         "baseSection": "Normál korlátok",
         "baseSectionDesc": "A mindennapi letöltésekhez használatosak, és minden mód figyelembe veszi őket.",
         "baseDownload": "Letöltés",

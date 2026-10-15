@@ -879,7 +879,14 @@
         "selectFilesFailed": "Kunne ikke åpne filvalget.",
         "singleTaskFailed": "{{name}}: {{reason}}",
         "stopSeeding": "Stopp deling",
-        "stopSeedingTooltipBatch": "Stopp deling: {{n}} / {{total}} i utvalget"
+        "stopSeedingTooltipBatch": "Stopp deling: {{n}} / {{total}} i utvalget",
+        "redownload": "Re-download",
+        "redownloadWithDialog": "Re-download with options... (Alt+Click)",
+        "redownloadTooltipBatch": "Re-download {{n}} of {{total}} selected",
+        "redownloadOverwriteTitle": "File Already Exists",
+        "redownloadOverwriteDescription": "“{{name}}” already exists in the download directory. Re-downloading will overwrite or rename it. Do you want to continue?",
+        "redownloadCredentialsExpired": "Original request options have expired. Please review and submit.",
+        "redownloadStarted": "Re-download started"
       },
       "column": {
         "connections": "Noder",
@@ -2107,6 +2114,7 @@
         "bandwidthUsed": "Motrix kan bruke opptil {{motrix}}%.",
         "baseDownload": "Nedlasting",
         "baseDownloadDesc": "Maksimal nedlastingshastighet til daglig bruk.",
+        "unitFor": "Enhet for {{field}}",
         "baseSection": "Standardgrenser",
         "baseSectionDesc": "Brukes til daglige nedlastinger og overholdes i alle moduser.",
         "baseUpload": "Opplasting",

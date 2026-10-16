@@ -114,6 +114,7 @@
 ### 歌词/封面缓存
 - 歌词：`mine.streamLyric({provider, song})` → `{lrc, tlyric}`（tlyric 译文轨，wy/tx/kg 源自带）。缓存按 `state.currentPath`（即 URL）键控：`window.__annieStreamLrcByPath[path]=lrc`、`__annieStreamTlyByPath[path]=tlyric`（streaming.js:400-406），并广播 `annie-stream-lyric` CustomEvent。
 - FB2K 接歌词：`loadLyrics`（fb2k.js:1171 对 http 直接 return）改为先查 `__annieStreamLrcByPath[state.currentPath]`，命中即用；未命中监听 `annie-stream-lyric` 事件补。
+- **内嵌歌词换行事故（2026-10-15 修复 ✅）**：tagWriter.js 的 `metaValue()`（:27-30）把 `\r\n` 洗成空格，下载嵌入歌词（writeTags :120-121 走该函数）被压成单行 → 渲染层 `parseLrc`（am-lyrics.js:121，按物理行切段、只认行首时间戳）只解析出第一句、无时间轴不滚动。旁挂 .lrc 不受影响（writeLyric 原文直写）。修复：① writeTags 歌词字段改用 `lyricValue()`（:34-37，保换行仅去反引号）——ffmpeg 命令行参数传多行值实测没问题（ffmpeg 7.x 回环验证 PASS）；② `parseLrc` 入口加单行 LRC 归一化：`/([^\r\n\]])(\[\d+:\d+(\.\d+)?\])/g → '$1\n$2'`，在「非 ] 字符后的时间戳」前补换行，存量坏文件无需重下即可恢复滚动；行首连续时间戳 `[t1][t2]同句多时间点` 前字符是 `]` 不匹配，行为不变。注意：PowerShell `node -e "..."` 双引号串里 `$1/$2` 会被 PS 展开吞掉，正则替换测试要写临时脚本文件跑。
 
 ### 平台/音质
 - `PLATFORMS` 映射表（provider 键→中文名）在 am-stream.js / streaming.js 顶部。音质 `S.stQuality` / `currentQuality()`。
@@ -370,6 +371,61 @@
 - **IPC**（替换旧 backup:export/import）：`backup:estimate(listenStats)`、`backup:export({sections,listenStats})`（返回 bytes/counts）、`backup:pickInspect()`（选文件+只读摘要+roots）、`backup:apply({path,mode,sections})`（.bak 兜底 → apply → flush → setupLibraryWatch；tracks 空且 folders 非空时写 `_pendingRescan` 标记）。
 - **渲染层**：player.js 启动 `loadLibrary()` 后检查 `_pendingRescan` → saveSettings 清除 + proToast + scanStart（换机/重装导入后自动重建索引）。settings.js 曲库工具区「曲库备份与迁移」：导出面板 7 项勾选（analysis 默认不勾，各项实时显示条数+预估字节+总计）；导入向导内联两步（B 切片暂不含路径映射步）：摘要（版本/时间/各项数量/roots）→ 模式（覆盖/合并 radio）+ 内容勾选 → confirm → apply → listenStats 写回 localStorage（merge 时本机已有报告则保留）→ 800ms 后 relaunchApp。
 - **验证**：check-syntax 157 文件 0 失败；纯 Node 单测 44 项断言全过（v2 导出/白名单/roots 聚类/覆盖/合并全口径/v1 兼容/坏文件三种形态拒绝/部分分区导入）。
+
+## 八、DSD 播放链路与已知坑（V4.4.3 诊断实锤，首案 DIAG-20261014-2144 XMOS 沙沙声）
+
+- **三模式**（settings.js:34 dsdMode `pcm|dop|native`，IPC `dsd.setMode`）：
+  - `pcm` 转 PCM（默认）：ffmpeg DSF 解码器直出 **352800Hz**（DSD64/8）float PCM 走普通 Play 路径（Engine.Playback.cs:69 条件 `_dsdMode!="pcm"`）。
+  - `dop`：**仅 WASAPI 独占**（TryPlayDop 对非 WasapiExclusiveBackend 直接 notify 回退，Engine.Playback.cs:260-264）；引擎自封装 DoP = DsdRate/16 → 176.4k/24bit（Dop.cs:128）；设备能力 `wb.SupportsDop(rate)` 实测（devices.json `dop:true/false`）。
+  - `native`：TryPlayDop 分发到 TryPlayNativeDsd（Engine.Playback.cs:259 → :326），**仅 ASIO**；`AsioNativeDsdOutput.Open()` 用 kAsioCanDoIoFormat 探 DSD 原始格式，被拒即 notify 并**回退普通 PCM 路径（=352.8k ffmpeg 直出）**。
+- **⚠️ 已实锤坑：Native 被拒后回退 352.8k float 直出 ASIO 会出「全程沙沙白噪」**。AsioBackend.TryOpenCore 在 `getSampleRate` 返 ASE_NotPresent（驱动未运行态，良性）时「按请求率直试」（Outputs.cs:816-819），`AsioOut.Init` 不抛异常只代表缓冲建成（日志「已以 float32 格式成功初始化」），**不保证 DSD 能力驱动真按 352.8k 线性 PCM 重放**——Thesycon 系 XMOS 驱动（XMOS USB Audio 2.0 ST 3059 实测）Init 假成功、DAC 输出沙沙。
+- **处置口径**（给用户）：ASIO+native 沙沙/异常 → 改 **WASAPI 独占 + DoP**（devices.json dop:true 的设备即支持，真 DSD 直通）；ASIO 刚需 → 选 foo_dsd_asio/DSDTranscoder 代理驱动（设备枚举里可见，需自配）；pcm 模式在同类驱动的 352.8k 上同样可能异常。
+- **可选引擎加固（未做，待授权）**：DSF 转 PCM 对 ASIO 后端优先降到 176.4k/24bit（DoP 同族率）而非 352.8k 直出；ASIO 通道 sampleType 为 ASIOSTDSDInt8* 时禁止以 float PCM Init；Native 失败 notify 带「超高率 PCM 部分驱动会出噪，建议 WASAPI DoP」文案。
+- 判据速记：DSD 沙沙（全程宽带白噪、持续）= 格式错配，不是欠载（欠载是静音断续）；看 engine-log 有无「Native DSD 打开失败」+「352800Hz…float32 成功初始化」相邻两行即可定性。
+
+## 九、安全审计加固（V4.4.3，群友秋野奈静态审计反馈，第 1 批已修）✅
+- **P0 流缓存源流错误崩溃（已修）**：streamCache.js fill() 旧实现 `Readable.fromWeb(resp.body).pipe(ws)` 只监听 ws 的 error，网络中断时源流 unhandled 'error' 异步抛出、try/catch 抓不到 → 主进程无提示退出（与「失败静默」注释矛盾）。改用 `stream/promises` 的 `pipeline()`（错误统一走 catch，失败销毁两端）。
+- **P0 主进程全局兜底（已修）**：main.js 顶部注册 `process.on('uncaughtException'/'unhandledRejection')` → `processErrorRing`（50 条环形，console.error 留痕，不主动退出——Electron 主进程多数未捕获错误可恢复）；诊断包新增 **main-process-errors.txt**。此前全项目零兜底。
+- **P1 渲染层封面缓存 LRU（已修，上限均 300）**：proUi.js `npfCoverCache`（Map+npfCoverSet 触顶删最旧键）、pro.js `coverCache`（Map+coverSet）、remote.js `coverCache`（普通对象+coverKeys FIFO，因 fetchCover 用 `in` 判占位）。对照已有的 library.js coverCache 300 / streaming coverCache 200。
+- **P2 HTML 注入面（已修）**：fb2k.js 新增本地 `escHtml()`（与 player.js:547 同口径 `&<>"'`），元信息面板两处 innerHTML 拼接（流媒体 sg.* + 本地 m.*/文件路径）元素内容与 key 都转义（title 属性原有 `&quot;` 替换保留）；fakeScan.js buildHtml 报告的 path/grade/reason 转义（score 是数字不转）。实际威胁低（数据源是曲库+平台 API，无远程页面），属纵深防御。
+- **src/ 目录真相（审计误判澄清）**：`package.json "main":"src/main.js"`——src/main.js 是**真入口**（便携模式/单例锁/托盘/require annie 主模块），进打包，**绝不能删**。仅 `src/preload.js`（svlx:* 7 通道主进程零 handler）、`src/launcher.js`、`src/launcher.html`（无 loadFile）是旧启动器残留，V4.4.3 已精确删除。
+- **未修（第 2/3 批，待拍板）**：① `track:readFile`（main.js:1943→library.readFileBuffer 只限 64MB 无目录约束）与 `lib:deleteFiles`（shell.trashItem 任意路径）拟加「必须在已加入曲库目录内」白名单；② senderFrame 来源校验（单窗口应用价值低）、sandbox:true（需验证手机遥控第二窗口）；③ backgroundThrottling:false 是 V4.4 为彩胶遮挡停转有意关闭，hide 时节流方案用户 2026-10-14 已拍板放弃省电方向；④ 591 空 catch 多为有意静默降级，不搞运动式整改。
+
+## 十、AM 专辑详情页排序（V4.4.3）✅
+- **需求**：专辑详情页（albums 视图点入某专辑）曲目多方式排序 + 默认按「发布顺序」。
+- **设置键**：`ui.amAlbumDetailSort`（settings.js DEFAULTS，默认 `release`；与专辑列表页 `amAlbumSort` 独立）。
+- **实现**：am.js `sortAlbumDetailTracks(list, mode)`——
+  - `release`：碟号 disc → 曲目号 track（'no/of' 取前段 `parseInt(s.split('/')[0])`，与 library.js orderAudioPaths 同口径）；无碟号按 1 处理；无号沉底按文件名 azCollator；CUE 虚拟分轨无 track 标签 → `#cueN`/`#isoN` 数字续排（正 `#(cue|iso)(\d+)`）。
+  - `az` 标题 / `azArtist` 演唱者（副键标题）/ `name` 文件名 / `durDesc|durAsc` 时长。
+  - `trackMeta(t)` 扩展返回 `track/disc` 原始串（metaCache 白名单字段本就含）。
+  - `currentTracks()` 在 `albums&&albumKey` 分支末尾调用。
+- **UI**：am-dom.js 详情页头部改为「‹ 专辑 + 专辑名 + am-sort-sel 排序下拉」（复用 `.am-view-head` 样式与下拉持久化逻辑，headKeyFor 加 `albumDetail#key#mode` 保证 IME/切换不重建搜索框——详情页无搜索框，故自建 head 而非 buildViewHead）。
+- **验证**：check-syntax 157 文件 0 失败；dev 真机验证待用户跑。
+
+## 十一、在线搜索历史交互（V4.4.3）✅
+- **需求**：在线音乐搜索历史支持单条删除 + 清空全部。
+- **实现**：am-stream.js 搜索输入行（仅 search 页签）去掉原生 `<datalist>`（不支持交互），改自绘下拉弹层 `.am-st-histpop`（输入行内 `position:absolute` 挂载，复用玻璃风 CSS 变量）——聚焦/输入时弹出，每行 ✕ 单删（改 localStorage `annieplayer.stHistory`），底部「清空全部」；blur 120ms 后关闭（给点击留窗口，不自建 document 外点监听，避免与 R.pop 机制冲突）。
+- **CSS**：am.css `.am-st-histpop/.am-st-histrow/.am-st-histtxt/.am-st-histdel/.am-st-histfoot`（z-index 60 在内容层之上、低于全局 R.pop 的 90）。
+- **验证**：check-syntax 157 文件 0 失败；dev 真机验证待用户跑。
+
+## 十二、DSD 白噪修复 + 特权 IPC 白名单 + 播放链路状态实时化（V4.4.5 待发）✅
+### 1. DSD 转 PCM「假成功」白噪修复（红叶抄诊断包实锤）
+- **故障链**（诊断日志逐行）：`[dsd] Native DSD 打开失败: kAsioCanDoIoFormat 被拒` → `[asio] 采样率探测返回 0，将以 352800Hz 直接尝试打开` → `[asio] 已以 float32 格式成功初始化` = 全程白噪。根因：DSF 的 ffmpeg 默认输出率（DSD64→352.8kHz）当 PCM 率直开 ASIO，驱动 Init「假成功」但取数速率错配。
+- **修复 A（Engine.Playback.cs `OpenWithChannels`）**：DSD 源（`info.Codec` 含 dsd）且 rate>176400 时钳到 **176400Hz**（DoP 同族率），标 `resampled=true` 并 emit notify；format 事件 `dsdMode` 如实报 `"pcm"`（此前报 `_dsdMode` 全局值，渲染层会误显 Native DSD 徽标），`reason` 写「DSD 转 PCM（钳至 176400Hz 安全回退）」。
+- **修复 B（Outputs.cs `AsioBackend.TryOpenCore`）**：驱动采样率探测返回 0 且 requestedRate>192000 时，不再硬开——先按 `AsioFallbackRates` 找 ≤192k 的可对齐率（优先 176400/88200）交给引擎重采样；全被拒才硬开。
+- **Stats 补字段（Engine.cs）**：`dsdNativeActive = _asioDsd != null`——注意 `dopActive` 在 Native 和 DoP 路径都为 true，区分必须看 `dsdNativeActive`，状态页判断顺序先 Native 后 DoP。
+- **验证**：引擎编译 0 error（109 警告全是既有 CS8632 nullable 注释）；真机白噪消除待用户验证（用户设备 XMOS USB Audio 2.0 ST 3059 + ASIO Native）。
+
+### 2. 特权 IPC 曲库白名单（安全审计第 2 批）
+- **实现（main.js `registerIpc` 内 `pathAllowed(p)`）**：路径剥 `#cueN/#isoN` 后缀后，必须命中 `store.tracks[].path` ∪ `store.playlists[].paths` ∪ `store.folders[]` 前缀（含根目录自身）。playlists.paths 入白名单是为兜住「拖入曲库外文件」的既有体验（这类文件进歌单不一定进 tracks）。`path.resolve` 归一防 `..` 穿越，大小写按 Windows 语义。
+- **套用点**：`lib:deleteFiles`（拒绝时 `failed.push({error:'not-in-library'})` 不删）、`track:readFile`（拒绝时 throw）。两者与 `pathAllowed` 同在 `registerIpc` 作用域（闭包可见）。
+- **未套用**：`iso:extractTrack`（src 须是曲库轨才被 UI 触发，且产物落 userData/isoCache，风险低）；tagWriter/backup 走 dialog 自选路径天然受限。sandbox:true 升级未做（需专项验证手机遥控第二窗口）。
+- **验证**：check-syntax 0 失败；行为回归待用户验证（拖入曲库外文件的节拍分析/删除不应被误拒）。
+
+### 3. 播放链路状态页（设置 → 音频输出 → 输出健康）
+- **范围决策**：不新建页面——「输出健康」区（settings.js:962 起）已含设备/格式/缓冲/欠载/限幅 + 链路图 + 全参数对照浮层（openChainDetail），本次只补差距。
+- **本次增量**：① 文本区补「音频输出」行（ASIO/WASAPI + 独占/共享说明）与「DSD 处理」行（Native DSD / DoP / 不适用，依赖 stats.dsdNativeActive）；② 自动刷新——`setInterval` 2.5s 且仅在 `panel.open && currentPage==='audio'` 时拉 `engine('stats')`（与统计页 3454 行同款「面板开着才轮询」模式，关闭零开销）。
+- **验证**：check-syntax 0 失败；真机显示待用户验证。
 
 ---
 

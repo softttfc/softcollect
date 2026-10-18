@@ -54,6 +54,9 @@
     accent: 'default',       // V3.5.17：强调色（default=主题原色；AM/粒子舞台生效）
     amViz: true,              // V3.5.17：AM 主题底部实时频谱条
     amVizColor: 'cover',      // V4.3.17：频谱条配色 cover|coverMulti|rainbow|heat|accent
+    amLRBar: 'on',            // V4.4.7（PR#6）：信息面板电平条 on|off
+    amSmtc: 'on',             // V4.4.7（PR#6）：系统媒体会话（SMTC）on|off
+    amQBadge: 'dot',          // V4.4.7（PR#6）：待播清单角标 off=隐藏 | dot=小圆点 | count=歌曲数量
     beatAnalysis: true        // V4.4：节拍律动分析（相机随鼓点运动；关闭省整轨解码，弱机建议关）
   };
 
@@ -736,6 +739,52 @@
     vcSel.onchange = function () { ui.amVizColor = vcSel.value; save(); };
     vcRow.appendChild(vcLab); vcRow.appendChild(vcSel);
     s5.appendChild(vcRow);
+    // —— 信息面板电平条（PR#6）：开关（颜色跟随封面） ——
+    var lrRow2 = markItem(el('div', 'set-row'), '电平条 L/R 信息面板 频谱');
+    var lrLab = el('div'); lrLab.appendChild(el('div', '', '信息面板电平条'));
+    lrLab.appendChild(el('div', 'set-hint', '信息面板里那两条 L / R 电平指示，颜色跟随封面'));
+    var lrSel = document.createElement('select');
+    [['on', '显示'], ['off', '隐藏']].forEach(function (o) {
+      var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; lrSel.appendChild(op);
+    });
+    lrSel.value = ui.amLRBar === 'off' ? 'off' : 'on';
+    try { localStorage.setItem('amLRBar', lrSel.value); } catch (e3) { }
+    lrSel.onchange = function () {
+      ui.amLRBar = lrSel.value; save();
+      try { localStorage.setItem('amLRBar', lrSel.value); } catch (e3) { }
+      var rr = document.getElementById('am-root');
+      if (rr) rr.classList.toggle('am-lr-off', lrSel.value === 'off');
+    };
+    lrRow2.appendChild(lrLab); lrRow2.appendChild(lrSel);
+    s5.appendChild(lrRow2);
+    // —— 系统媒体会话（V4.4.7 PR#6）：壁纸 / 歌词挂件读歌名歌手封面 ——
+    var stRow = markItem(el('div', 'set-row'), '系统媒体 SMTC 媒体会话 壁纸 歌词挂件 浮层');
+    var stLab = el('div'); stLab.appendChild(el('div', '', '系统媒体会话（SMTC）'));
+    stLab.appendChild(el('div', 'set-hint', '给 Windows 媒体浮层 / 音频壁纸 / 歌词挂件提供歌名·歌手·封面；会多一个隐藏的常驻进程'));
+    var stSel = document.createElement('select');
+    [['on', '开启'], ['off', '关闭']].forEach(function (o) {
+      var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; stSel.appendChild(op);
+    });
+    stSel.value = ui.amSmtc === 'off' ? 'off' : 'on';
+    try { localStorage.setItem('amSmtc', stSel.value); } catch (e2) { }
+    stSel.onchange = function () {
+      ui.amSmtc = stSel.value; save();
+      try { localStorage.setItem('amSmtc', stSel.value); } catch (e2) { }
+    };
+    stRow.appendChild(stLab); stRow.appendChild(stSel);
+    s5.appendChild(stRow);
+    // —— 待播角标样式（V4.4.7 PR#6：隐藏 / 小圆点 / 歌曲数量） ——
+    var qbRow = markItem(el('div', 'set-row'), '待播角标 待播清单 队列 角标 红点 数字 徽标 badge');
+    var qbLab = el('div'); qbLab.appendChild(el('div', '', '待播清单角标'));
+    qbLab.appendChild(el('div', 'set-hint', '顶栏 ☰ 右上角那个小标记：隐藏不显示 / 只显示一个小圆点 / 显示待播歌曲数量'));
+    var qbSel = document.createElement('select');
+    [['off', '隐藏'], ['dot', '小圆点'], ['count', '歌曲数量']].forEach(function (o) {
+      var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; qbSel.appendChild(op);
+    });
+    qbSel.value = ui.amQBadge || 'dot';
+    qbSel.onchange = function () { ui.amQBadge = qbSel.value; save(); };
+    qbRow.appendChild(qbLab); qbRow.appendChild(qbSel);
+    s5.appendChild(qbRow);
 
     // —— 氛围模式（V3.5.18：全屏频谱，任意主题可用） ——
     var ambRow = markItem(el('div', 'set-row'), '氛围模式 全屏 频谱 可视化 ambient');

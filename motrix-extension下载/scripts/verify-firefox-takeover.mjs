@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { zipSync } from 'fflate'
 import { build } from 'vite'
+import { waitForFirefoxFixture } from './fixtures/firefox-readiness.mjs'
 import { createMdxpSimulator } from './fixtures/mdxp-simulator.mjs'
 import {
   FIREFOX_CASES,
@@ -49,6 +50,11 @@ const extension = join(temporary, 'extension')
 const profile = join(temporary, 'profile')
 const uuid = 'bd2a973c-7f7b-468e-bd3d-03f8bc59336f'
 const requests = new Map()
+const unicodeFilenames = new Map([
+  ['early-default', 'résumé 日本語 😀.zip'],
+  ['early-direct', '中文 extended.zip'],
+  ['early-confirm-accept', 'aaa123中文.zip'],
+])
 const transfers = new Set()
 let firefox
 let socket
@@ -98,13 +104,19 @@ const server = createServer((request, response) => {
           'Content-Type':
             name === 'early-pdf' ? 'application/pdf' : 'application/zip',
         }),
+    // Model raw UTF-8 in a legacy filename, the suspected input in #2388.
+    // Node serializes HTTP header strings as Latin-1 bytes.
     'Content-Disposition':
-      ` ${name === 'early-pdf' ? 'inline' : 'attachment'}; filename="${name}.zip"`.trim(),
+      name === 'early-direct'
+        ? `attachment; filename=backup.zip; filename*=UTF-8'zh'${encodeURIComponent(unicodeFilenames.get(name))}`
+        : `${name === 'early-pdf' ? 'inline' : 'attachment'}; filename="${Buffer.from(unicodeFilenames.get(name) ?? `${name}.zip`).toString('latin1')}"`,
     ...(!name.startsWith('unknown-') && name !== 'probe-only'
       ? { 'Content-Length': size }
       : {}),
   })
-  response.flushHeaders()
+  // Flush via a buffer write to preserve header bytes. flushHeaders() can
+  // UTF-8-encode the Latin-1 byte string again, creating artificial mojibake.
+  response.write(Buffer.alloc(0))
   let sent = 0
   const timer = setInterval(() => {
     const count = Math.min(64 * 1024, size - sent)
@@ -308,16 +320,10 @@ try {
     console.error(diagnostics)
     throw error
   }
-  let context
-  const pageDeadline = Date.now() + 10000
-  while (!context && Date.now() < pageDeadline) {
-    const tree = await command('browsingContext.getTree', {})
-    context = tree.contexts.find((page) =>
-      page.url?.endsWith('/runner.html')
-    )?.context
-    if (!context) await delay(100)
-  }
-  assert.ok(context, `Firefox did not open the fixture: ${diagnostics}`)
+  const context = await waitForFirefoxFixture(
+    command,
+    `moz-extension://${uuid}/runner.html`
+  )
   const receiverResponse = await command('script.evaluate', {
     expression: `checkFetchReceiver(${JSON.stringify(baseUrl)}).then(JSON.stringify)`,
     target: { context },
@@ -378,6 +384,21 @@ try {
         : 0,
       `${name}: peer submission count`
     )
+    if (unicodeFilenames.has(name)) {
+      assert.equal(
+        result.mdxp.submissions[0]?.suggestedFilename,
+        unicodeFilenames.get(name),
+        `${name}: decoded filename reached MDXP peer`
+      )
+      if (name === 'early-confirm-accept') {
+        assert.equal(
+          result.observations.find((o) => o.event === 'confirmation-filename')
+            ?.filename,
+          unicodeFilenames.get(name),
+          `${name}: confirmation draft filename`
+        )
+      }
+    }
     if (name.startsWith('early-')) {
       const accepted = [
         'early-default',

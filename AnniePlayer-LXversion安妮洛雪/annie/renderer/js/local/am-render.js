@@ -4,6 +4,17 @@
  * 来源：am.js 原稿行 1691-1771 + 1800-2447（原样切片，零行为变更）
  * 共享变量经 window.__annieAMInternal 桥接；前向引用为转发桩，运行时解析。 */
 (function () {
+  // V4.4.8：沉浸层线性图标（SVG，替代 emoji 字形）
+  function immSvgIcon(d, size) {
+    var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    s.setAttribute('viewBox', '0 0 16 16');
+    s.setAttribute('width', String(size || 15)); s.setAttribute('height', String(size || 15));
+    var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', d); p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', 'currentColor'); p.setAttribute('stroke-width', '1.5');
+    p.setAttribute('stroke-linecap', 'round'); p.setAttribute('stroke-linejoin', 'round');
+    s.appendChild(p); return s;
+  }
   var AM = window.__annieAMInternal || (window.__annieAMInternal = {}); // AM 主题内部模块桥（跨分片共享闭包变量）
   // 从桥取用先加载分片导出的引用（此时前片已执行完，引用有效）
   var S = AM.S;
@@ -51,11 +62,51 @@
   AM.refreshBadge = refreshBadge;
   AM.refreshCacheBadge = refreshCacheBadge;
 
-  /* ================= 播放模式 / 播放定时（仅本地播放生效） ================= */
+function amModeSvg(id) {
+    var SH = '<path d="M2.6 5.2 H5.1 C6.1 5.2 6.9 5.6 7.5 6.3 L10.3 9.5 C10.9 10.2 11.7 10.6 12.7 10.6 H13.2 M12 8.7 L13.9 10.6 L12 12.5 M2.6 10.6 H5.1 C6.1 10.6 6.9 10.2 7.5 9.5 L10.3 6.3 C10.9 5.6 11.7 5.2 12.7 5.2 H13.2 M12 3.3 L13.9 5.2 L12 7.1"/>';
+    if (id === 'all-rand') {
+      return '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + SH + '</svg>';
+    }
+    if (id === 'list-rand') {
+      /* 列表内随机：外框表示「只在本列表」 */
+      return '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + '<rect x="1.3" y="1.3" width="13.4" height="13.4" rx="3.6" stroke-opacity=".75"/><g transform="translate(2.7 2.7) scale(0.66)">' + SH + '</g></svg>';
+    }
+    if (id === 'all-seq') {
+      /* 全文件顺序：三条杠 */
+      return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>';
+    }
+    if (id === 'list-seq') {
+      /* 列表内顺序：上右箭头 + 下左箭头（直线） */
+      return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8h12"/><path d="M15 5.5 18 8 15 10.5"/><path d="M18 16H6"/><path d="M9 13.5 6 16 9 18.5"/></svg>';
+    }
+    var key = { 'repeat-one': 'modeRepeatOne' }[id];
+    if (typeof window.ico === 'function' && key) return window.ico(key, 16);
+    return null;
+  }function amModeSvg(id) {
+    var SH = '<path d="M2.6 5.2 H5.1 C6.1 5.2 6.9 5.6 7.5 6.3 L10.3 9.5 C10.9 10.2 11.7 10.6 12.7 10.6 H13.2 M12 8.7 L13.9 10.6 L12 12.5 M2.6 10.6 H5.1 C6.1 10.6 6.9 10.2 7.5 9.5 L10.3 6.3 C10.9 5.6 11.7 5.2 12.7 5.2 H13.2 M12 3.3 L13.9 5.2 L12 7.1"/>';
+    if (id === 'all-rand') {
+      return '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + SH + '</svg>';
+    }
+    if (id === 'list-rand') {
+      /* 列表内随机：外框表示「只在本列表」 */
+      return '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + '<rect x="1.3" y="1.3" width="13.4" height="13.4" rx="3.6" stroke-opacity=".75"/><g transform="translate(2.7 2.7) scale(0.66)">' + SH + '</g></svg>';
+    }
+    if (id === 'all-seq') {
+      /* 全文件顺序：三条杠 */
+      return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>';
+    }
+    if (id === 'list-seq') {
+      /* 列表内顺序：上右箭头 + 下左箭头（直线） */
+      return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8h12"/><path d="M15 5.5 18 8 15 10.5"/><path d="M18 16H6"/><path d="M9 13.5 6 16 9 18.5"/></svg>';
+    }
+    var key = { 'repeat-one': 'modeRepeatOne' }[id];
+    if (typeof window.ico === 'function' && key) return window.ico(key, 16);
+    return null;
+  }  /* ================= 播放模式 / 播放定时（仅本地播放生效） ================= */
   function syncModeBtn() {
     if (!R.btnMode || !window.anniePlayMode) return;
     var inf = window.anniePlayMode.info();
-    R.btnMode.textContent = inf.icon;
+    R.btnMode.innerHTML = amModeSvg(inf.id) || inf.icon;
     R.btnMode.title = '播放模式：' + inf.label + (inf.hint ? '\n' + inf.hint : '') + '\n（本地全量生效；在线播放支持顺序/随机/单曲循环，点击切换）';
   }
   function syncTimerBtn() {
@@ -181,7 +232,7 @@
           list.appendChild(el('div', 'am-q-empty', (r && r.error) || '暂无评论（该曲可能未收录网易云）'));
           return;
         }
-        list.appendChild(el('div', 'am-q-empty', '网易云热门评论 · 共 ' + (r.total || r.comments.length) + ' 条'));
+        list.appendChild(el('div', 'am-q-empty am-q-cmt', '网易云热门评论 · 共 ' + (r.total || r.comments.length) + ' 条'));
         r.comments.forEach(function (c) {
           var row = el('div', 'am-cmt-row');
           row.appendChild(el('div', 'am-cmt-text', c.text));
@@ -218,6 +269,7 @@
     }
     function addRow(coverUrl, track, title, sub, durText, cur, onclick, opts) {
       var row = el('div', 'am-q-row' + (cur ? ' cur' : ''));
+      if (track && track.path) row.dataset.path = track.path; // V4.4.9：切歌时按 path 只改高亮，不整表重建
       var img = document.createElement('img');
       img.className = 'am-q-cover'; img.alt = ''; img.draggable = false;
       if (coverUrl) img.src = coverUrl;
@@ -280,7 +332,7 @@
     }
 
     if (S.qTab !== 'hist') {
-      // 待播清单：流媒体用搜索结果队列，本地用 state.queue（从当前索引起）
+      // 待播清单：流媒体用搜索结果队列，本地用 state.queue（完整队列，当前曲高亮）
       if (state.currentStream) {
         // V4.3.13：跟随实际播放队列（在线歌单快照 S._playList），不是搜索结果列表
         var rs = S._playList || S.stResults || [];
@@ -305,7 +357,8 @@
       function qGenLive(box, g) { return _qGens.get(box) === g; }
       /* V4.4.7（PR#6）：队列可能有上万首——原来一次性同步建几千行、每行还排一次封面解析，
          面板要等好几秒才弹出来。改成先建外壳 + 每帧只干 ~8ms（超预算就交还事件循环）。 */
-      var qGen = qGenNext(box), qPut = Math.max(0, state.index), qStop = q.length;
+      /* V4.4.9：渲染完整队列（此前从 state.index 起，点选靠后的歌会让上面已播曲目从列表消失） */
+      var qGen = qGenNext(box), qPut = 0, qStop = q.length;
       (function pumpQueueRows() {
       if (!qGenLive(box, qGen)) return;        // 同一容器又开了一轮渲染 → 这一轮作废
       var qT0 = performance.now();
@@ -320,7 +373,18 @@
             { dragIdx: idx, onRemove: function () { removeQueueRow(idx); } });
         })(q[i], i);
       }
-      if (qPut < qStop) setTimeout(pumpQueueRows, 0);
+      if (qPut < qStop) { setTimeout(pumpQueueRows, 0); return; }
+      /* 打开面板时把当前曲滚进可视区（只跳一次，避免跟随播放打断手动浏览） */
+      if (S._qJumpCur) {
+        S._qJumpCur = false;
+        try {
+          var curRow = list.querySelector('.am-q-row.cur');
+          if (curRow) {
+            var rt = curRow.offsetTop - (list.clientHeight - curRow.offsetHeight) / 2;
+            list.scrollTop = Math.max(0, rt);
+          }
+        } catch (e0) { }
+      }
       })();
       return;
     }
@@ -380,7 +444,9 @@
     R.immPlay = el('button', 'am-imm-btn am-imm-play', '▶'); R.immPlay.onclick = togglePlay;
     var bN = el('button', 'am-imm-btn', '⏭'); bN.onclick = next;
     ctl.appendChild(bP); ctl.appendChild(R.immPlay); ctl.appendChild(bN);
-    R.immBtnLyr = el('button', 'am-imm-btn', '💬'); R.immBtnLyr.title = '歌词（再点收起）';
+    R.immBtnLyr = el('button', 'am-imm-btn', '');
+    R.immBtnLyr.appendChild(immSvgIcon('M4.4 4.4 h7.2 a1.6 1.6 0 0 1 1.6 1.6 v4.0 a1.6 1.6 0 0 1 -1.6 1.6 h-3.9 l-2.5 1.9 v-1.9 a1.6 1.6 0 0 1 -1.6 -1.6 v-4.0 a1.6 1.6 0 0 1 1.6 -1.6 z', 24));
+ R.immBtnLyr.title = '歌词（再点收起）';
     R.immBtnLyr.onclick = function () { setImmLyr(!S.immLyrOn); };
     R.immBtnQ = el('button', 'am-imm-btn', '☰'); R.immBtnQ.title = '待播清单 / 历史记录';
     R.immBtnQ.onclick = function () { setImmQueue(!S.immQOn); };
@@ -951,7 +1017,21 @@
     var gTarget = qmax > 0.08 ? Math.min(3.2, 0.85 / qmax) : 1;
     _infoGain += (gTarget - _infoGain) * 0.12;
     for (var i = 0; i < n; i++) {
-      var v = _infoSmooth[i] += ((vizBands[i] || 0) - _infoSmooth[i]) * 0.28; // 帧间插值
+      /* V4.4.8：与主界面同一套低频去同步（连续相同 band → 爬升） */
+      var rb = vizBands[i] || 0;
+      var rs2 = i, re2 = i;
+      while (rs2 > 0 && Math.abs((vizBands[rs2 - 1] || 0) - rb) < 0.0005) rs2--;
+      while (re2 < n - 1 && Math.abs((vizBands[re2 + 1] || 0) - rb) < 0.0005) re2++;
+      var rlen2 = re2 - rs2 + 1;
+      if (rlen2 > 1) {
+        var st2 = (i - rs2) / (rlen2 - 1);
+        var ph2 = (performance.now() / 2600) % 1;
+        st2 = (st2 * 0.7 + ph2 * 0.3) % 1;
+        rb = rb * (0.50 + 0.50 * st2);
+        rb = Math.min(1, rb * (1 + 0.10 * Math.sin(performance.now() / 190 + i * 2.1)));
+      }
+      var kI = rb > _infoSmooth[i] ? (0.28 + ((i * 17) % 5) * 0.07) : (0.13 + ((i * 29) % 6) * 0.03);
+      var v = _infoSmooth[i] += (rb - _infoSmooth[i]) * kI; // 帧间插值
       var vs = Math.min(1, v * _infoGain);
       var bh = Math.max(2, vs * (cv.height - 6));
       if (heat) ctx.fillStyle = vizHeatColor(vs);
@@ -963,7 +1043,14 @@
   function immInfoOutside(e) {
     if (!_infoOn || Date.now() - _infoAt < 60) return; // 忽略「打开面板的那一次点击」
     var t = e.target;
-    if ((R.immInfo && R.immInfo.contains(t)) || (R.immInfoBar && R.immInfoBar.contains(t))) return;
+    if (R.immInfoBar && R.immInfoBar.contains(t)) return;
+    // V4.4.8：面板内层铺满整屏，点它的空白区域也应算「外面」——只有点真正的文字/图表块才不关
+    if (R.immInfo) {
+      var inner = R.immInfo.querySelector('.am-imm-info-inner');
+      if (inner && t !== inner && inner.contains(t)) return;
+      if (inner && t === inner) { setImmInfo(false); return; }
+      if (!R.immInfo.contains(t)) { /* 面板外的任意位置 → 关闭 */ }
+    }
     /* 沉浸层右上角那排按钮浮在面板之上：真全屏 / 最小化 / 退出沉浸 不关面板，
        歌词外观（⚙）要关面板（它会在面板上叠一层设置弹层） */
     var cbBtn = (t && t.closest) ? t.closest('.am-imm-closebar .am-tbtn') : null;
@@ -977,9 +1064,19 @@
     e.stopPropagation();
     setImmInfo(false);
   }
+  /* V4.4.8：监听器的挂/摘改成幂等同步——原先 setImmInfo 早退时会把监听器摘掉就不再挂回，
+     表现为「面板开着但点哪都关不掉」 */
+  function syncImmInfoListeners(on) {
+    document.removeEventListener('mousedown', immInfoOutside, true);
+    document.removeEventListener('keydown', immInfoKey, true);
+    if (on) {
+      document.addEventListener('mousedown', immInfoOutside, true);
+      document.addEventListener('keydown', immInfoKey, true);
+    }
+  }
   function setImmInfo(on) {
     on = !!on;
-    if (on === _infoOn) return;
+    if (on === _infoOn) { syncImmInfoListeners(on); return; }
     _infoOn = on;
     _infoAt = Date.now();
     if (R.immInfo) R.immInfo.classList.toggle('on', on);
@@ -988,12 +1085,9 @@
       R.immBtnInfo.title = on ? '收起歌曲信息' : '歌曲信息（下拉面板）';
     }
     cancelAnimationFrame(_infoRaf); _infoRaf = 0;
-    document.removeEventListener('mousedown', immInfoOutside, true);
-    document.removeEventListener('keydown', immInfoKey, true);
+    syncImmInfoListeners(on);
     if (on) {
       refreshImmInfo();
-      document.addEventListener('mousedown', immInfoOutside, true);
-      document.addEventListener('keydown', immInfoKey, true);
       infoVizFrame();
     } else if (_infoSmooth) _infoSmooth.fill(0);
     immShowChrome(); // 展开/收起都退出「静止隐藏」态，左上角按钮始终可见
@@ -1105,7 +1199,19 @@
       R.immBtnVinyl.onclick = function (e) { e.stopPropagation(); openVinylSetPop(R.immBtnVinyl); };
       cb.insertBefore(R.immBtnVinyl, R.immBtnLyrSet);
     } else R.immBtnVinyl = null;
-    var bExit = el('button', 'am-tbtn', '⤡');
+    // V4.4.8：退出沉浸按钮改用 SVG 叉形（与顶栏关闭键同款，不用字形）
+    function _immWinIcon(d) {
+      var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      s.setAttribute('viewBox', '0 0 16 16');
+      s.setAttribute('width', '16'); s.setAttribute('height', '16');
+      var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('d', d); p.setAttribute('fill', 'none');
+      p.setAttribute('stroke', 'currentColor'); p.setAttribute('stroke-width', '1.6');
+      p.setAttribute('stroke-linecap', 'round'); p.setAttribute('stroke-linejoin', 'round');
+      s.appendChild(p); return s;
+    }
+    var bExit = el('button', 'am-tbtn', '');
+    bExit.appendChild(_immWinIcon('M4.2 4.2 L11.8 11.8 M11.8 4.2 L4.2 11.8'));
     bExit.title = '退出沉浸模式';
     bExit.onclick = function () { toggleImmersive(false); };
     cb.appendChild(bExit);
@@ -1114,15 +1220,18 @@
     R.immBtnFs.title = '真全屏（隐藏任务栏）';
     R.immBtnFs.onclick = function (e) {
       e.stopPropagation();
+      /* V4.4.8：按实际窗口状态切换，避免「持久化值 true 但窗口没全屏」时第一次点击无效 */
       var ui = window.annieSettings && annieSettings.ui;
-      var on = !(ui && ui.amImmFullscreen);
+      var on = !_immFsOn;
+      _immFsOn = on;
       if (ui) ui.amImmFullscreen = on;
       try { window.annieSettings.save(); } catch (x) { }
       try { if (window.mine && window.mine.winFullScreen) window.mine.winFullScreen(on); } catch (x) { }
       R.immBtnFs.classList.toggle('on', on);
       R.immBtnFs.title = on ? '退出真全屏（显示任务栏）' : '真全屏（隐藏任务栏）';
     };
-    try { R.immBtnFs.classList.toggle('on', !!(window.annieSettings && annieSettings.ui && annieSettings.ui.amImmFullscreen)); } catch (x) { }
+    var _immFsOn = false;   // V4.4.8：进入沉浸时窗口一定不是全屏（不再跟随设置）
+    R.immBtnFs.classList.remove('on');
     cb.insertBefore(R.immBtnFs, bExit);
     /* V4.4.7（秋野奈 PR#5）：沉浸界面最小化按钮（CSS 画横线图标，不用字形——em dash 太宽、U+2212 太窄） */
     R.immBtnMin = el('button', 'am-tbtn', '');
@@ -1139,6 +1248,15 @@
     R.immBtnMin.appendChild(_minBar);
     R.immBtnMin.onclick = function (e) { e.stopPropagation(); try { window.mine.winMin(); } catch (x) { } };
     cb.insertBefore(R.immBtnMin, bExit);
+    /* V4.4.8：沉浸层直接最大化/还原（与顶栏窗口三键同源） */
+    R.immBtnMax = el('button', 'am-tbtn', '');
+    R.immBtnMax.title = '最大化';
+    R.immBtnMax.style.display = 'inline-flex';
+    R.immBtnMax.style.alignItems = 'center';
+    R.immBtnMax.style.justifyContent = 'center';
+    R.immBtnMax.appendChild(_immWinIcon('M3.6 3.6 H12.4 V12.4 H3.6 Z'));
+    R.immBtnMax.onclick = function (e) { e.stopPropagation(); try { window.mine.winMax(); } catch (x) { } };
+    cb.insertBefore(R.immBtnMax, bExit);
     ov.appendChild(cb);
     buildImmInfo(ov);            // V4.4.7：左上角 ↓ + 歌曲信息面板
 
@@ -1600,6 +1718,21 @@
     pop.classList.add('on');
   }
   /* 设置里切换沉浸样式：沉浸中立即重建布局（不退出沉浸，不打断播放） */
+  /* V4.4.8：设置里切换取色权重后，立刻按新模式重算当前封面的颜色 */
+  AM.refreshVizColor = function () {
+    var root = document.getElementById('am-root');
+    var src = R.npCover && R.npCover.getAttribute('src');
+    if (!root || !src || !window.amVizColor) return;
+    window.amVizColor.analyze(src, function (pal) {
+      if (!pal) {
+        root.style.removeProperty('--am-cover-c1');
+        root.style.removeProperty('--am-cover-c2');
+        return;
+      }
+      root.style.setProperty('--am-cover-c1', pal.primary);
+      root.style.setProperty('--am-cover-c2', pal.accent);
+    });
+  };
   AM.refreshImmMode = function () {
     if (!R.imm) return;
     var wasVinyl = R.imm.classList.contains('am-imm-vinyl');
@@ -1630,7 +1763,7 @@
   }
   function immPopOpen() {
     // 弹层/右键菜单开着时不藏 chrome（💿 彩胶外观、歌词外观等正在交互）
-    return !!document.querySelector('#am-root .am-pop.on') || _infoOn; // 信息面板展开时不藏 chrome
+    return !!document.querySelector('#am-root .am-pop.on');   // V4.4.8：信息面板不再阻止静止隐藏 // 信息面板展开时不藏 chrome
   }
   function immGoIdle() {
     var root = immRoot();
@@ -1741,6 +1874,7 @@
         lyr: vinyl ? true : !!S.immLyrOn, // 彩胶歌词常驻恒为开
         q: !!S.immQOn,
         sr: +ratio.toFixed(4),
+      cur: S.lyrCur,   // V4.4.8：记住当时的当前行，换行后不再套用旧位置
         v: 1
       }));
     } catch (e) { }
@@ -1752,14 +1886,29 @@
     // 有存档时严格同步（避免经典→彩胶→经典后 S.immLyrOn 被彩胶置 true 残留）
     setImmLyr(vinyl ? true : !!cfg.lyr);
     setImmQueue(!!cfg.q);
-    if (cfg.sr > 0 && R.immLyrBox) {
+    if (R.immLyrBox) {
+      // V4.4.8：进度与当前行不同（切歌/播放推进）就回到当前行；同一行内才恢复手动滚动位置
+      var _sameLine = (cfg.cur === S.lyrCur), _nearBottom = cfg.sr >= 0.985;
       requestAnimationFrame(function () {
         if (!R.immLyrBox) return;
-        var v = cfg.sr * Math.max(0, R.immLyrBox.scrollHeight - R.immLyrBox.clientHeight);
-        (AM.progScrollTop || function (b, x) { b.scrollTop = x; })(R.immLyrBox, v);
+        if (_sameLine && !_nearBottom) {
+          var v = cfg.sr * Math.max(0, R.immLyrBox.scrollHeight - R.immLyrBox.clientHeight);
+          (AM.progScrollTop || function (b, x) { b.scrollTop = x; })(R.immLyrBox, v);
+          return;
+        }
+        var nl = R.immLyrBox.querySelector('.am-lyr-line.cur');
+        if (nl) (AM.progScrollTop || function (b, x) { b.scrollTop = x; })(R.immLyrBox, nl.offsetTop - R.immLyrBox.clientHeight * 0.35);
       });
     }
   }
+  /* V4.4.8：空闲预构建沉浸层——首次进入不再因同步建 DOM/canvas 而卡顿、丢动画 */
+  var _immWarmed = false;
+  function immWarmUp() {
+    if (_immWarmed || R.imm) return;
+    _immWarmed = true;
+    try { buildImmersive(); } catch (e) { }
+  }
+  try { setTimeout(immWarmUp, 2500); } catch (e) { }
   function toggleImmersive(force) {
     var want = force !== undefined ? force : !S.imm;
     if (want === !!S.imm) return;
@@ -1773,7 +1922,9 @@
     // V4.4：沉浸模式真全屏（设置 → AM 界面 开关；退出沉浸无条件复位，非全屏时为无害空操作）
     try {
       var fsOn = !!(window.annieSettings && annieSettings.ui && annieSettings.ui.amImmFullscreen);
-      if (window.mine && window.mine.winFullScreen && (want ? fsOn : true)) window.mine.winFullScreen(want && fsOn);
+      /* V4.4.8：进沉浸保持主界面窗口大小，不再自动真全屏；退出时若曾全屏则复原 */
+    var immKeepWindowSize = true;
+    if (!want && window.mine && window.mine.winFullScreen && fsOn) window.mine.winFullScreen(false);
     } catch (e) { }
     var root = document.getElementById('am-root');
     root.classList.toggle('am-imm-on', want);
@@ -1796,7 +1947,7 @@
     S.immQOn = on;
     document.getElementById('am-root').classList.toggle('am-imm-q-on', on && S.imm);
     R.immBtnQ.classList.toggle('on', on);
-    if (on && S.imm) { renderQueuePanel(R.immQ); immShowChrome(); } // 打开队列即退出静止隐藏态
+    if (on && S.imm) { S._qJumpCur = true; renderQueuePanel(R.immQ); immShowChrome(); } // 打开队列即退出静止隐藏态
   }
 
   /* ================= V4.4：主界面待播清单抽屉 ================= */
@@ -1811,7 +1962,7 @@
     S.qOn = on;
     document.getElementById('am-root').classList.toggle('am-q-on', on);
     if (R.btnQ) R.btnQ.classList.toggle('on', on);
-    if (on) renderQueuePanel(R.qDrawer);
+    if (on) { S._qJumpCur = true; renderQueuePanel(R.qDrawer); }
   }
   AM.toggleMainQueue = toggleMainQueue;
   /* 队列剩余条数角标（流媒体=当前之后的曲目数；本地=当前索引之后） */
@@ -1831,9 +1982,27 @@
     R.btnQBadge.style.display = (n > 0 && qbMode !== 'off') ? '' : 'none';
   }
   /* 抽屉开着时的轻刷新：切歌/队列增删后更新高亮与角标（仅 queue 页签需要，评论/历史各自有事件或手动切回） */
+  /* V4.4.9：切歌只改当前行高亮，不重建整表（避免封面闪烁、列表跳动） */
+  function amQueueCurUpdate(box) {
+    try {
+      var list = box && box.querySelector('.am-q-list');
+      if (!list) return false;
+      var rows = list.querySelectorAll('.am-q-row');
+      if (!rows.length) return false;
+      var curPath = state.currentPath || '';
+      var hasPath = false;
+      for (var i = 0; i < rows.length; i++) {
+        var rp = rows[i].dataset.path || '';
+        if (rp) hasPath = true;
+        var on = !state.currentStream && rp && rp === curPath;
+        if (on !== rows[i].classList.contains('cur')) rows[i].classList.toggle('cur', on);
+      }
+      return hasPath;
+    } catch (e) { return false; }
+  }
   function refreshQDrawerIfOpen() {
     refreshQBadge();
-    if (S.qOn && R.qDrawer && S.qTab !== 'cmt') renderQueuePanel(R.qDrawer);
+    if (S.qOn && R.qDrawer && S.qTab !== 'cmt' && !amQueueCurUpdate(R.qDrawer)) renderQueuePanel(R.qDrawer);
   }
 
   /* ================= V4.4：重启恢复播放（本地 + 流媒体） =================
@@ -1860,10 +2029,18 @@
           songs: list.slice(0, 200) // 快照上限 200 首（约 100~300KB，localStorage 容量内）
         }));
       } else if (state.currentPath && state.queue && state.queue.length && state.index >= 0) {
+        /* V4.4.9：播放列表曲目可能不在媒体库（未加入库的目录），恢复时按 libIndex 查不到——
+           额外存一份轻量曲目信息，doRestore 里作为兜底 */
         localStorage.setItem(RESUME_META, JSON.stringify({
           v: 1, kind: 'local', idx: state.index, playing: !!state.playing, path: state.currentPath,
           title: (state.queue[state.index] && state.queue[state.index].name) || '',
-          paths: state.queue.map(function (t) { return t && t.path; }).filter(Boolean)
+          paths: state.queue.map(function (t) { return t && t.path; }).filter(Boolean),
+          items: state.queue.slice(0, 200).map(function (t) {
+            if (!t) return null;
+            var mm = trackMeta(t);
+            return { path: t.path, name: t.name || '', title: mm.title || '', artist: mm.artist || '',
+                     album: mm.album || '', dur: t.dur || t.duration || 0 };
+          }).filter(Boolean)
         }));
       }
     } catch (e) { /* 配额超限等：静默放弃本次保存 */ }
@@ -1897,7 +2074,60 @@
       if (pp && pp.path === meta.path) pos = Math.max(0, pp.pos || 0);
     } catch (e) { }
     // V4.4.2：不再静默续播——弹确认框由用户决定（无论上次退出是播放还是暂停）
-    showResumePrompt(meta, pos);
+    /* V4.4.9：设置项「启动时询问是否续播」写入 localStorage，这里必须读同一个键；
+       window.__amResumePrompt 仅保留为 DevTools 逃生口（此前只读 window 导致开关形同虚设） */
+    var _ask = false;
+    try {
+      var _rpLs = localStorage.getItem('annieplayer.amResumePrompt');
+      if (_rpLs === 'on' || _rpLs === '1') _ask = true;
+      else if (_rpLs === null && window.annieSettings && annieSettings.ui && annieSettings.ui.amResumePrompt === 'on') _ask = true;
+    } catch (e0) { }
+    if (_ask || window.__amResumePrompt) { showResumePrompt(meta, pos); }
+    else {
+      /* V4.4.9：默认静默恢复队列并强制暂停；等曲库索引就绪再执行（否则会静默失败） */
+      var _rr = 0;
+      (function _tryRestore() {
+        var ready = false;
+        try { ready = !!(state.libIndex && state.libIndex.size); } catch (e2) { }
+        if (!ready) { if (_rr++ < 40) setTimeout(_tryRestore, 250); return; }
+        try {
+          meta.playing = false;
+          var _vg = (state.library && state.library.volume != null) ? state.library.volume : 0.6;
+          /* 先按持久化的独占/共享重建后端，再静默恢复；否则引擎启动默认独占会短暂静音其他程序 */
+          var _ex = true;
+          try { var _ev = localStorage.getItem('annieplayer.exclusive'); if (_ev !== null) _ex = _ev === '1'; } catch (e0) { }
+          var _go = function () {
+            try { window.mine.engine('volume.set', { gain: 0 }).catch(function () { }); } catch (e10) { }
+            doRestore(meta, pos);
+            setTimeout(function () { try { window.mine.engine('pause').catch(function () { }); } catch (e8) { } }, 80);
+            setTimeout(function () { try { window.mine.engine('pause').catch(function () { }); } catch (e9) { } }, 600);
+            setTimeout(function () { try { window.mine.engine('volume.set', { gain: _vg }).catch(function () { }); } catch (e11) { } }, 900);
+          };
+          if (_ex === false) {
+            var _kind = state.backendKind || 'wasapi';
+            var _id = null;
+            try { var _bk = (state.library && state.library.backend) || ''; var _p = _bk.split('|'); if (_p[0] === 'wasapi' && _p[1]) _id = _p[1]; } catch (e0) { }
+            var _select = function () { return window.mine.engine('devices.select', { kind: _kind, id: _id, exclusive: false }); };
+            var _apply = function () {
+              var _race = new Promise(function (res) { setTimeout(res, 1500); });
+              Promise.race([_select().then(function () { return true; }), _race.then(function () { return false; })])
+                .then(function (ok) { if (ok) window.__amExclDone = true; _go(); })
+                .catch(function () { _go(); });
+            };
+            var _nm = (window.__lastFormat && window.__lastFormat.device) || null;
+            if (_nm) {
+              try {
+                window.mine.engine('devices.list').then(function (dd) {
+                  var hit = ((dd && dd.wasapi) || []).filter(function (x) { return x.name === _nm; })[0];
+                  if (hit) _id = hit.id;
+                  _apply();
+                }).catch(function () { _apply(); });
+              } catch (e0) { _apply(); }
+            } else { _apply(); }
+          } else { _go(); }
+        } catch (e3) { }
+      })();
+    }
   }
   /* 续播确认弹窗：显示上次曲目/进度/状态；「续播」执行恢复，其余（不续播/关窗/Esc）清除恢复点 */
   function showResumePrompt(meta, pos) {
@@ -1949,14 +2179,38 @@
   function doRestore(meta, pos) {
     if (meta.kind === 'local') {
       var byPath = state.libIndex || null;
-      var tracks = (meta.paths || []).map(function (p) { return byPath ? byPath.get(p) : null; }).filter(Boolean);
+      /* V4.4.9：播放列表曲目未必在媒体库索引里（未入库目录），此时用恢复点自带的 items 兜底 */
+      var byItem = {};
+      (meta.items || []).forEach(function (it) { if (it && it.path) byItem[it.path] = it; });
+      var tracks = (meta.paths || []).map(function (p) {
+        var t = byPath ? byPath.get(p) : null;
+        if (!t && byItem[p]) t = byItem[p];
+        return t || null;
+      }).filter(Boolean);
       var idx = -1;
       tracks.forEach(function (t, i) { if (t.path === meta.path) idx = i; });
-      if (idx < 0 || !tracks.length) return; // 曲目已不在媒体库（移动/移除）→ 放弃恢复
+      if (idx < 0 || !tracks.length) return; // 曲目已不在媒体库且无兜底信息（移动/移除）→ 放弃恢复
       state.queue = tracks;
       state.queueCtx = 'list'; // 手动恢复的队列不视为全库（全文件顺序模式不越权接管）
       _resumePause = !meta.playing;
       playAt(idx, pos);
+      /* V4.4.9：未入库的播放列表曲目没有标签缓存 → 顶栏标题会退化成文件路径、
+         队列行只剩编号。恢复后异步补标签，到达后重刷顶栏与队列 */
+      try {
+        var _need = tracks.filter(function (x) { return x && x.path && !(S.meta && S.meta[x.path]); });
+        if (_need.length) {
+          if (window.__annieAMInternal && window.__annieAMInternal.ensureMeta) window.__annieAMInternal.ensureMeta(_need.slice(0, 200));
+          var _mt = 0;
+          (function _pollQueueMeta() {
+            var miss = tracks.filter(function (x) { return x && x.path && !(S.meta && S.meta[x.path] && !S.meta[x.path].fail); });
+            if (miss.length && _mt++ < 40) { setTimeout(_pollQueueMeta, 300); return; }
+            try { refreshNowPlaying(); } catch (e1) { }
+            try { if (S.qOn && R.qDrawer) renderQueuePanel(R.qDrawer); } catch (e2) { }
+            try { if (S.immQOn && R.immQ && S.imm) renderQueuePanel(R.immQ); } catch (e3) { }
+            try { if (S.miniQOn && R.miniQ && S.mini) renderQueuePanel(R.miniQ); } catch (e4) { }
+          })();
+        }
+      } catch (eM) { }
     } else if (meta.kind === 'stream' && Array.isArray(meta.songs) && meta.songs[meta.idx]) {
       S.stQuality = meta.quality || S.stQuality;
       S._playList = meta.songs; // 纯快照队列，不污染搜索视图 stResults
@@ -2200,6 +2454,30 @@
   /* ---------------- 播放状态刷新 ---------------- */
   /* V4.1 切歌动效助手：氛围背景 dip-fade / 封弹入 / 文本两阶段过渡，全部可重入（连点切歌重置定时器） */
   var _bgSwapT = 0, _bgLast = undefined;
+  /* V4.4.8：超大内嵌封面（data:）先缩到 720px 再用作氛围背景；
+     之前 3~4MB 的 base64 直接塞进 --am-bgimage 会整条背景不显示 */
+  var _bgSmallCache = {};
+  function bgFromDataUrl(url, cb) {
+    if (!url || url.slice(0, 5) !== 'data:' || url.length < 300 * 1024) { cb(url); return; }
+    if (_bgSmallCache[url]) { cb(_bgSmallCache[url]); return; }
+    var img = new Image();
+    img.onload = function () {
+      try {
+        var max = 720;
+        var w = img.naturalWidth || 1, h = img.naturalHeight || 1;
+        var k = Math.min(1, max / Math.max(w, h));
+        var cv2 = document.createElement('canvas');
+        cv2.width = Math.max(1, Math.round(w * k));
+        cv2.height = Math.max(1, Math.round(h * k));
+        cv2.getContext('2d').drawImage(img, 0, 0, cv2.width, cv2.height);
+        var out = cv2.toDataURL('image/jpeg', 0.82);
+        _bgSmallCache[url] = out;
+        cb(out);
+      } catch (e) { cb(url); }
+    };
+    img.onerror = function () { cb(url); };
+    img.src = url;
+  }
   function swapAtmosphere(url) {
     var root = document.getElementById('am-root');
     if (!root || url === _bgLast) return;
@@ -2207,7 +2485,13 @@
     root.classList.add('am-bgout');
     clearTimeout(_bgSwapT);
     _bgSwapT = setTimeout(function () {
-      if (url) { root.style.setProperty('--am-bgimage', 'url("' + url + '")'); root.classList.remove('am-nobg'); }
+      if (url) {
+        bgFromDataUrl(url, function (u) {
+          if (_bgLast !== url) return;
+          root.style.setProperty('--am-bgimage', 'url("' + u + '")');
+          root.classList.remove('am-nobg');
+        });
+      }
       else root.classList.add('am-nobg');
       root.classList.remove('am-bgout');
     }, 180);
@@ -2221,7 +2505,44 @@
     if (img === R.npCover && R.lyrCover) {
       swapCover(R.lyrCover, url);
       var root = document.getElementById('am-root');
-      if (root) root.classList.toggle('am-lyrcover-has', !!url);
+      if (root) {
+        root.classList.toggle('am-lyrcover-has', !!url);
+        // V4.4.8：当前封面取色 → CSS 变量（侧栏搜索框 / A–Z 索引条半透明底色用）
+        if (window.amVizColor) {
+          if (!url) {
+            root.style.removeProperty('--am-cover-c1');
+            root.style.removeProperty('--am-cover-c2');
+          } else {
+            window.amVizColor.analyze(url, function (pal) {
+              if (!pal) {
+                root.style.removeProperty('--am-cover-c1');
+                root.style.removeProperty('--am-cover-c2');
+                return;
+              }
+              /* 搜索框底色来源可选：跟随封面 / 跟随频谱主色 / 不着色 */
+              var _tone = (window.annieSettings && annieSettings.ui && annieSettings.ui.amSearchTone) || 'cover';
+              var _c1 = _tone === 'plain' ? 'transparent'
+                      : (_tone === 'prime' ? pal.primary : (pal.vizUi || pal.primary));
+              root.style.setProperty('--am-cover-c1', _c1);
+              root.style.setProperty('--am-cover-c2', pal.accent);
+              /* 深色封面给更高占比、浅色封面给更低占比，避免「深封面一片白、浅封面一片灰」 */
+              try {
+                var _m = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(pal.primary || '');
+                if (_m) {
+                  var _r = +_m[1], _g = +_m[2], _b = +_m[3];
+                  var _l = 0.2126 * _r + 0.7152 * _g + 0.0722 * _b;
+                  /* 反解占比：让合成后的亮度落在一个固定区间 ——
+                     深色封面自动少掺（不发黑），浅色封面自动多掺（不发白） */
+                  var _W = 251, _tgt = 0.845 * 255;
+                  var _ratio = (_W - _tgt) / Math.max(18, (_W - _l));
+                  var _t = Math.round(Math.max(12, Math.min(40, _ratio * 100)));
+                  root.style.setProperty('--am-cover-tint', _t + '%');
+                }
+              } catch (e2) { }
+            });
+          }
+        }
+      }
     }
   }
   var _txT = 0;
@@ -2271,7 +2592,62 @@
     clearTimeout(_fmtClearT);
     if (S.fmt) _lastFmt = S.fmt;
     if (!R.npBadge) return;
-    R.npBadge.textContent = S.fmt;
+    /* V4.4.8：按 np 实际可用宽度决定胶囊文案（短/长） */
+    var _rootEl = document.getElementById('am-root');
+    var _npEl = _rootEl && _rootEl.querySelector('.am-np');
+    if (window.__amMeasuring) return;   /* 展开预测测量期间不要动胶囊 */
+    /* 迟滞：低于 290 才收，高于 330 才展开，中间区间保持现状（防止阈值附近来回抖） */
+    var _npw = _npEl ? _npEl.clientWidth : 0;
+    if (_npw < 290) window.__amTightOn = true; else if (_npw > 330) window.__amTightOn = false;
+    var _tightBadge = !!window.__amTightOn;   /* np 被压到 0 也算紧凑 */
+    var _txt = _tightBadge ? String(S.fmt || '').split('·')[0].trim() : S.fmt;
+    if (R.npBadge.textContent !== _txt) {
+      var _b = R.npBadge;
+      if (window.__amBadgeAnim) return;   /* 动画进行中，避免拖拽/观测器反复重启 */
+      var _shrink = _txt.length < _b.textContent.length;
+      if (window.__amNoBlur) {
+        /* 拖动路径：先动宽度（文字暂不换，靠 ellipsis 逐字裁），收完再落文案；无模糊 */
+        _b.classList.remove('am-badge-blur');
+        var _ow = _b.getBoundingClientRect().width;
+        var _clone = _b.cloneNode(false);
+        _clone.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;width:auto;';
+        _clone.textContent = _txt;
+        _b.appendChild(_clone);
+        var _nw = _clone.getBoundingClientRect().width;
+        _clone.remove();
+        window.__amBadgeAnim = true;
+        _b.style.transition = 'width .16s ease';
+        _b.style.width = _ow + 'px';
+        if (_shrink) {
+          void _b.offsetWidth;
+          _b.style.width = _nw + 'px';
+          setTimeout(function () { _b.textContent = _txt; _b.style.width = ''; _b.style.transition = ''; window.__amBadgeAnim = false; }, 180);
+        } else {
+          _b.textContent = _txt;
+          void _b.offsetWidth;
+          _b.style.width = _nw + 'px';
+          setTimeout(function () { _b.style.width = ''; _b.style.transition = ''; window.__amBadgeAnim = false; }, 180);
+        }
+      } else {
+        var _ow2 = _b.getBoundingClientRect().width;
+        var _clone2 = _b.cloneNode(false);
+        _clone2.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;width:auto;';
+        _clone2.textContent = _txt;
+        _b.appendChild(_clone2);
+        var _nw2 = _clone2.getBoundingClientRect().width;
+        _clone2.remove();
+        window.__amBadgeAnim = true;
+        _b.style.transition = _shrink ? 'width .11s ease' : 'width .28s cubic-bezier(.25,.1,.25,1)';
+        _b.style.width = _ow2 + 'px';
+        _b.textContent = _txt;
+        void _b.offsetWidth;
+        if (_shrink) { _b.classList.remove('am-badge-blur'); void _b.offsetWidth; _b.classList.add('am-badge-blur'); }
+        else { _b.classList.remove('am-badge-blur'); }
+        _b.style.width = _nw2 + 'px';
+        setTimeout(function () { _b.style.transition = 'none'; _b.style.width = ''; void _b.offsetWidth; _b.style.transition = ''; window.__amBadgeAnim = false; }, _shrink ? 160 : 340);
+        setTimeout(function () { _b.classList.remove('am-badge-blur'); }, 620);
+      }
+    }
     R.npBadge.style.display = S.fmt ? '' : 'none';
   }
   // V4.4：流媒体命中本地播放缓存时，主/沉浸/迷你三处音质徽标点亮「缓存」态
@@ -2310,7 +2686,29 @@
       streamCover = state.currentStream.cover || '';
     } else if (state.currentCue && state.currentCue.title) { title = state.currentCue.title; artist = state.currentCue.artist || ''; }
     else if (t) { var m = trackMeta(t); title = m.title; artist = m.artist; album = m.album; }
+    /* __amNpMetaFallback: 不在曲库索引时回退到标签缓存，避免顶栏只剩文件路径 */
+    else if (S.meta[p]) { var mf = S.meta[p]; title = mf.title || p; artist = mf.artist || ''; album = mf.album || ''; }
     swapNpText(title, artist + (album ? ' — ' + album : ''));
+    /* V4.4.8：冷启动曲库/标签未就绪时标题会退化成文件名，就绪后补一次 */
+    if (!state.currentStream) {
+      var _npTry = 0;
+      (function _npPoll() {
+        if (state.currentPath !== p) return;
+        var _tt = null;
+        try { _tt = allTracks().find(function (x) { return x.path === p; }); } catch (e0) { }
+        if (!_tt) { if (_npTry++ < 25) setTimeout(_npPoll, 300); return; }
+        if (!(S.meta && S.meta[_tt.path])) {
+          try { if (window.__annieAMInternal && window.__annieAMInternal.ensureMeta) window.__annieAMInternal.ensureMeta([_tt]); } catch (e1) { }
+          if (_npTry++ < 25) setTimeout(_npPoll, 300);
+          return;
+        }
+        var _m2 = window.__annieAMInternal && window.__annieAMInternal.trackMeta ? window.__annieAMInternal.trackMeta(_tt) : null;
+        if (_m2 && _m2.title && _m2.title !== R.npTitle.textContent) {
+          swapNpText(_m2.title, _m2.artist + (_m2.album ? ' — ' + _m2.album : ''));
+          S._smtc = { title: _m2.title, artist: _m2.artist, album: _m2.album }; pushSmtc();
+        }
+      })();
+    }
     S._smtc = { title: title, artist: artist, album: album }; // V4.4.7：供 SMTC 伴随进程使用
     S._smtcCover = ''; S._smtcCoverReady = false;            // 换曲先清封面，等回调里补
     pushSmtc();
@@ -2321,7 +2719,7 @@
       syncAuxViews();
     } else {
       var srcPath = (state.currentCue && state.currentCue.src) ||
-                    (state.currentIso && state.currentIso.src) || (t && t.path);
+                    (state.currentIso && state.currentIso.src) || (t && t.path) || p;
       if (srcPath) (t ? albumCover : ensureCover).call(null, t || srcPath, function (url) {
         if (state.currentPath !== p) return;
         if (url && url.indexOf('data:') === 0) smtcCoverThumb(url, function (small) { S._smtcCover = small; S._smtcCoverReady = true; pushSmtc(); }); /* V4.4.7：SMTC 封面（缩到 400px） */
@@ -2332,7 +2730,7 @@
       else { swapCover(R.npCover, null); swapAtmosphere(null); }
       syncAuxViews();
     }
-    loadLyrics(state.currentStream ? state.currentPath : ((state.currentCue && state.currentCue.src) || (t && t.path) || null), !!state.currentStream);
+    loadLyrics(state.currentStream ? state.currentPath : ((state.currentCue && state.currentCue.src) || (t && t.path) || p || null), !!state.currentStream);
   }
 
   /* V4.4.7（PR#6）：SMTC 封面统一缩到 400px JPEG（SMTC 缩略图不需要大图，减小 IPC 体积）。
@@ -2393,6 +2791,113 @@
       window.mine.smtcUpdate(o);
     } catch (e) { }
   }
+  /* PR#17#B：SMTC 首启迁移——存量 on 且用户从未显式选择过 → 置 off 并提示 */
+  (function () {
+    try {
+      if (localStorage.getItem('annieplayer.amSmtcMigrated') === '1') return;
+      localStorage.setItem('annieplayer.amSmtcMigrated', '1');
+      if (localStorage.getItem('annieplayer.amSmtcUserSet') === '1') return;
+      if (localStorage.getItem('amSmtc') !== 'on') return;
+      localStorage.setItem('amSmtc', 'off');
+      (function syncStore(n) {
+        try {
+          if (localStorage.getItem('annieplayer.amSmtcUserSet') === '1') return;
+          var s = window.annieSettings;
+          if (s && s.ui) {
+            if (s.ui.amSmtc !== 'off') { s.ui.amSmtc = 'off'; if (typeof s.save === 'function') s.save(); }
+            if (localStorage.getItem('amSmtc') !== 'off') localStorage.setItem('amSmtc', 'off');
+            return;
+          }
+        } catch (e3) { }
+        if (n < 40) setTimeout(function () { syncStore(n + 1); }, 250);
+      })(0);
+      (function waitToast(n) {
+        if (typeof window.proToast === 'function') {
+          try { window.proToast('SMTC 可能增加系统负载，已默认关闭，可在 设置 → AM 界面 开启'); } catch (e2) { }
+          return;
+        }
+        if (n > 20) return;
+        setTimeout(function () { waitToast(n + 1); }, 500);
+      })(0);
+    } catch (e0) { }
+  })();
+  /* PR#17#A：设置项「启动时询问是否续播」+ SMTC 显式选择标记 */
+  (function () {
+    var KEY = 'annieplayer.amResumePrompt';
+    var FLAG = 'annieplayer.amSmtcUserSet';
+    function val() {
+      try { return localStorage.getItem(KEY) === 'on' ? 'on' : 'off'; } catch (e) { return 'off'; }
+    }
+    function markSmtc() {
+      try {
+        var rows = document.querySelectorAll('.set-row');
+        for (var i = 0; i < rows.length; i++) {
+          if ((rows[i].textContent || '').indexOf('系统媒体会话') >= 0) {
+            var sel = rows[i].querySelector('select');
+            if (sel && !sel.__amSmtcMark) {
+              sel.__amSmtcMark = 1;
+              sel.addEventListener('change', function () {
+                try { localStorage.setItem(FLAG, '1'); } catch (e) { }
+              });
+            }
+            break;
+          }
+        }
+      } catch (e) { }
+    }
+    function inject() {
+      try {
+        if (document.getElementById('am-rp-row')) return;
+        var rows = document.querySelectorAll('.set-row');
+        if (!rows.length) return;
+        var anchor = null;
+        for (var i = 0; i < rows.length; i++) {
+          if ((rows[i].textContent || '').indexOf('系统媒体会话') >= 0) { anchor = rows[i]; break; }
+        }
+        if (!anchor) return;
+        var row = document.createElement('div');
+        row.className = 'set-row';
+        row.id = 'am-rp-row';
+        var lab = document.createElement('div');
+        var t = document.createElement('div');
+        t.textContent = '启动时询问是否续播';
+        var h = document.createElement('div');
+        h.className = 'set-hint';
+        h.textContent = '关闭=直接静默恢复并暂停（不弹窗）；开启=弹窗让你选择续播或从头播放';
+        lab.appendChild(t); lab.appendChild(h);
+        var sel = document.createElement('select');
+        [['off', '关闭（静默恢复）'], ['on', '开启（弹窗询问）']].forEach(function (o) {
+          var op = document.createElement('option');
+          op.value = o[0]; op.textContent = o[1];
+          sel.appendChild(op);
+        });
+        sel.value = val();
+        sel.onchange = function () {
+          try { localStorage.setItem(KEY, sel.value); } catch (e) { }
+          try {
+            if (window.annieSettings && annieSettings.ui) {
+              annieSettings.ui.amResumePrompt = sel.value;
+              if (typeof annieSettings.save === 'function') annieSettings.save();
+            }
+          } catch (e) { }
+        };
+        row.appendChild(lab); row.appendChild(sel);
+        anchor.parentNode.insertBefore(row, anchor.nextSibling);
+      } catch (e) { }
+    }
+    window.__amRpInject = inject;
+    /* 面板打开时每 600ms 轻量补一次（一次 getElementById，代价可忽略）；关闭时不做事 */
+    try {
+      function tick() {
+        var panel = document.getElementById('settings-panel');
+        if (!panel || !panel.classList.contains('open')) return;
+        inject();
+        markSmtc();
+      }
+      setInterval(tick, 600);
+      setTimeout(tick, 800);
+    } catch (e) { }
+  })();
   function refreshTransport() {
     pushSmtc();  /* V4.4.7: 播放/暂停状态也同步给 SMTC */
 
@@ -2410,6 +2915,8 @@
   }
   /* renderView 重建内容但保持滚动位置，并主动对齐窗口化可视区（不等 scroll 事件，时序不可靠） */
   function restoreScrollAround() {
+    /* __amDragGuard: 拖动期间延迟重绘，拖动结束再补 */
+    if (window.__amDragBusy) { window.__amDragPending = true; return; }
     var sc = R.content ? R.content.scrollTop : 0;
     renderView();
     if (!R.content) return;
@@ -2417,6 +2924,11 @@
     R.content.scrollTop = sc;
     if (S._tbl) { S._tbl.lastStart = -1; renderAmWindow(); }
   }
+  window.__amFlushDragRender = function () {
+    if (!window.__amDragPending) return;
+    window.__amDragPending = false;
+    restoreScrollAround();
+  };
 
   /* ---------------- 引擎事件 ---------------- */
   function bindGlobal() {
@@ -2495,9 +3007,9 @@
         resetResumePos(state.currentPath); // 新曲位置键归零（此刻 S.pos 仍是旧曲值）
         // V4.4：任何打开的队列面板随切歌刷新（评论页签不打断，历史/待播更新当前行高亮）
         if (S.qTab !== 'cmt') {
-          if (S.qOn && R.qDrawer) renderQueuePanel(R.qDrawer);
-          if (S.immQOn && R.immQ && S.imm) renderQueuePanel(R.immQ);
-          if (S.miniQOn && R.miniQ && S.mini) renderQueuePanel(R.miniQ);
+          if (S.qOn && R.qDrawer && !amQueueCurUpdate(R.qDrawer)) renderQueuePanel(R.qDrawer);
+          if (S.immQOn && R.immQ && S.imm && !amQueueCurUpdate(R.immQ)) renderQueuePanel(R.immQ);
+          if (S.miniQOn && R.miniQ && S.mini && !amQueueCurUpdate(R.miniQ)) renderQueuePanel(R.miniQ);
         }
         // V4.1：切歌后自动定位到当前播放行（随机/顺序播放跳转到远处时滚动跟随；
         // 行已在可视区则不打扰；流媒体与专辑/文件夹网格视图跳过）
@@ -2505,7 +3017,8 @@
         if (p2 && !state.currentStream && S.view !== 'stream'
             && !(S.view === 'albums' && !S.albumKey) && !(S.view === 'folders' && !S.folderPath)
             && currentTracks().some(function (t) { return t.path === p2; })) {
-          scrollRowIntoView(p2, { auto: true });
+          /* V4.4.9：用户刚手动滚动过（1.5s 内）就不强制定位，避免打断浏览 */
+          if (Date.now() - (S._userScrollAt || 0) > 1500) scrollRowIntoView(p2, { auto: true });
         } else if (p2 && state.currentStream && (S.view === 'stream' || S.view.indexOf('spl:') === 0)
             && AM.scrollStreamRowIntoView) {
           // V4.4：流媒体切歌终点校正——playStreamAt 的 smooth 滚动会被 refresh 链里
@@ -2564,7 +3077,12 @@
     var cv = R.vizBar;
     if (!cv || !S.mounted || document.hidden) return;
     if (window.annieTheme && annieTheme.current !== 'am') return;
-    if (window.annieSettings && annieSettings.ui.amViz === false) { if (cv.style.display !== 'none') cv.style.display = 'none'; return; }
+    if (window.annieSettings && annieSettings.ui.amViz === false) {
+      if (cv.style.display !== 'none') cv.style.display = 'none';
+      var _r0 = document.getElementById('am-root'); if (_r0) _r0.classList.add('am-viz-off');
+      return;
+    }
+    var _r1 = document.getElementById('am-root'); if (_r1) _r1.classList.remove('am-viz-off');
     if (cv.style.display === 'none') cv.style.display = '';
     /* V4.4.7：取色/模式轮询必须排在「频谱条有没有尺寸」之前——沉浸模式里 .am-vizbar 是
        display:none（宽高 0），原来在这儿就 return 了，氛围模式面板的配色会永远停在
@@ -2602,7 +3120,8 @@
       } else if (vizMode === 'coverMulti' && vizPal && vizPal.stops && vizPal.stops.length >= 2) {
         for (var si = 0; si < vizPal.stops.length; si++) grad.addColorStop(si / (vizPal.stops.length - 1), vizPal.stops[si]);
       } else if ((vizMode === 'cover' || vizMode === 'coverMulti') && vizPal) {
-        grad.addColorStop(0, vizPal.primary); grad.addColorStop(1, vizPal.accent);
+        grad.addColorStop(0, vizPal.vizPrimary || vizPal.primary);
+        grad.addColorStop(1, vizPal.vizAccent || vizPal.accent);
       } else { // accent 模式 / 封面取色失败（无封面、黑白封面、CORS 被拦）回落
         grad.addColorStop(0, vizAccA); grad.addColorStop(1, vizAccB);
       }
@@ -2610,8 +3129,39 @@
     }
     var n = 32, bw = cv.width / n;
     for (var i = 0; i < n; i++) {
+      /* V4.4.8：引擎低频若干条 band 是同一个值（bin 重复），整段等高很死板；
+         按「连续相同值」的段做线性爬升 0.55 → 1.0，视觉上才有层次 */
+      var rStart = i, rEnd = i, rStep;
+      while (rStart > 0 && Math.abs(vizBands[rStart - 1] - vizBands[i]) < 0.0005) rStart--;
+      while (rEnd < n - 1 && Math.abs(vizBands[rEnd + 1] - vizBands[i]) < 0.0005) rEnd++;
+      var rLen = rEnd - rStart + 1;
+      /* V4.4.8：引擎低频若干条 band 是同一个值（bin 重复），整段等高很死板；
+         按「连续相同值」的段做线性爬升 0.55 → 1.0，视觉上才有层次 */
+      var rStart = i, rEnd = i, rStep;
+      while (rStart > 0 && Math.abs(vizBands[rStart - 1] - vizBands[i]) < 0.0005) rStart--;
+      while (rEnd < n - 1 && Math.abs(vizBands[rEnd + 1] - vizBands[i]) < 0.0005) rEnd++;
+      var rLen = rEnd - rStart + 1;
       var target = vizBands[i];
-      vizSmooth[i] += (target - vizSmooth[i]) * 0.35; // 帧间插值
+      if (rLen > 1) {
+        rStep = (i - rStart) / (rLen - 1);
+        /* 峰值缓慢滑动：同一段里的拾弧不是死的，看着有呼吸感 */
+        var phM = (performance.now() / 2600) % 1;
+        rStep = (rStep * 0.7 + phM * 0.3) % 1;
+        target = target * (0.50 + 0.50 * rStep);
+        /* 每根柱子带一点相位摆动，同一段里也不会齐刷刷 */
+        target = Math.min(1, target * (1 + 0.12 * Math.sin(performance.now() / 170 + i * 1.9)));
+      }
+      if (rLen > 1) {
+        rStep = (i - rStart) / (rLen - 1);
+        /* 峰值缓慢滑动：同一段里的拾弧不是死的，看着有呼吸感 */
+        var phM = (performance.now() / 2600) % 1;
+        rStep = (rStep * 0.7 + phM * 0.3) % 1;
+        target = target * (0.50 + 0.50 * rStep);
+        /* 每根柱子带一点相位摆动，同一段里也不会齐刷刷 */
+        target = Math.min(1, target * (1 + 0.12 * Math.sin(performance.now() / 170 + i * 1.9)));
+      }
+      var kRise = 0.30 + ((i * 13) % 5) * 0.075, kFall = 0.14 + ((i * 37) % 7) * 0.028;
+      vizSmooth[i] += (target - vizSmooth[i]) * (target > vizSmooth[i] ? kRise : kFall); // 帧间插值
       var bh = Math.max(2, vizSmooth[i] * (cv.height - 4));
       if (vizMode === 'heat') ctx.fillStyle = vizHeatColor(Math.min(1, vizSmooth[i]));
       ctx.globalAlpha = 0.35 + vizSmooth[i] * 0.6;

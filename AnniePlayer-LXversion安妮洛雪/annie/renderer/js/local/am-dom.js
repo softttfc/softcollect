@@ -4,6 +4,325 @@
  * 来源：am.js 原稿行 388-871 + 1248-1295 + 1499-1540（原样切片，零行为变更）
  * 共享变量经 window.__annieAMInternal 桥接；前向引用为转发桩，运行时解析。 */
 (function () {
+  /* V4.4.8：顶栏图标统一 SVG（emoji 字形在不同字体下大小/基线各不相同） */
+  function amIcoTop(name, size) {
+    var P = {
+      vol: '<path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none"/><path d="M16.6 8.6a4.8 4.8 0 0 1 0 6.8"/>',
+      mute: '<path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none"/><path d="M16.4 9.2l4.6 5.6M21 9.2l-4.6 5.6"/>',
+      queue: '<path d="M4 7h10M4 12h10M4 17h6"/><circle cx="18.4" cy="16.6" r="2.3"/><path d="M20.7 16.6V7.8l2.2-.6"/>',
+      timer: '<circle cx="12" cy="12" r="8.4"/><path d="M12 7.2v5l3.4 2"/>',
+      expand: '<path d="M14.6 4.6H19.4V9.4"/><path d="M19.4 4.6L13.2 10.8"/><path d="M9.4 19.4H4.6V14.6"/><path d="M4.6 19.4L10.8 13.2"/>',
+      mini: '<rect x="3" y="5" width="18" height="14" rx="2.2"/><path d="M7 15h6"/>',
+      mic: '<rect x="9" y="2.6" width="6" height="11" rx="3"/><path d="M5.6 11a6.4 6.4 0 0 0 12.8 0M12 17.4V21"/>',
+      gear: '<g transform="translate(12 12) scale(0.9) translate(-12 -12)"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></g>',
+      msg: '<path d="M4.6 4.2h14.8a1.6 1.6 0 0 1 1.6 1.6v9.6a1.6 1.6 0 0 1-1.6 1.6h-8l-4.2 2.8v-2.8H4.6A1.6 1.6 0 0 1 3 15.4V5.8A1.6 1.6 0 0 1 4.6 4.2z"/>',
+      moon: '<path d="M21 12.8A8.6 8.6 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+      sun: '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.2 5.2l1.6 1.6M17.2 17.2l1.6 1.6M18.8 5.2l-1.6 1.6M6.8 17.2l-1.6 1.6"/>',
+      palette: '<rect x="3.6" y="3.6" width="7" height="7" rx="1.8"/><rect x="13.4" y="3.6" width="7" height="7" rx="1.8"/><rect x="3.6" y="13.4" width="7" height="7" rx="1.8"/><circle cx="16.9" cy="16.9" r="3.7"/>',
+      lock: '<rect x="5" y="10.6" width="14" height="9.8" rx="2"/><path d="M8.6 10.6V7.4a3.4 3.4 0 0 1 6.8 0v3.2"/>',
+      unlock: '<rect x="5" y="10.6" width="14" height="9.8" rx="2"/><path d="M8.6 10.6V7.4a3.4 3.4 0 0 1 6.4-1.7"/>',
+      link: '<path d="M10.6 13.4a4 4 0 0 0 5.6 0l2.8-2.8a4 4 0 1 0-5.6-5.6l-1.4 1.4"/><path d="M13.4 10.6a4 4 0 0 0-5.6 0l-2.8 2.8a4 4 0 1 0 5.6 5.6l1.4-1.4"/>',
+      back: '<path d="M14.6 6.2 9.4 12l5.2 5.8"/>',
+    };
+    return '<svg viewBox="0 0 24 24" width="' + (size || 16) + '" height="' + (size || 16) + '" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (P[name] || '') + '</svg>';
+  }
+  /* ===== V4.4.8：可拖动分栏（侧栏 / 歌词面板） ===== */
+  (function () {
+    var KS = 'annieplayer.am.sidew', KL = 'annieplayer.am.lyrw';
+    function num(v, d) { var n = parseInt(v, 10); return isFinite(n) ? n : d; }
+    function boot() {
+      var root = document.getElementById('am-root');
+      var body = root && root.querySelector('.am-body');
+      if (!body) { setTimeout(boot, 300); return; }
+      if (body.querySelector('.am-resize-l')) return;
+      var sw = num(localStorage.getItem(KS), 0);
+      if (sw >= 56 && sw <= 800) root.style.setProperty('--am-side-w', sw + 'px');
+      var lw = num(localStorage.getItem(KL), 0);
+      if (lw >= 260 && lw <= 640) root.style.setProperty('--am-lyr-w', lw + 'px');
+      function make(cls, get, set, save, sign) {
+        var h = document.createElement('div');
+        h.className = 'am-resize ' + cls;
+        body.appendChild(h);
+        h.addEventListener('dblclick', function () {
+          root.style.removeProperty(sign < 0 ? '--am-lyr-w' : '--am-side-w');
+          try { localStorage.removeItem(sign < 0 ? KL : KS); } catch (e) { }
+        });
+        h.addEventListener('mousedown', function (e) {
+          e.preventDefault(); e.stopPropagation();
+          var x0 = e.clientX, v0 = get(), last = v0;
+          root.classList.add('am-resizing'); h.classList.add('dragging');
+          function mv(ev) { last = set(v0 + (ev.clientX - x0) * sign) || last; if (window.__amCoalesce) window.__amCoalesce(); }
+          function up() {
+            document.removeEventListener('mousemove', mv, true);
+            document.removeEventListener('mouseup', up, true);
+            root.classList.remove('am-resizing'); h.classList.remove('dragging');
+            try { localStorage.setItem(sign < 0 ? KL : KS, String(Math.round(last))); } catch (e) { }
+            syncNarrow();
+          }
+          document.addEventListener('mousemove', mv, true);
+          document.addEventListener('mouseup', up, true);
+        });
+      }
+      // 左：侧栏（向左拖变窄 → sign = +1 时向右拖变宽）
+      make('am-resize-l',
+        function () { var s = root.querySelector('.am-side'); return s ? Math.round(s.getBoundingClientRect().width) : 240; },
+        function (w) { w = Math.max(56, Math.min(Math.round(innerWidth * 0.33), w)); root.__sideWant = w; root.style.setProperty('--am-side-w', w + 'px'); return w; },
+        null, 1);
+      // 右：歌词面板（手柄在面板左缘，向左拖变宽 → sign = -1）
+      /* 切换视图会重建内容区，重建后要重新判断一次 */
+      try {
+        var _c0 = root.querySelector('.am-content');
+        if (_c0) new MutationObserver(function () { setTimeout(syncNarrow, 30); }).observe(_c0, { childList: true });
+      } catch (e) { }
+      syncNarrow();
+      syncNpTight();
+      syncRail();
+      syncTransport();
+      make('am-resize-r',
+        function () { var l = root.querySelector('.am-lyrics'); return l ? Math.round(l.getBoundingClientRect().width) : 360; },
+        function (w) { w = Math.max(260, Math.min(640, w)); root.style.setProperty('--am-lyr-w', w + 'px'); return w; },
+        null, -1);
+    }
+    /* 内容区窄时切紧凑模式（按钮变小，避免三行换行） */
+    function syncNarrow() {
+      var r = document.getElementById('am-root'); if (!r) return;
+      var c = r.querySelector('.am-content'); if (!c) return;
+      /* 按「整排按钮所需宽度」判断：放得下保持原样，放不下才紧凑 */
+      var info = r.querySelector('.am-pl-info');
+      if (!info) { r.classList.remove('am-narrow'); return; }
+      var acts = info.querySelector('.am-pl-actions');
+      if (!acts || !acts.children.length) { r.classList.remove('am-narrow'); return; }
+      /* 先按完整样式量一次「三个按钮 + 间距」的真实宽度 */
+      var had = r.classList.contains('am-narrow');
+      r.classList.remove('am-narrow');
+      var _sum = 0, _kids = acts.children;
+      for (var _k = 0; _k < _kids.length; _k++) _sum += _kids[_k].getBoundingClientRect().width;
+      var _gap = parseFloat(getComputedStyle(acts).columnGap) || 8;
+      var need = _sum + _gap * Math.max(0, _kids.length - 1);
+      if (had) r.classList.add('am-narrow');
+      r.classList.toggle('am-narrow', info.getBoundingClientRect().width < need);
+    }
+    /* 顶栏太挤时隐藏音质胶囊，避免插进右侧图标 */
+    function syncNpTight() {
+      var r = document.getElementById('am-root'); if (!r) return;
+      var np = r.querySelector('.am-np'); if (!np) return;
+      var w = np.getBoundingClientRect().width;
+      var tight = r.classList.contains('am-np-tight');
+      if (!tight && w < 340) r.classList.add('am-np-tight');
+      else if (tight && w > 380) r.classList.remove('am-np-tight');
+      /* 胶囊展开/收起等动画结束（约 280ms）再换文案，避免边动边变 */
+      clearTimeout(window.__amBadgeT);
+      window.__amBadgeT = setTimeout(function () {
+        var w2 = np.getBoundingClientRect().width;
+        var tg = r.classList.contains('am-np-tight');
+        if (!tg && w2 < 340) r.classList.add('am-np-tight');
+        else if (tg && w2 > 380) r.classList.remove('am-np-tight');
+        try { if (window.__annieAMInternal && __annieAMInternal.refreshBadge) __annieAMInternal.refreshBadge(); } catch (e3) { }
+      }, 300);
+    }
+    /* 侧栏窄到只剩图标（≈120px 以下）时切「轨道」模式 */
+    function syncRail() {
+      var r = document.getElementById('am-root'); if (!r) return;
+      var s = r.querySelector('.am-side'); if (!s) return;
+      var w = s.getBoundingClientRect().width;
+      var rail = r.classList.contains('am-side-rail');
+      var next = rail ? (w > 100 ? false : true) : (w <= 96 ? true : false);
+      if (next !== rail) r.classList.toggle('am-side-rail', next);
+      var hdr = r.querySelector('.am-side .am-side-h');
+      var line = next || (!!hdr && (hdr.scrollWidth > hdr.clientWidth + 1));
+      if (line !== r.classList.contains('am-hdr-line')) r.classList.toggle('am-hdr-line', line);
+    }
+    /* 拖拽时把三种同步合并到一帧，避免每个 mousemove 都强制重排 */
+    var _rafSync = 0;
+    /* 顶栏左侧控制键：随侧栏宽度保持居中；右侧正在播放块始终贴齐侧栏右缘 */
+    function syncTransport() {
+      var r = document.getElementById('am-root'); if (!r) return;
+      var tr = r.querySelector('.am-transport');
+      var np = r.querySelector('.am-np');
+      var side = r.querySelector('.am-side');
+      if (!tr || !np || !side) return;
+      var sb = side.getBoundingClientRect();
+      var sw = sb.width, pad = 14;
+      var twant = Math.max(116, Math.min(sw - 28, 116 + (sw - 120) * 0.20));
+      tr.style.width = twant + 'px';
+      tr.style.marginLeft = Math.max(0, sw / 2 - pad - twant / 2) + 'px';
+      var t2 = tr.getBoundingClientRect();
+      var npNow = np.getBoundingClientRect().left;
+      var m0 = parseFloat(np.style.marginLeft) || 0;
+      var extra = npNow - t2.right - m0;
+      var _gap = Math.max(8, t2.left);   /* 控制栏到左边框的距离，作为最小间距 */
+      var want = Math.max(t2.right + _gap + 5, sb.right) - 2;   /* 再左移 2px：整体贴近侧栏竖线 */
+      var ml = Math.max(0, want - t2.right - extra);
+      np.style.marginLeft = ml + 'px';
+      np.style.marginRight = '8px';   /* 右侧最小间隙对齐左侧（含视觉补偿 3px） */
+      /* 自检：np 左缘与目标偏差 >1px 时立刻补一次（不越过控制键） */
+      var d = want - np.getBoundingClientRect().left;
+      if (Math.abs(d) > 1) np.style.marginLeft = (ml + d) + 'px';
+      /* 拖动时即时触发胶囊收缩动画（不夹宽度，胶囊靠动画自己收窄） */
+      try {
+        var _swNow = Math.round(sb.width);
+        if (_swNow !== window.__amLastSw) {
+          window.__amLastSw = _swNow;
+          window.__amNoBlur = true;
+          try { var _AM = window.__annieAMInternal; if (_AM && _AM.refreshBadge) _AM.refreshBadge(); } catch (e) { }
+          window.__amNoBlur = false;
+        }
+      } catch (e) { }
+    }
+    window.__amCoalesce = function () {
+      if (_rafSync) return;
+      _rafSync = requestAnimationFrame(function () {
+        _rafSync = 0; syncNarrow(); syncRail(); syncNpTight(); syncTransport();
+      });
+    };
+    window.__amSyncRail = syncRail;
+    window.addEventListener('resize', syncRail);
+    document.addEventListener('mouseup', function () { setTimeout(syncRail, 60); }, true);
+    window.__amSyncNpT = syncNpTight;
+    window.__amSyncTransport = syncTransport;
+    /* 侧栏 / 内容区滚动条：鼠标移入该面板并移动时显示，停移约 900ms 隐藏，移出立即隐藏 */
+    (function _amScrollbarHook() {
+      var root = document.getElementById('am-root');
+      if (!root) { setTimeout(_amScrollbarHook, 300); return; }
+      var c = root.querySelector('.am-content');
+      var s = root.querySelector('.am-side');
+      if (!c || !s) { setTimeout(_amScrollbarHook, 300); return; }
+      function bind(el) {
+        if (!el || el.__amSB) return; el.__amSB = 1;
+        var t = 0;
+        el.addEventListener('mouseenter', function () { el.classList.add('am-sb-on'); });
+        el.addEventListener('mousemove', function () {
+          el.classList.add('am-sb-on');
+          clearTimeout(t);
+          t = setTimeout(function () { el.classList.remove('am-sb-on'); }, 900);
+        }, { passive: true });
+        el.addEventListener('scroll', function () {
+          el.classList.add('am-sb-on');
+          clearTimeout(t);
+          t = setTimeout(function () { el.classList.remove('am-sb-on'); }, 900);
+        }, { passive: true });
+        el.addEventListener('mouseleave', function () { clearTimeout(t); el.classList.remove('am-sb-on'); });
+      }
+      bind(c); bind(s);
+      function dragScroll(el) {
+        if (!el || el.__amDrag) return; el.__amDrag = 1;
+        var down = false, sy = 0, st = 0, moved = false, skipUntil = 0;
+        el.addEventListener('pointerdown', function (e) {
+          if (e.button !== 0) return;
+          down = true; moved = false; sy = e.clientY; st = el.scrollTop; el._sbPrev = el.style.scrollBehavior; el.style.scrollBehavior = 'auto'; el.classList.add('am-drag-lyr');
+        });
+        window.addEventListener('pointermove', function (e) {
+          if (!down) return;
+          var dy = e.clientY - sy;
+          if (Math.abs(dy) > 4) moved = true;
+          el.scrollTop = st - dy;
+        }, { passive: true });
+        window.addEventListener('pointerup', function () {
+          if (!down) return; down = false; el.classList.remove('am-drag-lyr'); el.style.scrollBehavior = el._sbPrev || '';
+          if (moved) {
+            skipUntil = Date.now() + 400;   /* 拖动后松手不算点击 */
+            setTimeout(function () {
+              if (down) return;
+              var A = window.__annieAMInternal;
+              var cur = el.querySelector('.am-lyr-line.cur');
+              if (!cur || !A || !A.progScrollTop) return;
+              el.style.scrollBehavior = 'smooth';
+              A.progScrollTop(el, cur.offsetTop - el.clientHeight * 0.35);
+            }, 2000);
+          }
+        }, true);
+        el.addEventListener('click', function (e) {
+          if (Date.now() < skipUntil) { e.stopPropagation(); e.preventDefault(); skipUntil = 0; }
+        }, true);
+      }
+      function bindLyrDrag() {
+        ['.am-lyr-scroll', '.am-imm-lyr', '.am-mini-lyr'].forEach(function (sel) {
+          var el = root.querySelector(sel); if (el) dragScroll(el);
+        });
+      }
+      bindLyrDrag(); setInterval(bindLyrDrag, 1500);
+      var lyr = root.querySelector('.am-lyrics');
+      if (lyr && !lyr.__amMV) {
+        lyr.__amMV = 1; var t2 = 0;
+        lyr.addEventListener('mousemove', function () {
+          lyr.classList.add('am-mv');
+          clearTimeout(t2); t2 = setTimeout(function () { lyr.classList.remove('am-mv'); }, 1200);
+        }, { passive: true });
+        lyr.addEventListener('mouseleave', function () { clearTimeout(t2); lyr.classList.remove('am-mv'); });
+      }
+    })();
+    /* 记录/恢复上次停留的视图（歌曲/专辑/文件夹/播放列表…），重启回到原位置 */
+    try {
+      var _lvLast = '';
+      setInterval(function () {
+        var A = window.__annieAMInternal; if (!A || !A.S) return;
+        var st = JSON.stringify({ v: A.S.view, a: A.S.albumKey || null, f: A.S.folderPath || null });
+        if (st !== _lvLast) { _lvLast = st; try { localStorage.setItem('annieplayer.am.lastView', st); } catch (e) { } }
+      }, 800);
+      var _lvTries = 0;
+      var _lvT = setInterval(function () {
+        _lvTries++;
+        var A = window.__annieAMInternal; if (!A || !A.S) { if (_lvTries > 100) clearInterval(_lvT); return; }
+        var st2 = null; try { st2 = JSON.parse(localStorage.getItem('annieplayer.am.lastView') || 'null'); } catch (e) { }
+        if (!st2 || !st2.v) { clearInterval(_lvT); return; }
+        var _vT = st2.v, _aT = st2.a || null, _fT = st2.f || null;
+        /* 播放列表还没加载完就再等一会儿（避免恢复到一个暂时不存在的歌单） */
+        if ((_vT.indexOf('pl:') === 0 || _vT.indexOf('spl:') === 0) && _lvTries < 40) {
+          var _id = _vT.split(':')[1];
+          var _arr = _vT.indexOf('spl:') === 0 ? (A.S.streamPlaylists || []) : (A.S.playlists || []);
+          if (!_arr.some(function (p) { return String(p.id) === String(_id); })) return;
+        }
+        if (A.S.view !== _vT || (A.S.albumKey || null) !== _aT || (A.S.folderPath || null) !== _fT) {
+          A.S.view = _vT; A.S.albumKey = _aT; A.S.folderPath = _fT;
+          try { if (A.renderSidebar) A.renderSidebar(); if (A.renderView) A.renderView(); } catch (e) { }
+        }
+        clearInterval(_lvT);
+      }, 300);
+    } catch (e) { }
+    /* 兜底：每 400ms 检查一次对齐，有偏差才重算（防元素重建导致观察器失效） */
+    setTimeout(function () { setInterval(function () {   /* 延后启动，首屏更快 */
+      try {
+        var r = document.getElementById('am-root'); if (!r) return;
+        var s = r.querySelector('.am-side'); var c = r.querySelector('.am-np-cover');
+        if (!s || !c) return;
+        var d = s.getBoundingClientRect().right - c.getBoundingClientRect().left;
+        if (Math.abs(d) > 1) syncTransport();
+      } catch (e) { }
+    }, 400); }, 1500);
+    /* 侧栏宽度一变（恢复存档、拖动、窗口缩放）就重新对齐顶栏 */
+    try {
+      var _sideEl = document.querySelector('#am-root .am-side');
+      if (_sideEl) {
+        var _sideRO = new ResizeObserver(function () {
+          clearTimeout(window.__amSideT);
+          window.__amSideT = setTimeout(syncTransport, 60);
+        });
+        _sideRO.observe(_sideEl);
+      }
+    } catch (e) { }
+    /* 启动瞬间侧栏宽度可能还没恢复：补几次 */
+    [0, 120, 400, 1000].forEach(function (d) { setTimeout(function () { try { syncTransport(); } catch (e) { } }, d); });
+    /* np 宽度变化时实时校正胶囊长短，避免状态残留 */
+    try {
+      var _npRO = new ResizeObserver(function () {
+        clearTimeout(window.__amNpROT);
+        window.__amNpROT = setTimeout(function () {
+          if (window.__amSyncNpT) window.__amSyncNpT();
+          try { if (window.__annieAMInternal && __annieAMInternal.refreshBadge) __annieAMInternal.refreshBadge(); } catch (e) { }
+        }, 180);
+      });
+      var _npEl0 = document.querySelector('#am-root .am-np');
+      if (_npEl0) _npRO.observe(_npEl0);
+    } catch (e) { }
+    window.addEventListener('resize', syncTransport);
+    document.addEventListener('mouseup', function () { setTimeout(syncTransport, 60); }, true);
+    window.addEventListener('resize', syncNpTight);
+    document.addEventListener('mouseup', function () { setTimeout(syncNpTight, 60); }, true);
+    window.addEventListener('resize', syncNarrow);
+    setTimeout(syncNarrow, 400);
+    document.addEventListener('mouseup', function () { setTimeout(syncNarrow, 60); }, true);
+    boot();
+  })();
   var AM = window.__annieAMInternal || (window.__annieAMInternal = {}); // AM 主题内部模块桥（跨分片共享闭包变量）
   // 从桥取用先加载分片导出的引用（此时前片已执行完，引用有效）
   var S = AM.S;
@@ -83,16 +402,31 @@
     top.appendChild(np);
 
     var right = el('div', 'am-tb-right');
+    // V4.4.8：按钮组宽度逐帧写进 CSS 变量，中间块右缘与它保持恒定间距（展开/收起同速）
+    try {
+      var _tbLast = -1, _tbRaf = 0, _tbRoot = document.getElementById('am-root');
+      var _tbRO = new ResizeObserver(function () {
+        if (_tbRaf) return;
+        _tbRaf = requestAnimationFrame(function () {
+          _tbRaf = 0;
+          var w = Math.round(right.getBoundingClientRect().width);
+          if (w === _tbLast) return;
+          _tbLast = w;
+          if (_tbRoot) _tbRoot.style.setProperty('--am-tb-right-w', w + 'px');
+        });
+      });
+      _tbRO.observe(right);
+    } catch (e) { }
     var vol = el('div', 'am-vol');
     // V4.1：🔊 图标可点击（静音/取消静音），悬停展开音量条
-    var volIco = el('button', 'am-tbtn am-vol-ico', '🔊');
+    var volIco = el('button', 'am-tbtn am-vol-ico', ''); volIco.innerHTML = amIcoTop('vol', 18);
     volIco.title = '点击静音/取消静音；悬停展开音量条';
     volIco.onclick = function () {
       var cur = +R.vol.value;
       if (cur > 0) { S._muteVol = cur; R.vol.value = 0; }
       else { R.vol.value = S._muteVol || 80; }
       R.vol.oninput();
-      volIco.textContent = +R.vol.value > 0 ? '🔊' : '🔇';
+      volIco.innerHTML = amIcoTop(+R.vol.value > 0 ? 'vol' : 'mute', 18);
     };
     vol.appendChild(volIco);
     R.vol = document.createElement('input');
@@ -103,6 +437,11 @@
       var g = (+R.vol.value) / 100;
       window.mine.engine('volume.set', { gain: g }).catch(function () { });
       if (legacyVol) legacyVol.value = R.vol.value; // 与粒子舞台底栏音量保持同步
+      /* V4.4.9：持久化音量（此前只发引擎不落盘，重启会被 store 里的旧值覆盖成 100%） */
+      try {
+        if (state.library) state.library.volume = g;
+        if (window.mine && window.mine.saveSettings) window.mine.saveSettings({ volume: g });
+      } catch (e0) { }
     };
     vol.appendChild(R.vol);
     // V4.3.22：音量条关闭延迟——离开悬停区后保持 600ms，给鼠标移过去的余量；
@@ -125,20 +464,20 @@
       if (volFromPtr) { volFromPtr = false; R.vol.blur(); }
     });
     right.appendChild(vol);
-    R.btnExcl = el('button', 'am-tbtn', (window.annieIsExclusive ? window.annieIsExclusive() : true) ? '🔒' : '🔓');
+    R.btnExcl = el('button', 'am-tbtn', ''); R.btnExcl.innerHTML = amIcoTop((window.annieIsExclusive ? window.annieIsExclusive() : true) ? 'lock' : 'unlock', 16);
     R.btnExcl.title = 'WASAPI 独占/共享输出（独占 = bit-perfect）';
     R.btnExcl.onclick = async function () {
       if (!window.annieExclusiveToggle) return;
       var on = await window.annieExclusiveToggle();
-      R.btnExcl.textContent = on ? '🔒' : '🔓';
+      R.btnExcl.innerHTML = amIcoTop(on ? 'lock' : 'unlock', 16);
     };
     document.addEventListener('annie-exclusive-changed', function (e) {
-      if (R.btnExcl) R.btnExcl.textContent = (e.detail && e.detail.exclusive) ? '🔒' : '🔓';
+      if (R.btnExcl) R.btnExcl.innerHTML = amIcoTop((e.detail && e.detail.exclusive) ? 'lock' : 'unlock', 16);
     });
 
     // V4.4.6：顶栏精简——低频按钮不再直接入栏（对象照建，同步逻辑不受影响），收进「⋯」菜单
     // V4.4：主界面待播清单抽屉（此前仅沉浸/迷你能看队列）
-    R.btnQ = el('button', 'am-tbtn', '☰'); R.btnQ.title = '待播清单 / 历史记录';
+    R.btnQ = el('button', 'am-tbtn', ''); R.btnQ.innerHTML = amIcoTop('queue', 16); R.btnQ.title = '待播清单 / 历史记录';
     R.btnQ.style.position = 'relative';
     R.btnQ.onclick = function () { if (AM.toggleMainQueue) AM.toggleMainQueue(); };
     R.btnQBadge = el('span', 'am-q-badge', '');
@@ -156,17 +495,18 @@
     document.addEventListener('annie-playmode-changed', syncModeBtn);
     right.appendChild(R.btnMode);
     // 播放定时（仅本地播放生效）
-    R.btnTimer = el('button', 'am-tbtn', '⏲');
+    R.btnTimer = el('button', 'am-tbtn', ''); R.btnTimer.innerHTML = amIcoTop('timer', 16);
     R.btnTimer.onclick = function (e) { e.stopPropagation(); toggleTimerPop(); };
     document.addEventListener('annie-sleeptimer-changed', syncTimerBtn);
     // 沉浸式播放界面 / 迷你模式
-    R.btnImm = el('button', 'am-tbtn', '⤢'); R.btnImm.title = '沉浸式播放界面';
+    R.btnImm = el('button', 'am-tbtn', ''); R.btnImm.innerHTML = amIcoTop('expand', 16); R.btnImm.title = '沉浸式播放界面';
     R.btnImm.onclick = function () { toggleImmersive(); };
     right.appendChild(R.btnImm);
-    R.btnMiniM = el('button', 'am-tbtn', '🗕'); R.btnMiniM.title = '迷你模式';
+    R.btnMiniM = el('button', 'am-tbtn', ''); R.btnMiniM.innerHTML = amIcoTop('mini', 16); R.btnMiniM.title = '迷你模式';
     R.btnMiniM.onclick = function () { enterMini(); };
     // 桌面歌词快捷入口（Alt+L；状态跟随 annie-dlyrics-changed）
-    var btnDlyr = el('button', 'am-tbtn' + ((window.annieDlyricsOn && window.annieDlyricsOn()) ? ' on' : ''), '🎤');
+    var btnDlyr = el('button', 'am-tbtn' + ((window.annieDlyricsOn && window.annieDlyricsOn()) ? ' on' : ''), '');
+    btnDlyr.innerHTML = amIcoTop('mic', 16);
     btnDlyr.title = '桌面歌词（Alt+L）';
     btnDlyr.onclick = function () { if (window.annieDlyricsToggle) window.annieDlyricsToggle(); };
     document.addEventListener('annie-dlyrics-changed', function (e) { btnDlyr.classList.toggle('on', !!(e.detail && e.detail.on)); });
@@ -217,28 +557,28 @@
     syncNpFav();
     setInterval(syncNpFav, 800); // 切歌/别处收藏后跟上状态（只是 Set.has，开销可忽略）
     // V4.3.16：复制播放中在线歌的平台分享链接
-    var btnNpShare = el('button', 'am-tbtn', '🔗');
+    var btnNpShare = el('button', 'am-tbtn', ''); btnNpShare.innerHTML = amIcoTop('link', 16);
     btnNpShare.title = '复制正在播放的在线歌曲的分享链接';
     btnNpShare.onclick = function () { if (AM.copyCurrentStreamLink) AM.copyCurrentStreamLink(); };
     // 设置中心入口（与粒子舞台顶栏 ⚙ 同一个面板）
-    var btnSet = el('button', 'am-tbtn', '⚙'); btnSet.title = '设置中心（Ctrl+,）';
+    var btnSet = el('button', 'am-tbtn', ''); btnSet.innerHTML = amIcoTop('gear', 16); btnSet.title = '设置中心（Ctrl+,）';
     btnSet.onclick = function () { if (window.annieSettings) window.annieSettings.togglePanel(); };
     right.appendChild(btnSet);
-    R.btnLyr = el('button', 'am-tbtn' + (S.lyricsOn ? ' on' : ''), '💬'); R.btnLyr.title = '歌词面板';
+    R.btnLyr = el('button', 'am-tbtn' + (S.lyricsOn ? ' on' : ''), ''); R.btnLyr.innerHTML = amIcoTop('msg', 16); R.btnLyr.title = '歌词面板';
     R.btnLyr.onclick = function () {
       S.lyricsOn = !S.lyricsOn;
       root.classList.toggle('am-lyr-on', S.lyricsOn);
       R.btnLyr.classList.toggle('on', S.lyricsOn);
       syncLyrFold(); // 与面板左缘折叠小标签同步图标/方向
     };
-    R.btnLight = el('button', 'am-tbtn', isLight() ? '🌙' : '☀'); R.btnLight.title = '亮色/暗色';
+    R.btnLight = el('button', 'am-tbtn', ''); R.btnLight.innerHTML = amIcoTop(isLight() ? 'moon' : 'sun', 16); R.btnLight.title = '亮色/暗色';
     R.btnLight.onclick = function () {
       var l = !isLight();
       try { localStorage.setItem(LIGHT_KEY, l ? '1' : '0'); } catch (e) { }
       root.classList.toggle('am-light', l);
-      R.btnLight.textContent = l ? '🌙' : '☀';
+      R.btnLight.innerHTML = amIcoTop(l ? 'moon' : 'sun', 16);
     };
-    R.btnTheme = el('button', 'am-tbtn', '🎨'); R.btnTheme.title = '切换主题（粒子舞台 → FB2K → Apple Music）';
+    R.btnTheme = el('button', 'am-tbtn', ''); R.btnTheme.innerHTML = amIcoTop('palette', 16); R.btnTheme.title = '切换主题（粒子舞台 → FB2K → Apple Music）';
     R.btnTheme.onclick = function () {
       var order = ['legacy', 'fb2k', 'am'];
       window.annieTheme.switch(order[(order.indexOf(annieTheme.current) + 1) % order.length]);
@@ -257,21 +597,44 @@
     moreGroup([btnNpShare]);
     moreGroup([R.btnLight, R.btnTheme]);
     right.appendChild(moreWrap);
-    // V4.4.8：展开/收起时给 #am-root 打 0.42s 状态标记，CSS 据此播放对应的回弹动画
+    // V4.4.8：只有展开/收起真的挤到顶栏进度条那一块时才回弹，否则不动
     try {
-      var _moT = 0;
+      var _moT = 0, _w0 = -1;
+      function _npWidth() { var n = document.querySelector('#am-root .am-np'); return n ? n.getBoundingClientRect().width : -1; }
+      document.addEventListener('click', function (e) {
+        var t = e.target;
+        if (t && t.closest && t.closest('.am-tb-more-btn')) _w0 = _npWidth();
+      }, true);
       new MutationObserver(function () {
         var root = document.getElementById('am-root');
         if (!root || !moreWrap.isConnected) return;
         var open = moreWrap.classList.contains('open');
-        root.classList.toggle('am-tb-open', open);
-        root.classList.toggle('am-tb-close', !open);
-        clearTimeout(_moT);
-        _moT = setTimeout(function () {
+        function _squeezed() {
+          var w1 = _npWidth();
+          var changed = (_w0 > 0 && w1 > 0 && Math.abs(w1 - _w0) > 2);
+          _w0 = -1;
+          return changed;
+        }
+        function _fire() {
+          if (window.__amSyncNpT) window.__amSyncNpT();
+          var _sq = _squeezed();
+          /* 展开/收起都只在真的推动了中间块时才回弹（没碰到进度条就不动） */
+          var _moved = (window.__amSqueezeNext !== false);
+          window.__amSqueezeNext = undefined;
+          if (open ? !_moved : !_sq) { root.classList.remove('am-tb-open', 'am-tb-close'); return; }
           root.classList.remove('am-tb-open', 'am-tb-close');
-        }, 420);
+          void root.offsetWidth;
+          root.classList.add(open ? 'am-tb-open' : 'am-tb-close');
+          clearTimeout(_moT);
+          _moT = setTimeout(function () {
+            root.classList.remove('am-tb-open', 'am-tb-close');
+          }, 420);
+        }
+        clearTimeout(window.__amFireT);
+        window.__amFireT = setTimeout(_fire, open ? 0 : 40);   /* 展开与布局同时开始，合为一次回弹 */
       }).observe(moreWrap, { attributes: true, attributeFilter: ['class'] });
     } catch (e) { }
+
     R.btnMore = el('button', 'am-tbtn am-tb-more-btn');
     R.btnMore.title = '展开更多';
     var moreChev = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -302,7 +665,46 @@
     }
     R.btnMore.onclick = function (e) {
       e.stopPropagation();
-      setMore(!moreWrap.classList.contains('open'));
+      var _opening = !moreWrap.classList.contains('open');
+      if (!_opening) { setMore(false); return; }
+      var _np = document.querySelector('#am-root .am-np');
+      var _collide = false;
+      if (_np) {
+        /* 真实测量：临时用内联 maxWidth 展开 moreWrap（不改 class，不会触发回弹观察器），读完立刻还原 */
+        window.__amMeasuring = true;
+        var _mmPrev = moreWrap.style.maxWidth;
+        var _trPrev = moreWrap.style.transition;
+        moreWrap.style.transition = 'none';
+        var _npBefore = _np.getBoundingClientRect().width;
+        moreWrap.style.maxWidth = 'none';   /* 真实展开宽度，避免低估导致胶囊晚收 */
+        var _npAfter = _np.getBoundingClientRect().width;
+        _collide = _npAfter < 290;
+        window.__amSqueezeNext = (_npAfter < _npBefore - 1);   /* 没推动就不要回弹 */
+        moreWrap.style.maxWidth = _mmPrev;
+        moreWrap.style.transition = _trPrev;
+        window.__amMeasuring = false;
+        void moreWrap.offsetWidth;
+      }
+      if (!_collide) { setMore(true); return; }
+      setMore(true);   /* 展开图标与收胶囊同时进行 */
+      (function () { var _rt = document.getElementById('am-root'); if (!_rt) return;
+        _rt.classList.add('am-badge-shift');
+        clearTimeout(window.__amShiftT);
+        window.__amShiftT = setTimeout(function () { _rt.classList.remove('am-badge-shift'); }, 1100); })();
+      var _A = window.__annieAMInternal, _b = document.querySelector('#am-root .am-badge');
+      if (_A && _A.S && _b) {
+        var _t = String(_A.S.fmt || '').split('·')[0].trim();
+        if (_t && _b.textContent !== _t) {
+          /* 直接换文案、不做宽度动画：避免「宽空胶囊」压到标题上 */
+          _b.style.transition = 'none';
+          _b.style.width = '';
+          _b.textContent = _t;
+          void _b.offsetWidth;
+          _b.classList.remove('am-badge-blur'); void _b.offsetWidth; _b.classList.add('am-badge-blur');
+          setTimeout(function () { _b.style.transition = ''; }, 60);
+          setTimeout(function () { _b.classList.remove('am-badge-blur'); }, 620);
+        }
+      }
     };
     right.appendChild(R.btnMore);
     // 恢复上次的展开/收起状态（重启后不再默认收起）；直接落定，不播一遍展开动画
@@ -362,6 +764,8 @@
       if (!S._tbl || S._tblRAF) return;
       S._tblRAF = requestAnimationFrame(function () { S._tblRAF = 0; renderAmWindow(); });
     });
+    scrollMemBind();
+    scrollMemRestoreTick();   // V4.4.9：重启后恢复侧栏/内容区滚动位置
     var lyr = el('aside', 'am-lyrics');
     // V4.3.22：面板顶部封面（绝对定位叠加在歌词滚动区上方；无封面/开关关闭时隐藏）
     R.lyrCover = el('img', 'am-lyr-cover'); R.lyrCover.alt = '';
@@ -783,6 +1187,454 @@
     }).catch(function () { });
   }
 
+  /* ===== V4.4.9：侧栏分组折叠（左侧按钮单击 / 标题双击） ===== */
+  function sideGroupState() {
+    var raw = null; try { raw = localStorage.getItem('annieplayer.am.sideCollapsed'); } catch (e) { }
+    if (raw) { try { var a = JSON.parse(raw); if (Array.isArray(a)) return a; } catch (e2) { } }
+    return [];
+  }
+  function sideGroupSave(arr) { try { localStorage.setItem('annieplayer.am.sideCollapsed', JSON.stringify(arr)); } catch (e) { } }
+  function sideHeadName(h) {
+    var t = h.querySelector('.am-side-h-txt');
+    return (h.dataset.amGrp || (t ? t.textContent : h.textContent) || '').trim();
+  }
+  function buildSideHead(h) {
+    if (h.__amBuilt) return;
+    h.__amBuilt = 1;
+    var raw = (h.textContent || '').trim();
+    h.textContent = '';
+    var caret = el('button', 'am-side-caret', '▾');
+    caret.type = 'button';
+    caret.setAttribute('aria-label', '收起或展开该分组');
+    caret.onclick = function (e) { e.preventDefault(); e.stopPropagation(); toggleSideGroup(h); };
+    caret.ondblclick = function (e) { e.stopPropagation(); };
+    var txt = el('span', 'am-side-h-txt', raw);
+    h.appendChild(caret);
+    h.appendChild(txt);
+    h.setAttribute('role', 'button');
+    h.setAttribute('tabindex', '0');
+    h.title = '单击箭头或双击标题：收起 / 展开该组';
+    h.addEventListener('dblclick', function (e) {
+      if (e.target && e.target.closest && e.target.closest('.am-side-caret')) return;
+      e.preventDefault(); e.stopPropagation(); toggleSideGroup(h);
+    });
+    h.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleSideGroup(h); }
+    });
+  }
+  /* ===== V4.4.9：滚动位置记忆（侧栏 + 内容区）——重启回到上次位置 ===== */
+  var SCROLL_SIDE_KEY = 'annieplayer.am.sideScroll';
+  var SCROLL_VIEW_KEY = 'annieplayer.am.viewScroll';
+  var _scrollDeadline = Date.now() + 60000;
+  var _sideScrollDone = false, _viewScrollDone = false;
+  var _userScrolled = false;   // 只有用户真的滚动过才写盘，避免启动瞬间的 0 覆盖上次位置
+  function viewScrollKey() { return (S.view || '') + '|' + (S.albumKey || ''); }
+  function scrollMemBind() {
+    try {
+      if (R.sidebar) {
+        var _t1 = null;
+        R.sidebar.addEventListener('scroll', function () {
+          clearTimeout(_t1);
+          _t1 = setTimeout(function () {
+            if (!_userScrolled) return;
+            try { localStorage.setItem(SCROLL_SIDE_KEY, String(Math.round(R.sidebar.scrollTop))); } catch (e) { }
+          }, 250);
+        });
+      }
+      if (R.content) {
+        var _t2 = null;
+        R.content.addEventListener('scroll', function () {
+          clearTimeout(_t2);
+          _t2 = setTimeout(function () {
+            if (!_userScrolled) return;
+            try { localStorage.setItem(SCROLL_VIEW_KEY, JSON.stringify({ k: viewScrollKey(), top: Math.round(R.content.scrollTop) })); } catch (e) { }
+          }, 250);
+        });
+      }
+      var markUser = function () { _userScrolled = true; S._userScrollAt = Date.now(); };
+      [R.sidebar, R.content].forEach(function (el0) {
+        if (!el0) return;
+        el0.addEventListener('wheel', markUser, { passive: true });
+        el0.addEventListener('pointerdown', markUser, { passive: true });
+        el0.addEventListener('keydown', markUser, { passive: true });
+      });
+    } catch (e) { }
+  }
+  function scrollMemRestoreSide() {
+    if (_userScrolled || Date.now() > _scrollDeadline) return;
+    var sb = R.sidebar; if (!sb) return;
+    var v = 0;
+    try { v = parseInt(localStorage.getItem(SCROLL_SIDE_KEY), 10) || 0; } catch (e) { }
+    if (!v) return;
+    if (Math.abs(sb.scrollTop - v) > 2) sb.scrollTop = v;
+  }
+  function scrollMemRestoreView() {
+    if (_userScrolled || Date.now() > _scrollDeadline) return;
+    var c = R.content; if (!c) return;
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem(SCROLL_VIEW_KEY) || 'null'); } catch (e) { }
+    if (!saved || !saved.top) return;
+    /* 启动时视图可能是默认视图（songs），等切回目标视图再恢复；到期限再放弃 */
+    if (saved.k !== viewScrollKey()) return;
+    /* 持续对齐到期限：分帧渲染/窗口化校准会二次改动 scrollTop */
+    if (Math.abs(c.scrollTop - saved.top) > 2) c.scrollTop = saved.top;
+  }
+  function scrollMemRestoreTick() {
+    scrollMemRestoreSide();
+    scrollMemRestoreView();
+    if (_userScrolled || Date.now() > _scrollDeadline) return;
+    setTimeout(scrollMemRestoreTick, 200);
+  }
+  function applySideGroups(sb) {
+    var closed = sideGroupState();
+    var cur = null;
+    for (var i = 0; i < sb.children.length; i++) {
+      var n = sb.children[i];
+      if (n.classList && n.classList.contains('am-side-h')) {
+        cur = n;
+        buildSideHead(n);
+        var name = sideHeadName(n);
+        n.dataset.amGrp = name;
+        var off = closed.indexOf(name) >= 0;
+        n.classList.toggle('am-grp-off', off);
+        n.setAttribute('aria-expanded', off ? 'false' : 'true');
+        var c = n.querySelector('.am-side-caret');
+        if (c) c.textContent = off ? '▸' : '▾';
+        continue;
+      }
+      if (cur && !(n.classList && n.classList.contains('am-search'))) {
+        n.classList.toggle('am-grp-hidden', cur.classList.contains('am-grp-off'));
+      }
+    }
+    queueSideSticky();   // V4.4.9：侧栏重绘后主动同步吸顶状态（否则切歌单后要滚一下才恢复）
+    scrollMemRestoreSide(); // V4.4.9：侧栏构建完成后恢复滚动位置
+  }
+  function toggleSideGroup(h) {
+    var name = sideHeadName(h);
+    if (!name) return;
+    var closed = sideGroupState();
+    var i = closed.indexOf(name);
+    var on = i >= 0;
+    if (i >= 0) closed.splice(i, 1); else closed.push(name);
+    sideGroupSave(closed);
+    h.classList.toggle('am-grp-off', !on);
+    h.setAttribute('aria-expanded', on ? 'true' : 'false');
+    var c = h.querySelector('.am-side-caret');
+    if (c) c.textContent = on ? '▾' : '▸';
+    var n = h.nextElementSibling;
+    while (n && !n.classList.contains('am-side-h')) {
+      if (n.classList.contains('am-search')) break;
+      n.classList.toggle('am-grp-hidden', !on);
+      n = n.nextElementSibling;
+    }
+  }
+  /* ===== V4.4.9：歌曲 / 播放列表按专辑分组（组序固定专辑名 A–Z，组内按当前排序） ===== */
+  var AM_GRP_H = 52, AM_GRP_ROW_H = 40;
+  function amSongGroupOn() {
+    var v = S.view || '';
+    return (v === 'songs' || v === 'favorites' || v.indexOf('pl:') === 0) &&
+      !!(window.annieSettings && window.annieSettings.ui && window.annieSettings.ui.amSongGroup);
+  }
+  function grpCollapsedSet() { return S._grpCollapsed || (S._grpCollapsed = new Set()); }
+  function isGrpCollapsed(g) { return !!g && grpCollapsedSet().has(g.id); }
+  function expandGrp(g) { if (g) grpCollapsedSet().delete(g.id); }
+  function toggleGrp(g) {
+    if (!g) return;
+    var s = grpCollapsedSet();
+    if (s.has(g.id)) s.delete(g.id); else s.add(g.id);
+    renderView();
+  }
+  function grpSub(g, aa) {
+    var m = S.meta[g.first.path] || {};
+    var bits = [];
+    var a = aa || m.albumArtist || '';
+    if (a) bits.push(a);
+    bits.push(g.list.length + ' 首');
+    if (m.year) bits.push(m.year);
+    return bits.join(' · ');
+  }
+  function applyGrpMeta(m, cover, sub, g) {
+    if (cover && !cover.querySelector('img') && m && m.cover) {
+      cover.textContent = '';
+      var im = el('img'); im.alt = ''; im.loading = 'lazy'; im.draggable = false; im.src = m.cover;
+      cover.appendChild(im);
+    }
+    if (sub) sub.textContent = grpSub(g, (m && m.albumArtist) || '');
+  }
+  function fillGrpMeta(g, cover, sub) {
+    var p = g.first.path;
+    var cached = S.meta[p] || {};
+    if (cached._full) { applyGrpMeta(cached, cover, sub, g); return; }
+    if (!window.mine.metaFullBatch) {
+      albumCover(g.first, function (url) { if (url) applyGrpMeta({ cover: url }, cover, sub, g); });
+      return;
+    }
+    var q = S._grpFullQ || (S._grpFullQ = {});
+    if (q[p]) { q[p].push(function (m) { applyGrpMeta(m, cover, sub, g); }); return; }
+    q[p] = [function (m) { applyGrpMeta(m, cover, sub, g); }];
+    window.mine.metaFullBatch([p]).then(function (out) {
+      var m = (out && out[p]) || {};
+      m._full = 1;
+      S.meta[p] = Object.assign({}, S.meta[p] || {}, m);
+      var ws = q[p] || []; delete q[p];
+      ws.forEach(function (f) { try { f(m); } catch (e) { } });
+    }).catch(function () { delete q[p]; });
+  }
+  function buildGroupEntries(tracks) {
+    var groups = [], idxOf = {}, grp = null;
+    tracks.forEach(function (t, i) {
+      idxOf[t.path] = i;
+      var key = trackMeta(t).album || '未知专辑';
+      if (!grp || grp.key !== key) {
+        grp = { key: key, id: 'g:' + t.path, first: t, list: [] };
+        groups.push(grp);
+      }
+      grp.list.push(t);
+    });
+    var manual = grpOrderGet();
+    S._grpManualOn = !!(manual && manual.length);
+    if (manual && manual.length) {
+      var pos = {}, mk;
+      for (mk = 0; mk < manual.length; mk++) pos[manual[mk]] = mk;
+      groups.forEach(function (g, i) { g._i = i; });
+      groups.sort(function (a, b) {
+        var pa = pos[a.key], pb = pos[b.key];
+        if (pa === undefined) pa = 1e9 + a._i;
+        if (pb === undefined) pb = 1e9 + b._i;
+        return pa - pb;
+      });
+    }
+    var entries = [];
+    groups.forEach(function (g) {
+      entries.push({ k: 'h', grp: g });
+      g.list.forEach(function (t) { entries.push({ k: 't', t: t, i: idxOf[t.path], grp: g }); });
+    });
+    /* V4.4.9：不再自动展开「当前播放曲目所在组」，允许收起（Tab 全收起也生效） */
+    var offsets = new Array(entries.length), y = 0;
+    entries.forEach(function (e, k) {
+      offsets[k] = y;
+      y += e.k === 'h' ? AM_GRP_H : (isGrpCollapsed(e.grp) ? 0 : AM_GRP_ROW_H);
+    });
+    var trkEntry = new Array(tracks.length);
+    entries.forEach(function (e, k) { if (e.k === 't') trkEntry[e.i] = k; });
+    return { entries: entries, offsets: offsets, totalH: y, trkEntry: trkEntry };
+  }
+  function lowerBound(arr, v) {
+    var lo = 0, hi = arr.length;
+    while (lo < hi) { var mid = (lo + hi) >>> 1; if (arr[mid] < v) lo = mid + 1; else hi = mid; }
+    return lo;
+  }
+  function buildGroupRow(g) {
+    var tr = el('tr', 'am-grp-tr');
+    var collapsed = isGrpCollapsed(g);
+    if (collapsed) tr.classList.add('am-grp-collapsed');
+    tr.dataset.grpid = g.id;
+    tr.dataset.gkey = g.key;
+    if (grpDragAllowed()) tr.classList.add('am-grp-draggable');
+    if (S.msOn) tr.appendChild(el('td', 'am-grp-ckcell'));
+    // V4.4.9：封面单独占左列表头「封面」，组内歌曲在封面右侧
+    var tdCover = el('td', 'am-grp-covercell');
+    var cover = el('div', 'am-grp-cover');
+    tdCover.appendChild(cover);
+    tr.appendChild(tdCover);
+    albumCover(g.first, function (url) {
+      if (!url || cover.querySelector('img')) return;
+      var im = el('img'); im.alt = ''; im.loading = 'lazy'; im.draggable = false; im.src = url;
+      cover.appendChild(im);
+    });
+    var tdInfo = el('td', 'am-grp-infocell');
+    tdInfo.colSpan = 99;
+    var box = el('div', 'am-grp-box' + (collapsed ? ' off' : ''));
+    var info = el('div', 'am-grp-info');
+    info.appendChild(el('div', 'am-grp-name', g.key));
+    var sub = el('div', 'am-grp-sub', grpSub(g));
+    info.appendChild(sub);
+    box.appendChild(info);
+    tdInfo.appendChild(box);
+    tr.appendChild(tdInfo);
+    tr.ondblclick = function (e) { e.preventDefault(); e.stopPropagation(); toggleGrp(g); };
+    tr.oncontextmenu = function (e) {
+      e.preventDefault(); e.stopPropagation();
+      selectGroup(g, e.ctrlKey || e.metaKey);
+      if (g.list && g.list.length) openAddMenu(e.clientX, e.clientY, g.list[0].path);
+    };
+    fillGrpMeta(g, cover, sub);
+    bindGrpDrag(tr, g);
+    return tr;
+  }
+  function currentGrpIds() {
+    var w = S._tbl;
+    if (w && w.grp && w.entries) {
+      var ids = [];
+      w.entries.forEach(function (e) { if (e.k === 'h') ids.push(e.grp.id); });
+      if (ids.length) return ids;
+    }
+    // 非窗口化分组（≤300 首）：从 DOM 取组 id
+    var trs = document.querySelectorAll('#am-root .am-grp-tr');
+    if (!trs.length) return null;
+    var out = [];
+    for (var i = 0; i < trs.length; i++) if (trs[i].dataset.grpid) out.push(trs[i].dataset.grpid);
+    return out.length ? out : null;
+  }
+  function toggleAllGrps() {
+    var ids = currentGrpIds();
+    if (!ids) return false;
+    var s = grpCollapsedSet();
+    if (s.size) s.clear();
+    else for (var i = 0; i < ids.length; i++) s.add(ids[i]);
+    renderView();
+    return true;
+  }
+  if (!window.__amGrpTab) {
+    window.__amGrpTab = 1;
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab' || e.ctrlKey || e.altKey || e.metaKey) return;
+      if (!amSongGroupOn()) return;
+      var t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      if (S.msOn) return;
+      if (toggleAllGrps()) { e.preventDefault(); e.stopPropagation(); }
+    }, true);
+  }
+  function selectGroup(g, additive) {
+    if (!g) return;
+    if (!additive || !S.msSel) S.msSel = new Set();
+    g.list.forEach(function (t) { S.msSel.add(t.path); });
+    if (g.list.length) S._selAnchor = g.list[0].path;
+    /* V4.4.9：保留滚动位置（否则右键组头会跳回顶部） */
+    var c = document.querySelector('#am-root .am-content');
+    var sc = c ? c.scrollTop : 0;
+    renderView();
+    if (c) {
+      void c.scrollHeight;
+      c.scrollTop = sc;
+      if (S._tbl) { S._tbl.lastStart = -1; if (typeof renderAmWindow === 'function') renderAmWindow(); }
+    }
+  }
+  function renderAmWindowGrp(win, c) {
+    var headH = win.tb.tHead ? win.tb.tHead.offsetHeight : 0;
+    var base = win.tb.getBoundingClientRect().top - c.getBoundingClientRect().top + c.scrollTop + headH;
+    var st = c.scrollTop, h = c.clientHeight, y0 = st - base;
+    var start = Math.max(0, lowerBound(win.offsets, y0) - AM_OVERSCAN);
+    var end = Math.min(win.entries.length, lowerBound(win.offsets, y0 + h) + AM_OVERSCAN);
+    if (start === win.lastStart && end === win.lastEnd) return;
+    win.lastStart = start; win.lastEnd = end;
+    var frag = document.createDocumentFragment();
+    if (start > 0) frag.appendChild(amSpacerRow(win.offsets[start], win.cols));
+    for (var k = start; k < end; k++) {
+      var e = win.entries[k];
+      if (e.k === 'h') frag.appendChild(buildGroupRow(e.grp));
+      else if (!isGrpCollapsed(e.grp)) frag.appendChild(buildTrackRow(e.t, e.i, win.opts));
+    }
+    if (end < win.entries.length) frag.appendChild(amSpacerRow(win.totalH - win.offsets[end], win.cols));
+    win.body.innerHTML = '';
+    win.body.appendChild(frag);
+    var ti = -1;
+    for (var j = start; j >= 0; j--) { if (win.entries[j].k === 't') { ti = win.entries[j].i; break; } }
+    if (ti >= 0) azSyncActive(win, ti);
+  }
+  function renderGroupRows(body, grp, opts) {
+    grp.entries.forEach(function (e) {
+      if (e.k === 'h') body.appendChild(buildGroupRow(e.grp));
+      else if (!isGrpCollapsed(e.grp)) body.appendChild(buildTrackRow(e.t, e.i, opts));
+    });
+  }
+  /* V4.4.9：侧栏标题吸顶——只在真正吸住时加半透明底，平时保持无底 */
+  function syncSideSticky() {
+    var side = document.querySelector('#am-root .am-side');
+    if (!side) return;
+    var sr = side.getBoundingClientRect();
+    var stuck = side.scrollTop > 0;
+    var hs = side.querySelectorAll('.am-side-h');
+    for (var i = 0; i < hs.length; i++) {
+      var r = hs[i].getBoundingClientRect();
+      hs[i].classList.toggle('am-h-stuck', stuck && r.top <= sr.top + 9);
+    }
+    syncSideThumb();
+  }
+  var _sideStkRaf = 0;
+  function queueSideSticky() {
+    if (_sideStkRaf) return;
+    _sideStkRaf = requestAnimationFrame(function () { _sideStkRaf = 0; syncSideSticky(); });
+  }
+  document.addEventListener('scroll', function (e) {
+    var t = e.target;
+    if (t && t.classList && t.classList.contains('am-side')) { queueSideSticky(); showSideThumb(); }
+  }, true);
+  window.addEventListener('resize', queueSideSticky);
+  /* V4.4.9：侧栏悬浮滚动条——鼠标在侧栏内出现，移动保持，停一会隐藏，移出立刻隐藏；拖动期间常显 */
+  var _sideThumbHide = 0, _sideThumbDrag = false;
+  function ensureSideThumb() {
+    var root = document.getElementById('am-root');
+    if (!root) return null;
+    var t = root.querySelector('.am-side-thumb');
+    if (t) return t;
+    t = document.createElement('div');
+    t.className = 'am-side-thumb';
+    root.appendChild(t);
+    t.addEventListener('mouseenter', function () { showSideThumb(); });
+    t.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      _sideThumbDrag = true;
+      clearTimeout(_sideThumbHide);
+      t.classList.add('on');
+      var side = document.querySelector('#am-root .am-side');
+      if (!side) return;
+      var startY = e.clientY, startTop = side.scrollTop;
+      var trackH = side.clientHeight - t.offsetHeight;
+      var maxTop = side.scrollHeight - side.clientHeight;
+      var move = function (ev) {
+        if (trackH > 0) side.scrollTop = startTop + (ev.clientY - startY) / trackH * maxTop;
+      };
+      var up = function () {
+        document.removeEventListener('mousemove', move);
+        document.removeEventListener('mouseup', up);
+        _sideThumbDrag = false;
+        showSideThumb();
+      };
+      document.addEventListener('mousemove', move);
+      document.addEventListener('mouseup', up);
+    });
+    return t;
+  }
+  function showSideThumb() {
+    var t = ensureSideThumb();
+    if (!t || t.style.display === 'none') return;
+    t.classList.add('on');
+    clearTimeout(_sideThumbHide);
+    if (!_sideThumbDrag) _sideThumbHide = setTimeout(function () { t.classList.remove('on'); }, 900);
+  }
+  function hideSideThumb() {
+    var t = document.querySelector('#am-root .am-side-thumb');
+    if (!t || _sideThumbDrag) return;
+    clearTimeout(_sideThumbHide);
+    t.classList.remove('on');
+  }
+  function syncSideThumb() {
+    var side = document.querySelector('#am-root .am-side');
+    var t = ensureSideThumb();
+    if (!side || !t) return;
+    var sh = side.scrollHeight, ch = side.clientHeight;
+    if (sh <= ch + 2) { t.classList.remove('on'); t.style.display = 'none'; return; }
+    t.style.display = '';
+    var sr = side.getBoundingClientRect();
+    var h = Math.max(26, Math.round(ch * ch / sh));
+    var maxTop = sh - ch;
+    var y = sr.top + (maxTop ? (side.scrollTop / maxTop) * (ch - h) : 0);
+    t.style.height = h + 'px';
+    t.style.top = Math.round(y) + 'px';
+    t.style.right = Math.round(window.innerWidth - sr.right + 2) + 'px';
+  }
+  document.addEventListener('mousemove', function (e) {
+    var el = e.target;
+    if (!el || !el.closest) return;
+    if (el.closest('.am-side') || el.closest('.am-side-thumb')) showSideThumb();
+  }, true);
+  document.addEventListener('mouseout', function (e) {
+    var el = e.target, to = e.relatedTarget;
+    if (!el || !el.closest || !el.closest('.am-side')) return;
+    if (!to || !to.closest || (!to.closest('.am-side') && !to.closest('.am-side-thumb'))) hideSideThumb();
+  }, true);
   function renderSidebar() {
     if (!R.sidebar) return;
     var sb = R.sidebar;
@@ -1075,7 +1927,11 @@
 
     // 本地搜索（AM 语义：全库搜索；输入即切回歌曲视图并深加载全库标签）
     var sch = el('div', 'am-search');
-    sch.appendChild(el('span', null, '⌕'));
+    sch.appendChild((function () {
+      var sp = document.createElement('span'); sp.className = 'am-search-ico';
+      sp.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2 L14 14"/></svg>';
+      return sp;
+    })());
     var inp = document.createElement('input');
     inp.placeholder = '搜索歌曲、艺人、专辑'; inp.value = S.search;
     // V4.3.24：IME 组词期间不切视图/不重绘（renderSidebar 会重建本框，同样打断中文输入）
@@ -1100,14 +1956,16 @@
     inp.addEventListener('compositionend', function () { inp._ime = false; commitSideSearch(); });
     inp.oninput = function () { if (inp._ime) return; commitSideSearch(); };
     sch.appendChild(inp); sb.appendChild(sch);
+    applySideGroups(sb);
   }
 
   /* ---------------- 内容区 ---------------- */
   /* V4.3.22：视图头部共享构建器——标题 + 视图内搜索框 + 排序下拉（歌曲/专辑/喜爱歌曲共用）。
    * 搜索框匹配字段跟随当前排序方式（标题排序搜标题、演唱者排序搜演唱者……），
    * 查询串存 S.viewQuery[view]（会话级），输入 150ms 防抖重绘。 */
-  var SONG_SORT_OPTS = [['az', '首字母 A–Z（标题）'], ['azArtist', '首字母 A–Z（演唱者）'], ['name', '文件名'],
-    ['mtimeDesc', '修改时间 · 新→旧'], ['mtimeAsc', '修改时间 · 旧→新'], ['sizeDesc', '大小 · 大→小'], ['sizeAsc', '大小 · 小→大']];
+  var SONG_SORT_OPTS = [['az', '首字母 A–Z（标题）'], ['albumAz', '专辑名 A–Z'], ['azArtist', '首字母 A–Z（演唱者）'], ['name', '文件名'],
+    ['mtimeDesc', '修改时间 · 新→旧'], ['mtimeAsc', '修改时间 · 旧→新'],
+    ['ctimeDesc', '创建时间 · 新→旧'], ['ctimeAsc', '创建时间 · 旧→新'], ['sizeDesc', '大小 · 大→小'], ['sizeAsc', '大小 · 小→大']];
   var ALBUM_SORT_OPTS = [['az', '名称 A–Z'], ['azArtist', '艺人 A–Z'], ['countDesc', '曲目数 · 多→少'], ['countAsc', '曲目数 · 少→多']];
   // V4.4.3：专辑详情页（进入某张专辑后）曲目排序——默认按发布顺序（碟号+曲目号标签）
   var ALBUM_DETAIL_SORT_OPTS = [['release', '按专辑发布顺序'], ['az', '标题 A–Z'], ['azArtist', '演唱者 A–Z'], ['name', '文件名'], ['durDesc', '时长 · 长→短'], ['durAsc', '时长 · 短→长']];
@@ -1276,9 +2134,10 @@
     lab.textContent = labelOf(cur);
     return wrap;
   }
+  AM.sortDropdown = sortDropdown;   // V4.4.8：在线歌单复用同一个排序胶囊
   function songSearchPh(mode) {
     var f = AM.songSearchField(mode);
-    return f === 'artist' ? '搜索演唱者' : f === 'name' ? '搜索文件名' : '搜索标题';
+    return f === 'artist' ? '搜索演唱者' : f === 'name' ? '搜索文件名' : f === 'album' ? '搜索专辑' : '搜索标题';
   }
 
   function renderView() {
@@ -1344,7 +2203,7 @@
         if (e.button !== 0) return;
         var inTableView = S.view === 'songs' || S.view === 'favorites' || (S.view === 'albums' && S.albumKey) || S.view.indexOf('pl:') === 0;
         if (!inTableView) return;
-        if (e.target.closest && e.target.closest('tr.am-tr, thead, .am-view-head, .am-ms-bar, button, input, select, a, .am-az')) return;
+        if (e.target.closest && e.target.closest('tr.am-tr, tr.am-grp-tr, thead, .am-view-head, .am-ms-bar, button, input, select, a, .am-az')) return;
         if (e.target === c && e.offsetX >= c.clientWidth) return; // 滚动条
         var sx = e.clientX, sy = e.clientY, box = null, rect = null;
         function mv(ev) {
@@ -1434,6 +2293,7 @@
     }
     // V4.4：快速多选（Ctrl/Shift/框选）不换视图沿用，换视图即清空（msOn 复选框模式维持原行为）
     if (S._msView !== S.view) { S._msView = S.view; if (!S.msOn && S.msSel && S.msSel.size) S.msSel.clear(); }
+    if (S._grpView !== S.view) { S._grpView = S.view; if (S._grpCollapsed) S._grpCollapsed.clear(); }
 
     if (S.view === 'stream') { renderStreamView(c); return; }
     if (S.view === 'downloads') { if (window.annieAMDownload) window.annieAMDownload.render(c); return; } // V4.3.22：下载情况
@@ -1448,7 +2308,8 @@
     var folderKids = null;
     if (S.view === 'folders' && S.folderPath) {
       // V4.3.20：逐级浏览——返回上级 + 当前目录名 + 直接子文件夹行
-      var fback = el('button', 'am-btn', '‹ 返回上级');
+      var fback = el('button', 'am-btn am-btn-back', '');
+      fback.innerHTML = amIcoTop('back', 14) + '<span class="am-btn-label">返回上级</span>';
       fback.onclick = function () {
         var p = normP(S.folderPath).replace(/\\+$/, '');
         var isRoot = (S.libFolders || []).some(function (f) { return normP(f).replace(/\\+$/, '').toLowerCase() === p.toLowerCase(); });
@@ -1508,6 +2369,7 @@
     if (S.view === 'songs' && (!AM.songSortMode || AM.songSortMode() === 'az' || AM.songSortMode() === 'azArtist')) {
       ensureMetaDeep(); // 首字母排序依赖全库标签，闲时深加载（按块到达自动重排）；平铺排序不需要
     }
+    if (amSongGroupOn()) ensureMetaDeep();   // V4.4.9：分组依赖全库专辑标签，否则启动时全挤进「未知专辑」
 
     if (!tracks.length) {
       // 文件夹层级页：只有子文件夹没有直属音频时不报「曲库为空」
@@ -1520,8 +2382,9 @@
       return;
     }
     renderTrackTable(c, tracks);
-    if (S.view === 'songs') renderAzBar(c, tracks); // V4.3.8：右侧 A–Z 索引栏
+    if (S.view === 'songs' && !S._grpManualOn) renderAzBar(c, tracks); // V4.4.9：手动排过组序时索引条失去意义
     ensureMeta(tracks.slice(0, 120));
+    scrollMemRestoreView(); // V4.4.9：内容区渲染完成后恢复滚动位置（重启场景）
   }
 
   /* V4.3.20：文件夹根列表——媒体库根目录（点入逐级深入；根外目录兜底平铺） */
@@ -1635,7 +2498,18 @@
     var acts = el('div', 'am-pl-actions');
     var bPlay = el('button', 'am-btn am-btn-accent', '▶ 播放');
     bPlay.onclick = function () { if (tracks.length) playList(tracks, 0); };
-    var bShuffle = el('button', 'am-btn', '🔀 随机播放');
+    var bShuffle = el('button', 'am-btn am-btn-shuffle', '');
+    bShuffle.appendChild((function () {
+      var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      s.setAttribute('viewBox', '0 0 16 16');
+      s.setAttribute('width', '14'); s.setAttribute('height', '14');
+      var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('d', 'M2.6 5.2 H5.1 C6.1 5.2 6.9 5.6 7.5 6.3 L10.3 9.5 C10.9 10.2 11.7 10.6 12.7 10.6 H13.2 M12 8.7 L13.9 10.6 L12 12.5 M2.6 10.6 H5.1 C6.1 10.6 6.9 10.2 7.5 9.5 L10.3 6.3 C10.9 5.6 11.7 5.2 12.7 5.2 H13.2 M12 3.3 L13.9 5.2 L12 7.1');
+      p.setAttribute('fill', 'none'); p.setAttribute('stroke', 'currentColor');
+      p.setAttribute('stroke-width', '1.5'); p.setAttribute('stroke-linecap', 'round'); p.setAttribute('stroke-linejoin', 'round');
+      s.appendChild(p); return s;
+    })());
+    bShuffle.appendChild(el('span', 'am-btn-label', '随机播放'));
     bShuffle.onclick = function () {
       if (!tracks.length) return;
       playList(tracks, Math.floor(Math.random() * tracks.length));
@@ -1676,9 +2550,12 @@
       albumCover(t, function (url) { if (url) { img.src = url; img.style.visibility = ''; } });
       tdCover.appendChild(img); tr.appendChild(tdCover);
     }
-    tr.appendChild(el('td', 'am-c-title', esc(m.title)));
-    tr.appendChild(el('td', 'am-c-dim', esc(m.artist)));
-    tr.appendChild(el('td', 'am-c-dim', esc(m.album)));
+    if (opts.grouped) tr.appendChild(el('td', 'am-c-covercell'));
+    amCols().order.forEach(function (k) {
+      if (k === 'title') tr.appendChild(el('td', 'am-c-title', esc(m.title)));
+      else if (k === 'artist') tr.appendChild(el('td', 'am-c-dim am-c-artist', esc(m.artist)));
+      else tr.appendChild(el('td', 'am-c-dim am-c-album', esc(m.album)));
+    });
     var acts = el('td', 'am-c-acts');
     /* V4.4.7（PR#6）：行内收藏键与顶栏同款——未收藏空心描边，收藏后填成主题色 */
     var bFav = el('button', 'am-mini-btn' + (state.favorites && state.favorites.has(t.path) ? ' faved' : ''));
@@ -1707,9 +2584,9 @@
         if (S.view === 'favorites') renderView();
       });
     };
-    var bAdd = el('button', 'am-mini-btn');
-    miniIco(bAdd, 'M8 5.3 V10.7 M5.3 8 H10.7', 14, 5.3);
-    bAdd.title = '添加到播放列表';
+    var bAdd = el('button', 'am-mini-btn am-row-more');
+    miniIco(bAdd, 'M4.3 8 H4.31 M8 8 H8.01 M11.7 8 H11.71', 14);
+    bAdd.title = '歌曲操作';
     bAdd.onclick = function (e) { e.stopPropagation(); openAddMenu(e.clientX, e.clientY, t.path); };
     acts.appendChild(bFav); acts.appendChild(bAdd);
     /* V4.4.7（PR#6）：行内「从播放列表移除」的 ✕ 去掉了——太容易误触删歌；
@@ -1719,7 +2596,7 @@
     // V4.4.6：azArtist 排序模式下视图顺序≠paths 顺序，拖拽落点会错位——此时禁用拖拽
     if (opts.inPlaylist && !S.msOn && !(AM.plSortMode && AM.plSortMode() === 'azArtist')) {
       tr.draggable = true;
-      tr.title = '拖拽调整顺序';
+      tr.removeAttribute('title');
       tr.addEventListener('dragstart', function (e) {
         S._plDragPath = t.path;
         try { e.dataTransfer.effectAllowed = 'move'; } catch (er) { }
@@ -1779,7 +2656,7 @@
     if (e.ctrlKey || e.metaKey) {
       if (S.msSel.has(t.path)) S.msSel.delete(t.path); else S.msSel.add(t.path);
       S._selAnchor = t.path;
-      renderView();
+      renderKeepScroll();
       return true;
     }
     if (e.shiftKey && S._selAnchor && opts.tracks) {
@@ -1788,12 +2665,12 @@
       if (a >= 0 && b >= 0) {
         S.msSel.clear();
         for (var k = Math.min(a, b); k <= Math.max(a, b); k++) S.msSel.add(opts.tracks[k].path);
-        renderView();
+        renderKeepScroll();
         return true;
       }
       return false;
     }
-    if (S.msSel.size) { S.msSel.clear(); renderView(); }
+    if (S.msSel.size) { S.msSel.clear(); renderKeepScroll(); }
     return false;
   }
   function msToggle(p, tr, ck) {
@@ -1803,7 +2680,25 @@
     var cnt = document.querySelector('.am-ms-count');
     if (cnt) cnt.textContent = '已选 ' + S.msSel.size + ' 首';
   }
-  function msExit() { S.msOn = false; if (S.msSel) S.msSel.clear(); renderView(); }
+  /* V4.4.9：多选工具条出现/消失会改变内容高度 —— 重绘后按高度差补偿滚动，避免界面跳到顶上 */
+  function renderKeepScroll() {
+    var c = R.content;
+    if (!c) { renderView(); return; }
+    var st = c.scrollTop;
+    var ob = c.querySelector('.am-ms-bar');
+    var oh = ob ? ob.offsetHeight : 0;
+    renderView();
+    var nb = c.querySelector('.am-ms-bar');
+    var nh = nb ? nb.offsetHeight : 0;
+    var target = Math.max(0, st + nh - oh);
+    c.scrollTop = target;
+    if (S._tbl) { S._tbl.lastStart = -1; S._tbl.lastEnd = -1; renderAmWindow(); }
+    setTimeout(function () {
+      c.scrollTop = target;
+      if (S._tbl) { S._tbl.lastStart = -1; S._tbl.lastEnd = -1; renderAmWindow(); }
+    }, 0);
+  }
+  function msExit() { S.msOn = false; if (S.msSel) S.msSel.clear(); renderKeepScroll(); }
   function renderMsToolbar(c, tracks) {
     var bar = el('div', 'am-ms-bar');
     var bAll = el('button', 'am-btn', (S.msSel && S.msSel.size >= tracks.length && tracks.length) ? '☐ 取消全选' : '☑ 全选');
@@ -1811,7 +2706,7 @@
       if (!S.msSel) S.msSel = new Set();
       if (S.msSel.size >= tracks.length) S.msSel.clear();
       else tracks.forEach(function (t) { S.msSel.add(t.path); });
-      renderView();
+      renderKeepScroll();
     };
     bar.appendChild(bAll);
     // V4.4：顶部工具条独立歌单选择器——不复用右键 R.pop，避免全局外点关闭逻辑立即收掉菜单
@@ -1852,7 +2747,7 @@
         var del = new Set(S.msSel);
         window.mine.playlistReorder(plId, pl.paths.filter(function (p) { return !del.has(p); })).then(function (pls) {
           S.playlists = pls; S.msOn = false; if (S.msSel) S.msSel.clear();
-          renderSidebar(); renderView();
+          renderSidebar(); renderKeepScroll();
         });
       };
       bar.appendChild(bRm);
@@ -1870,6 +2765,8 @@
     bar.appendChild(el('span', 'am-ms-count', '已选 ' + (S.msSel ? S.msSel.size : 0) + ' 首'));
     bar.classList.add('am-ms-float');
     c.appendChild(bar);
+    /* V4.4.9：把工具条高度告诉表头（sticky top 让位），避免两者叠在一起 */
+    try { var _r = document.getElementById('am-root'); if (_r) _r.style.setProperty('--am-ms-h', bar.offsetHeight + 'px'); } catch (e0) { }
   }
   /* 删除确认：默认仅移出曲库显示；勾选后连同源文件（系统回收站，可恢复） */
   function amConfirmDel(count, cb) {
@@ -1922,37 +2819,370 @@
     tr.appendChild(td);
     return tr;
   }
+  /* ===== V4.4.9：歌曲表列（封面固定最左；歌曲/艺人/专辑可拖宽、可换位） ===== */
+  var AM_COL_DEFS = { title: '歌曲', artist: '艺人', album: '专辑' };
+  var _amColsCache = null;
+  function amCols() {
+    if (_amColsCache) return _amColsCache;
+    var st = { order: ['title', 'artist', 'album'], w: { title: 0.38, artist: 0.26, album: 0.36 } };
+    try {
+      var raw = localStorage.getItem('annieplayer.am.cols');
+      if (raw) {
+        var o = JSON.parse(raw);
+        if (o && Array.isArray(o.order)) {
+          var seen = {}, ord = [];
+          o.order.forEach(function (k) { if (AM_COL_DEFS[k] && !seen[k]) { seen[k] = 1; ord.push(k); } });
+          ['title', 'artist', 'album'].forEach(function (k) { if (ord.indexOf(k) < 0) ord.push(k); });
+          st.order = ord;
+        }
+        if (o && o.w) ['title', 'artist', 'album'].forEach(function (k) {
+          var v = +o.w[k];
+          if (v > 1) v = v / 100;   // 兼容旧版百分数
+          if (isFinite(v) && v >= 0.08 && v <= 0.8) st.w[k] = v;
+        });
+      }
+    } catch (e) { }
+    var sum = st.w.title + st.w.artist + st.w.album;
+    if (sum > 0) { st.w.title /= sum; st.w.artist /= sum; st.w.album /= sum; }
+    _amColsCache = st;
+    return st;
+  }
+  function amColsSave(st) {
+    _amColsCache = st;
+    try { localStorage.setItem('annieplayer.am.cols', JSON.stringify({ order: st.order, w: st.w })); } catch (e) { }
+  }
+  /* V4.4.9：按「可用宽度」把比例换成 px（calc 在 <col> 上不生效） */
+  function layoutCols(tb) {
+    if (!tb || !tb.isConnected) return;
+    var st = amCols();
+    var total = tb.getBoundingClientRect().width;
+    if (!total) return;
+    var fixed = +(tb.dataset.colfixed || 0);
+    var avail = Math.max(150, total - fixed);
+    st.order.forEach(function (k) {
+      var c = tb.querySelector('colgroup col[data-col="' + k + '"]');
+      if (c) c.style.width = Math.max(60, Math.round(avail * st.w[k])) + 'px';
+    });
+    tb.dataset.colavail = String(Math.round(avail));
+  }
+  var _colRO = null;
+  function watchCols(tb) {
+    if (!window.ResizeObserver) return;
+    try { if (_colRO) _colRO.disconnect(); } catch (e) { }
+    _colRO = new ResizeObserver(function () {
+      var t = document.querySelector('#am-root .am-table');
+      if (t) layoutCols(t);
+    });
+    _colRO.observe(tb);
+  }
+  function buildTableHead(tb, grp, opts) {
+    var st = amCols(), ms = !!S.msOn;
+    tb.innerHTML = '';
+    var cg = document.createElement('colgroup');
+    function addCol(w, key) {
+      var c = document.createElement('col');
+      c.style.width = w;
+      if (key) c.dataset.col = key;
+      cg.appendChild(c);
+      return c;
+    }
+    if (ms) addCol('34px');
+    if (grp) addCol('92px'); else if (opts.withCover) addCol('46px');
+    var fixed = (ms ? 34 : 0) + (grp ? 92 : (opts.withCover ? 46 : 0)) + 96;
+    tb.dataset.colfixed = String(fixed);
+    st.order.forEach(function (k) { addCol((st.w[k] * 100) + '%', k); });
+    addCol('96px');
+    tb.appendChild(cg);
+    var thead = document.createElement('thead'), trh = document.createElement('tr');
+    function addTh(w, label) {
+      var th = el('th', '', label || '');
+      if (w) th.style.width = w;
+      trh.appendChild(th);
+      return th;
+    }
+    if (ms) addTh('34px');
+    if (grp) addTh('92px', '封面'); else if (opts.withCover) addTh('46px');
+    st.order.forEach(function (k, i) {
+      var th = addTh(null, AM_COL_DEFS[k]);
+      th.dataset.col = k;
+      th.draggable = true;
+      th.removeAttribute('title');
+      if (i < st.order.length - 1) {
+        var g = el('span', 'am-col-grip');
+        g.dataset.col = k;
+        g.draggable = false;
+        g.removeAttribute('title');
+        th.appendChild(g);
+      } else {
+        th.classList.add('am-col-last');
+      }
+    });
+    addTh('96px');
+    thead.appendChild(trh);
+    tb.appendChild(thead);
+    bindColDrag(tb, thead);
+  }
+  function bindColDrag(tb, thead) {
+    var ths = thead.querySelectorAll('th[data-col]');
+    Array.prototype.forEach.call(ths, function (th) {
+      th.addEventListener('dragstart', function (e) {
+        if (e.target && e.target.classList && e.target.classList.contains('am-col-grip')) { e.preventDefault(); return; }
+        S._dragCol = th.dataset.col;
+        try { e.dataTransfer.setData('text/plain', th.dataset.col); e.dataTransfer.effectAllowed = 'move'; } catch (x) { }
+        th.classList.add('am-col-dragging');
+      });
+      th.addEventListener('dragend', function () {
+        th.classList.remove('am-col-dragging');
+        Array.prototype.forEach.call(ths, function (x) { x.classList.remove('am-col-drop'); });
+        S._dragCol = null;
+      });
+      th.addEventListener('dragover', function (e) {
+        if (!S._dragCol || S._dragCol === th.dataset.col) return;
+        e.preventDefault();
+        try { e.dataTransfer.dropEffect = 'move'; } catch (x) { }
+        th.classList.add('am-col-drop');
+      });
+      th.addEventListener('dragleave', function () { th.classList.remove('am-col-drop'); });
+      th.addEventListener('drop', function (e) {
+        e.preventDefault();
+        var from = S._dragCol, to = th.dataset.col;
+        th.classList.remove('am-col-drop');
+        if (!from || !to || from === to) return;
+        var st = amCols(), a = st.order.slice();
+        var fi = a.indexOf(from), ti = a.indexOf(to);
+        if (fi < 0 || ti < 0) return;
+        a.splice(fi, 1);
+        a.splice(ti, 0, from);
+        st.order = a;
+        amColsSave(st);
+        S._dragCol = null;
+        renderView();
+      });
+    });
+    Array.prototype.forEach.call(thead.querySelectorAll('.am-col-grip'), function (g) {
+      g.addEventListener('mousedown', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (S._dragSession) return;
+        S._dragSession = 'col';
+        window.__amDragBusy = true;
+        var key = g.dataset.col, st = amCols();
+        var startX = e.clientX, f0 = st.w[key];
+        var order = st.order.slice();
+        var i = order.indexOf(key);
+        var nb = order[i + 1];
+        if (!nb) return;
+        var f1 = st.w[nb];
+        var avail = 0;
+        Array.prototype.forEach.call(thead.querySelectorAll('th[data-col]'), function (th) { avail += th.getBoundingClientRect().width; });
+        var fixed = +(tb.dataset.colfixed || 0);
+        var minF = Math.min(0.45, 80 / Math.max(avail, 1));
+        var cols = tb.querySelectorAll('colgroup col');
+        var colOf = function (k) {
+          var out = null;
+          Array.prototype.forEach.call(cols, function (c) { if (c.dataset.col === k) out = c; });
+          return out;
+        };
+        var elKey = colOf(key), elNb = colOf(nb);
+        var move = function (ev) {
+          var d = (ev.clientX - startX) / Math.max(avail, 1);
+          var f = f0 + d, fn = f1 - d;
+          if (f < minF) { f = minF; fn = f0 + f1 - f; }
+          if (fn < minF) { fn = minF; f = f0 + f1 - fn; }
+          if (elKey) elKey.style.width = Math.round(avail * f) + 'px';
+          if (elNb) elNb.style.width = Math.round(avail * fn) + 'px';
+          st.w[key] = f; st.w[nb] = fn;
+        };
+        var up = function () {
+          document.removeEventListener('mousemove', move);
+          document.removeEventListener('mouseup', up);
+          document.documentElement.classList.remove('am-col-resizing');
+          S._dragSession = null;
+          window.__amDragBusy = false;
+          if (window.__amFlushDragRender) window.__amFlushDragRender();
+          amColsSave(st);
+        };
+        document.documentElement.classList.add('am-col-resizing');
+        document.addEventListener('mousemove', move);
+        document.addEventListener('mouseup', up);
+      });
+    });
+  }
+  /* ===== V4.4.9：长按组名拖动整组换位（顺序按「视图#排序」记忆） ===== */
+  function grpSortSig() {
+    var ui = (window.annieSettings && annieSettings.ui) || {};
+    var v = S.view || '';
+    var mode = v === 'songs' ? (ui.amSongSort || 'az')
+      : v === 'favorites' ? (ui.amFavSort || 'az')
+        : v.indexOf('pl:') === 0 ? (ui.amPlSort || 'default')
+          : v.indexOf('spl:') === 0 ? (ui.amSplSort || 'default') : '';
+    return v + '#' + mode;
+  }
+  function grpStore() {
+    try { return JSON.parse(localStorage.getItem('annieplayer.am.grpOrder') || '{}'); } catch (e) { return {}; }
+  }
+  function grpOrderGet() {
+    try {
+      var st = grpStore()[grpSortSig()];
+      if (!st || st.sig !== grpSortSig() || !Array.isArray(st.order)) return null;
+      return st.order;
+    } catch (e) { return null; }
+  }
+  function grpOrderSet(order) {
+    try {
+      var all = grpStore();
+      all[grpSortSig()] = { sig: grpSortSig(), order: order };
+      localStorage.setItem('annieplayer.am.grpOrder', JSON.stringify(all));
+    } catch (e) { }
+  }
+  /* 只有「播放列表/在线歌单 + 原始顺序」才允许整组拖动；其它按 A–Z 等排序的视图不允许 */
+  function grpDragAllowed() {
+    var v = S.view || '';
+    if (v.indexOf('pl:') !== 0 && v.indexOf('spl:') !== 0) return false;
+    var ui = (window.annieSettings && annieSettings.ui) || {};
+    var mode = v.indexOf('pl:') === 0 ? (ui.amPlSort || 'default') : (ui.amSplSort || 'default');
+    return mode === 'default';
+  }
+  function bindGrpDrag(tr, g) {
+    tr.addEventListener('mousedown', function (e) {
+      if (e.button !== 0) return;
+      if (S._dragSession) return;
+      if (!grpDragAllowed()) return;
+      S._dragSession = 'grp';
+      window.__amDragBusy = true;
+      var startView = S.view;
+      var startTable = tr.closest('table');
+      var startW = startTable ? startTable.getBoundingClientRect().width : 0;
+      var sx = e.clientX, sy = e.clientY, timer = null, active = false, ghost = null, moved = false;
+      var allRows = function () { return Array.prototype.slice.call(document.querySelectorAll('.am-grp-tr')).filter(function (x) { return !(x.closest && x.closest('.am-grp-ghost')); }); };
+      var cleanup = function () {
+        clearTimeout(timer);
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        S._dragSession = null;
+        window.__amDragBusy = false;
+        if (window.__amFlushDragRender) window.__amFlushDragRender();
+        tr.classList.remove('am-grp-dragging');
+        allRows().forEach(function (x) { x.classList.remove('am-grp-drop'); });
+        if (ghost) { ghost.remove(); ghost = null; }
+      };
+      var onMove = function (ev) {
+        if (S.view !== startView) { cleanup(); return; }
+        if (!active) {
+          if (Math.abs(ev.clientX - sx) > 5 || Math.abs(ev.clientY - sy) > 5) cleanup();
+          return;
+        }
+        moved = true;
+        if (ghost) { ghost.style.top = (ev.clientY - 30) + 'px'; ghost.style.left = (ev.clientX - 60) + 'px'; }
+        var under = document.elementFromPoint(ev.clientX, ev.clientY);
+        var row = under && under.closest ? under.closest('.am-grp-tr') : null;
+        allRows().forEach(function (x) { x.classList.toggle('am-grp-drop', !!row && x === row && x !== tr); });
+        var c = document.querySelector('.am-content');
+        if (c) {
+          var rr = c.getBoundingClientRect();
+          if (ev.clientY < rr.top + 56) c.scrollTop -= 12;
+          else if (ev.clientY > rr.bottom - 56) c.scrollTop += 12;
+        }
+      };
+      var onUp = function (ev) {
+        if (S.view !== startView) { cleanup(); return; }
+        if (!active) { cleanup(); return; }
+        active = false;
+        var under = document.elementFromPoint(ev.clientX, ev.clientY);
+        var row = under && under.closest ? under.closest('.am-grp-tr') : null;
+        if (row && row.closest('table') !== document.querySelector('#am-root .am-table')) row = null;
+        var rows = allRows();
+        cleanup();
+        if (moved && row && row !== tr && row.dataset.gkey != null) {
+          var keys = rows.map(function (x) { return x.dataset.gkey; });
+          var from = keys.indexOf(g.key), to = keys.indexOf(row.dataset.gkey);
+          if (from >= 0 && to >= 0) {
+keys.splice(from, 1);
+keys.splice(from < to ? to - 1 : to, 0, g.key);   // 插入到目标行之前（删除后目标下标左移一格）
+grpOrderSet(keys);
+renderView();
+          }
+        }
+      };
+      timer = setTimeout(function () {
+        active = true;
+        tr.classList.add('am-grp-dragging');
+        var r = tr.getBoundingClientRect();
+        var wrap = document.createElement('table');
+        wrap.className = 'am-table am-grp am-grp-ghost';
+        wrap.style.cssText = 'position:fixed;left:' + r.left + 'px;top:' + r.top + 'px;width:' + (startW || r.width) + 'px;pointer-events:none;z-index:9999;';
+        if (startTable) {
+          var cg0 = startTable.querySelector('colgroup');
+          if (cg0) wrap.appendChild(cg0.cloneNode(true));
+        }
+        var tb2 = document.createElement('tbody');
+        var clone = tr.cloneNode(true);
+        clone.classList.remove('am-grp-dragging');
+        tb2.appendChild(clone);
+        wrap.appendChild(tb2);
+        // 必须挂在 #am-root 内：AM 的样式都带 #am-root 作用域，挂 body 会让封面按原图尺寸撑满
+        (document.getElementById('am-root') || document.body).appendChild(wrap);
+        ghost = wrap;
+      }, 480);
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
+  /* V4.4.9：HTML5 拖动（歌曲行/列头）期间同样标注 busy，切歌时延迟整表重绘 */
+  document.addEventListener('dragstart', function (e) {
+    var el = e.target;
+    if (el && el.closest && el.closest('#am-root .am-table')) window.__amDragBusy = true;
+  }, true);
+  document.addEventListener('dragend', function () {
+    window.__amDragBusy = false;
+    if (window.__amFlushDragRender) window.__amFlushDragRender();
+  }, true);
+  document.addEventListener('drop', function () {
+    window.__amDragBusy = false;
+    if (window.__amFlushDragRender) window.__amFlushDragRender();
+  }, true);
   function renderTrackTable(c, tracks) {
+    setTimeout(scrollMemRestoreView, 0);   // V4.4.9：列表渲染完成后尝试恢复内容区滚动（重启场景）
     var tb = el('table', 'am-table');
     var inPlaylist = S.view.indexOf('pl:') === 0;
+    var grp = amSongGroupOn() ? buildGroupEntries(tracks) : null;   // V4.4.9：歌曲视图按专辑分组（连续块）
+    S._grpOn = !!grp;
+    if (!grp) S._grpManualOn = false;
     var opts = {
-      withCover: true, // V4.1：封面列全量开启（窗口化 + 专辑共享缓存兜底）
+      withCover: !grp, // V4.4.9：分组模式去掉行内封面（只留组封面）
+      grouped: !!grp,
       inPlaylist: inPlaylist,
       plId: inPlaylist ? S.view.slice(3) : null,
       tracks: tracks
     };
     if (S.msOn || (S.msSel && S.msSel.size)) renderMsToolbar(c, tracks); // V4.3.22：多选工具条（全选/删除选中/退出）；V4.4 快速多选有选中即显示
-    tb.innerHTML = '<thead><tr>' + (S.msOn ? '<th style="width:34px"></th>' : '') + (opts.withCover ? '<th style="width:46px"></th>' : '') +
-      '<th>歌曲</th><th>艺人</th><th>专辑</th><th style="width:96px"></th></tr></thead>';
+    else { try { var _r0 = document.getElementById('am-root'); if (_r0) _r0.style.setProperty('--am-ms-h', '0px'); } catch (e0) { } }
+    if (grp) tb.className = 'am-table am-grp';
+    buildTableHead(tb, grp, opts);   // V4.4.9：列头可拖宽 / 换位（封面固定最左）
     var body = el('tbody');
     tb.appendChild(body);
     c.appendChild(tb);
+    layoutCols(tb); watchCols(tb);   // V4.4.9：列宽按可用宽度换算 + 跟随容器变化
 
     if (tracks.length <= AM_WINDOW_MIN) {
       S._tbl = null;
-      tracks.forEach(function (t, i) { body.appendChild(buildTrackRow(t, i, opts)); });
+      if (grp) renderGroupRows(body, grp, opts);
+      else tracks.forEach(function (t, i) { body.appendChild(buildTrackRow(t, i, opts)); });
       return;
     }
     // 窗口化：可视区 ±15 行
     var rowH = opts.withCover ? AM_ROW_H_COVER : AM_ROW_H_PLAIN;
-    var cols = (opts.withCover ? 5 : 4) + (S.msOn ? 1 : 0);
-    var win = { tracks: tracks, opts: opts, body: body, tb: tb, rowH: rowH, cols: cols, lastStart: -1, lastEnd: -1 };
+    var cols = (opts.withCover || grp ? 5 : 4) + (S.msOn ? 1 : 0);
+    var win = grp
+      ? { grp: true, entries: grp.entries, offsets: grp.offsets, totalH: grp.totalH, trkEntry: grp.trkEntry, tracks: tracks, opts: opts, body: body, tb: tb, rowH: AM_GRP_ROW_H, cols: cols, lastStart: -1, lastEnd: -1 }
+      : { tracks: tracks, opts: opts, body: body, tb: tb, rowH: rowH, cols: cols, lastStart: -1, lastEnd: -1 };
     S._tbl = win;
     renderAmWindow();
   }
   function renderAmWindow() {
     var win = S._tbl, c = R.content;
     if (!win || !c || !win.body.isConnected) { return; }
+    if (win.grp) { renderAmWindowGrp(win, c); return; }   // V4.4.9：专辑分组窗口化
     /* V4.4：隐藏中（迷你模式 .am-body display:none）不算窗口——
      * clientHeight=0 会算出「顶部几行+巨大垫片」的假窗口，恢复显示后视口落在垫片上=列表空白。
      * 标脏返回，保持现有 DOM；恢复可见后由 exitMini/滚动事件重开。 */
@@ -2003,12 +3233,26 @@
     if (win && win.body.isConnected) {
       // 窗口化：与 scrollRowIntoView 同一套 base 换算；
       // 再多回退「表头 + 一行 + 6px」，否则字母组首行会被 sticky 表头（歌曲/艺人/专辑）盖住
+      if (win.grp) {
+        var _ee = win.trkEntry[idx], _gg = _ee != null ? win.entries[_ee].grp : null;
+        if (_gg && isGrpCollapsed(_gg)) { expandGrp(_gg); renderView(); setTimeout(function () { azJump(L); }, 30); return; }
+        var headH = win.tb.tHead ? win.tb.tHead.offsetHeight : 0;
+        var base = win.tb.getBoundingClientRect().top - c.getBoundingClientRect().top + c.scrollTop + headH;
+        c.scrollTo({ top: base + win.offsets[_ee] - headH - win.rowH - 6, behavior: 'smooth' });
+        return;
+      }
       var headH = win.tb.tHead ? win.tb.tHead.offsetHeight : 0;
       var base = win.tb.getBoundingClientRect().top - c.getBoundingClientRect().top + c.scrollTop + headH;
       c.scrollTo({ top: base + idx * win.rowH - headH - win.rowH - 6, behavior: 'smooth' });
     } else {
-      var rows = c.querySelectorAll('tr.am-tr');
-      var row = rows[idx];
+      var row = null;
+      if (amSongGroupOn()) {   // V4.4.9：分组后行序≠曲目序，按 path 找
+        var _tk = currentTracks()[idx];
+        row = _tk ? c.querySelector('.am-tr[data-path="' + CSS.escape(_tk.path) + '"]') : null;
+      } else {
+        var rows = c.querySelectorAll('tr.am-tr');
+        row = rows[idx];
+      }
       if (row) {
         // V4.3.11 修复：不能用 scrollIntoView——它会连 #am-root（fixed 壳）一起滚，把顶栏顶出视口
         //（用户实锤：点字母索引后顶部播放栏消失）。与窗口化路径同算法手动滚容器，
@@ -2219,7 +3463,7 @@
     pop.innerHTML = '';
     // V4.4：多选感知——右键/⊕ 的目标行在快速选择集合内时，歌单/删除/标签操作作用于整组选中（与 fb2k forEachSel 对齐）
     var selPaths = (S.msSel && S.msSel.size > 1 && S.msSel.has(trackPath)) ? Array.from(S.msSel) : [trackPath];
-    pop.appendChild(el('div', 'am-pop-head', selPaths.length > 1 ? '已选 ' + selPaths.length + ' 首' : '添加到播放列表')); // V4.4：改不可点分组标题（原 .am-pop-item 可点样式无功能，误导点击）
+    pop.appendChild(el('div', 'am-pop-head', selPaths.length > 1 ? '已选 ' + selPaths.length + ' 首' : '歌曲操作')); // V4.4：改不可点分组标题（原 .am-pop-item 可点样式无功能，误导点击）
     pop.appendChild(el('div', 'am-pop-sep'));
     var mte = el('button', 'am-pop-item', '✏️ 编辑标签…');
     mte.onclick = function () {
@@ -2273,7 +3517,7 @@
     // V4.3.22：多选（歌曲/专辑详情/喜爱歌曲/播放列表视图）——进入多选模式并选中本行
     if (S.view === 'songs' || S.view === 'favorites' || (S.view === 'albums' && S.albumKey) || S.view.indexOf('pl:') === 0) {
       var mms = el('button', 'am-pop-item', '☑ 多选');
-      mms.onclick = function () { pop.classList.remove('on'); S.msOn = true; S.msSel = new Set([trackPath]); renderView(); };
+      mms.onclick = function () { pop.classList.remove('on'); S.msOn = true; S.msSel = new Set([trackPath]); renderKeepScroll(); };
       pop.appendChild(mms);
     }
     // V4.4：歌单视图里右键「移除」默认只移出本歌单（不碰曲库/其他歌单）——
@@ -2365,11 +3609,21 @@
         var win = S._tbl, idx = -1;
         for (var k = 0; k < win.tracks.length; k++) if (win.tracks[k].path === p) { idx = k; break; }
         if (idx < 0) return;
-        var headH = win.tb.tHead ? win.tb.tHead.offsetHeight : 0;
-        var base = win.tb.getBoundingClientRect().top - R.content.getBoundingClientRect().top + R.content.scrollTop + headH;
-        R.content.scrollTop = Math.max(0, base + idx * win.rowH - (R.content.clientHeight - win.rowH) / 2);
-        renderAmWindow();
-        row = R.content.querySelector(sel);
+        if (win.grp) {
+          var _e = win.trkEntry[idx], _g = _e != null ? win.entries[_e].grp : null;
+          if (_g && isGrpCollapsed(_g)) { expandGrp(_g); renderView(); scrollRowIntoView(p, opts); return; }
+          var headH = win.tb.tHead ? win.tb.tHead.offsetHeight : 0;
+          var base = win.tb.getBoundingClientRect().top - R.content.getBoundingClientRect().top + R.content.scrollTop + headH;
+          R.content.scrollTop = Math.max(0, base + win.offsets[_e] + win.rowH / 2 - R.content.clientHeight / 2);
+          renderAmWindow();
+          row = R.content.querySelector(sel);
+        } else {
+          var headH = win.tb.tHead ? win.tb.tHead.offsetHeight : 0;
+          var base = win.tb.getBoundingClientRect().top - R.content.getBoundingClientRect().top + R.content.scrollTop + headH;
+          R.content.scrollTop = Math.max(0, base + idx * win.rowH - (R.content.clientHeight - win.rowH) / 2);
+          renderAmWindow();
+          row = R.content.querySelector(sel);
+        }
       } else if (row) {
         // 非窗口化：手动滚容器——不能用 scrollIntoView，它会连 #am-root（fixed 壳）一起滚，把顶栏顶出视口
         var cRect = R.content.getBoundingClientRect();

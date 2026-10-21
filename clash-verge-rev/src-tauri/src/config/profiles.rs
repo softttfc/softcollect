@@ -250,7 +250,6 @@ impl IProfiles {
                 patch!(each, item, file);
                 patch!(each, item, url);
                 patch!(each, item, selected);
-                patch!(each, item, latency_test_urls);
                 patch!(each, item, extra);
                 patch!(each, item, updated);
                 patch!(each, item, option);
@@ -294,7 +293,6 @@ impl IProfiles {
                     each.extra = item.extra;
                     each.updated = item.updated;
                     each.home = item.home.to_owned();
-                    each.name = item.name.clone();
                     each.option = PrfOption::merge(each.option.as_ref(), item.option.as_ref());
                     if let Some(file_data) = item.file_data.take() {
                         let file = each.file.take();

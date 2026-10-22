@@ -857,7 +857,7 @@ html.wp-on.wp-imm #am-root.am-nobg .am-imm-bg { opacity: 1; } /* 压过「无封
 .am-imm-prog { display: flex; align-items: center; gap: 10px; }
 .am-imm-bar { flex: 1; height: 5px; border-radius: 3px; background: rgba(255,255,255,.28); cursor: pointer; }
 .am-imm-fill { height: 100%; width: 0; border-radius: 3px; background: #fff; }
-.am-imm-time { font-size: 11px; color: rgba(255,255,255,.72); min-width: 36px; text-align: center; }
+.am-imm-time { font-size: calc(11px * var(--am-imm-fs, 1)); color: rgba(255,255,255,.72); min-width: 36px; text-align: center; }
 .am-imm-ctl { display: flex; align-items: center; justify-content: center; gap: 20px; margin-top: 2px; }
 .am-imm-btn {
   border: 0; background: transparent; color: #fff; font-size: 20px; cursor: pointer;
@@ -890,8 +890,10 @@ html.wp-on.wp-imm #am-root.am-nobg .am-imm-bg { opacity: 1; } /* 压过「无封
 /* V4.4：沉浸模式未开歌词时，封面+信息+控制栏整体居中
  *（.am-imm-main 恒为 1fr 1fr 双列，歌词隐藏后左列仍停在左半屏，右半全空） */
 #am-root.am-imm-on:not(.am-imm-lyr-on) .am-imm-main { grid-template-columns: 1fr; }
-.am-imm-lyr .am-lyr-line { font-size: calc(26px * var(--am-imm-lyr-scale, 1)); font-weight: 700; line-height: var(--am-imm-lyr-lh, 1.45); padding: 12px 0; color: rgba(255,255,255,.9); transform-origin: left center; }
-.am-imm-lyr .am-lyr-line .tly { font-size: calc(16px * var(--am-imm-tly-scale, 1)); }
+/* V4.5：文字随窗口缩放改为纯字号路径（原 zoom 方案在 zoom≠1 时会让滚动容器的
+   offsetTop/scrollTop/视觉坐标三套坐标系分离，当前行定位飞到容器外——zoom 已废弃） */
+.am-imm-lyr .am-lyr-line { font-size: calc(26px * var(--am-imm-lyr-scale, 1) * var(--am-imm-fs, 1)); font-weight: 700; line-height: var(--am-imm-lyr-lh, 1.45); padding: calc(12px * var(--am-imm-fs, 1)) 0; color: rgba(255,255,255,.9); transform-origin: left center; }
+.am-imm-lyr .am-lyr-line .tly { font-size: calc(16px * var(--am-imm-tly-scale, 1) * var(--am-imm-fs, 1)); }
 .am-imm-lyr .am-lyr-line.far { filter: blur(2px); opacity: .45; }
 .am-imm-lyr .am-lyr-line.near { color: rgba(255,255,255,.65); }
 .am-imm-lyr .am-lyr-line.cur { color: #fff; transform: scale(1.03); filter: none; }
@@ -910,8 +912,8 @@ html.wp-on.wp-imm #am-root.am-nobg .am-imm-bg { opacity: 1; } /* 压过「无封
   display: flex; flex-direction: column; min-height: 0; min-width: 0;
   justify-content: center; padding: 0 44px;
 }
-.am-imm-vinyl .am-imm-title { text-align: left; font-size: 30px; margin-top: 0; }
-.am-imm-vinyl .am-imm-sub { text-align: left; font-size: 17px; }
+.am-imm-vinyl .am-imm-title { text-align: left; font-size: calc(30px * var(--am-imm-fs, 1)); margin-top: 0; }
+.am-imm-vinyl .am-imm-sub { text-align: left; font-size: calc(17px * var(--am-imm-fs, 1)); }
 .am-imm-vinyl .am-imm-fmt { text-align: left; }
 .am-imm-vinyl .am-imm-lyr {
   display: block; width: 100%; max-width: none; justify-self: stretch;
@@ -1711,10 +1713,7 @@ html[data-motion="off"] #am-root::before {
   -webkit-backdrop-filter: var(--am-blur) brightness(1.06);
   box-shadow: 0 2px 10px -4px rgba(0, 0, 0, .18);
 }
-/* V4.4.8：音量条方向还原——上面 100%、下面 0%（原 rotate(90deg) 是 0 在上） */
-#am-root .am-vol input[type="range"] {
-  transform: translateX(-50%) translateY(41px) rotate(-90deg);
-}
+/* V4.4.8：音量条方向修复已并入 1396 行主规则（rotate(-90deg)），此处补丁块删除（同值冗余） */
 /* V4.4.8：歌词只在末尾留白，开头不留白（主面板 + 沉浸经典 + 彩胶三处统一） */
 #am-root .am-lyr-scroll { padding: 0 26px 40vh; }
 #am-root .am-imm-lyr { padding-top: 0; padding-bottom: 40vh; }
@@ -1887,3 +1886,168 @@ html[data-motion="off"] #am-root::before {
 #am-root .am-table .am-grp-tr + .am-tr:hover { background: linear-gradient(90deg, transparent 0 92px, var(--am-hover) 92px); }
 #am-root .am-table .am-grp-tr + .am-tr.cur { background: linear-gradient(90deg, transparent 0 92px, var(--am-row-cur) 92px); }
 #am-root .am-table .am-grp-tr + .am-tr.cur:hover { background: linear-gradient(90deg, transparent 0 92px, var(--am-row-cur) 92px); }
+
+/* 复选框：隐藏原生控件（它会多画两个小点），由 td 伪元素自绘并居中 */
+#am-root .am-table td:has(> input.am-ms-ck) { position: relative; }
+#am-root .am-table input.am-ms-ck {
+  -webkit-appearance: none; appearance: none;
+  opacity: 0; position: absolute; left: 10px; top: 50%;
+  width: 16px; height: 16px; margin: 0; transform: translateY(-50%);
+  cursor: pointer; z-index: 3;
+}
+#am-root .am-table td:has(> input.am-ms-ck)::before {
+  content: ''; position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  width: 16px; height: 16px; box-sizing: border-box; border-radius: 4px;
+  border: 1.5px solid color-mix(in srgb, var(--am-text) 40%, transparent);
+  background: transparent; pointer-events: none;
+}
+#am-root .am-table td:has(> input.am-ms-ck:checked)::before {
+  background-color: var(--am-accent);
+  border-color: var(--am-accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.3 8.4 L6.4 11.5 L12.7 4.9' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-size: 11px 11px; background-position: center; background-repeat: no-repeat;
+}
+/* 组头整组复选框：更大、靠左 */
+#am-root .am-table input.am-grp-ck { left: 10px; width: 19px; height: 19px; }
+#am-root .am-table td.am-grp-ckcell:has(> input.am-grp-ck)::before {
+  left: 10px; width: 19px; height: 19px; border-radius: 5px; border-width: 2px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--am-accent) 16%, transparent);
+}
+#am-root .am-table td.am-grp-ckcell:has(> input.am-grp-ck:checked)::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.3 8.4 L6.4 11.5 L12.7 4.9' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-size: 13px 13px; background-position: center; background-repeat: no-repeat;
+}
+/* 多选工具条窄窗换行，避免被右侧歌词面板裁掉 */
+#am-root .am-ms-bar { flex-wrap: wrap; row-gap: 6px; }
+/* 专辑详情头部：标题过长省略，排序下拉不被挤走 */
+#am-root .am-view-head[data-hkey^="albumDetail"] > .am-view-h {
+  flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#am-root .am-view-head[data-hkey^="albumDetail"] > .am-btn,
+#am-root .am-view-head[data-hkey^="albumDetail"] > .am-sort-btn,
+#am-root .am-view-head[data-hkey^="albumDetail"] > .am-dd,
+#am-root .am-view-head[data-hkey^="albumDetail"] > .am-select { flex: none; }
+/* 搜索框清空按钮（位置由 JS 按输入框计算） */
+#am-root .am-clear-btn, #settings-panel .am-clear-btn {
+  position: absolute; width: 17px; height: 17px; padding: 0; border: 0; border-radius: 50%;
+  background: color-mix(in srgb, var(--am-text) 16%, transparent);
+  color: var(--am-text); font-size: 10px; line-height: 17px; text-align: center;
+  cursor: pointer; z-index: 3; opacity: .75; transform: translateY(-50%);
+}
+#am-root .am-clear-btn:hover, #settings-panel .am-clear-btn:hover {
+  opacity: 1; background: color-mix(in srgb, var(--am-text) 28%, transparent);
+}
+
+/* 拖拽光标：默认箭头，按住一会儿才 grab */
+#am-root .am-tr[draggable="true"] { cursor: default; }
+#am-root .am-tr.drag-ready { cursor: grab; }
+#am-root .am-tr.drag-ready:active { cursor: grabbing; }
+/* 内容区滚动时隐藏歌词折叠按钮，避免挡住滚动条 */
+#am-root .am-lyr-fold { transition: opacity .18s ease; }
+#am-root.am-rolling .am-lyr-fold { opacity: 0 !important; pointer-events: none; }
+
+/* 搜索框 / 吸顶条 / A–Z：用不受冷色偏向影响的颜色，保持半透明叠加 */
+#am-root .am-side > .am-search {
+  background: color-mix(in srgb, var(--am-cover-vivid, var(--am-cover-c1, transparent)) 12%, color-mix(in srgb, var(--am-glass-2) 34%, transparent));
+}
+#am-root .am-side > .am-search:hover {
+  background: color-mix(in srgb, var(--am-cover-vivid, var(--am-cover-c1, transparent)) 18%, color-mix(in srgb, var(--am-glass-2) 44%, transparent));
+}
+#am-root:not(.am-hdr-line) .am-side .am-side-h.am-h-stuck::after {
+  background: color-mix(in srgb, var(--am-cover-vivid, var(--am-cover-c1, transparent)) 12%, color-mix(in srgb, var(--am-glass-2) 42%, transparent));
+}
+
+/* ===== V4.5.1：侧栏排版统一 ===== */
+/* 行高 33、上下内边距 4（三种间隙一致） */
+#am-root .am-side > .am-side-h {
+  height: 33px; min-height: 33px; padding-top: 4px; padding-bottom: 4px;
+  margin-top: 0; padding-left: 10px; gap: 4px;
+}
+#am-root .am-side .am-nav { min-height: 33px; padding-top: 4px; padding-bottom: 4px; gap: 10px; }
+/* 图标在 20px 列内居中（折叠箭头不参与，保持贴左） */
+#am-root .am-side .am-nav-ico { justify-content: center; text-align: center; }
+#am-root .am-side .am-side-caret { width: 16px; min-width: 16px; justify-content: flex-start; }
+/* 分组头与相邻可见行各 +0.5px；头→头不动 */
+#am-root .am-side .am-side-h + .am-nav:not(.am-grp-hidden) { margin-top: 0.5px; }
+#am-root .am-side .am-nav:not(.am-grp-hidden) + .am-side-h { margin-top: 0.5px; }
+/* 顶部留白 8px（底部 10px），吸顶头钉在内容区顶部 */
+#am-root .am-side { padding-top: 8px; }
+#am-root .am-side > .am-side-h { top: 0; }
+/* 吸顶胶囊：高 31px（= 搜索框），上沿贴顶 */
+#am-root:not(.am-hdr-line) .am-side .am-side-h.am-h-stuck::after { top: 0; bottom: 2px; }
+/* 侧栏 SVG 图标统一尺寸 */
+#am-root .am-side .am-nav-ico > svg { width: 18px; height: 18px; display: block; }
+
+/* 文字与图标/封面垂直居中（行高收紧，避免文字整体偏下） */
+#am-root .am-side .am-nav-name { line-height: 1; display: flex; align-items: center; }
+
+/* 歌单单曲拖拽：小胶囊预览（居中跟随指针），源行淡出 */
+#am-root .am-row-src { opacity: .35; }
+.am-row-ghost {
+  position: fixed; z-index: 9999; pointer-events: none;
+  transform: translateX(-50%);
+  max-width: 320px;
+  padding: 9px 18px;
+  border-radius: 12px;
+  font-size: 13px; line-height: 20px; font-weight: 500;
+  letter-spacing: .2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: var(--am-text, #1c1b18);
+  background: var(--am-panel, #fff);
+  border: 1px solid var(--am-line, rgba(0,0,0,.12));
+  box-shadow: 0 12px 30px rgba(0,0,0,.22);
+  opacity: .88;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+body.am-row-dragging { cursor: grabbing; }
+
+/* 落点插入线：组头也接受拖放，必须同样画出 2px 强调色线 */
+#am-root .am-table .am-grp-tr.drop-before {
+  box-shadow: inset 0 2px 0 0 var(--am-accent) !important;
+}
+#am-root .am-table .am-grp-tr.drop-after {
+  box-shadow: inset 0 -2px 0 0 var(--am-accent) !important;
+}
+
+/* 待播清单：提示语上下 4px，列表底部 6px，最后一首封面不贴边 */
+#am-root .am-q-drawer .am-q-empty,
+#am-root .am-imm-queue .am-q-empty {
+  margin: 0 !important;
+  padding: 4px 0 !important;
+}
+#am-root .am-q-drawer .am-q-list,
+#am-root .am-imm-queue .am-q-list {
+  padding-bottom: 6px !important;
+}
+
+
+/* ===== 本轮：封面比例 / 模糊铺底 / 沉浸封面与字号 / 折叠按钮 / 面板边线 ===== */
+#am-root .am-lyr-cover { object-fit: contain; background: transparent; z-index: 4; }
+#am-root .am-lyr-cover-bg {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%) scale(1.18);
+  width: var(--am-lyrcover-size, 200px); aspect-ratio: 1;
+  border-radius: 12px; overflow: hidden;
+  background-size: cover; background-position: center; background-repeat: no-repeat;
+  filter: blur(18px) saturate(1.6) brightness(1.02);
+  opacity: 1; z-index: 3; pointer-events: none;
+}
+#am-root .am-lyr-cover-bg:not([style*="url("]) { display: none; }
+#am-root.am-lyrcover-off .am-lyr-cover-bg { display: none; }
+
+#am-root .am-imm-cover {
+  aspect-ratio: auto !important; height: auto !important;
+  max-height: 74vh; width: 100%; object-fit: contain;
+}
+#am-root .am-imm-cover:not(.am-imm-wide) { transform: none !important; }
+#am-root .am-imm-cover.am-imm-wide { transform: scale(1.15) !important; }
+
+/* V4.5：原 zoom 规则（.am-imm-title/.am-imm-sub/.am-imm-fmt/时间/歌词行）已删除——
+   zoom≠1 时滚动容器的 offsetTop/scrollTop/视觉坐标三套系分离，当前行飞出容器。
+   文字缩放改由各元素 font-size 乘 var(--am-imm-fs) 实现（见歌词行/彩胶标题/时间等规则） */
+
+/* 待播清单收起按钮：与歌词面板收起按钮同一水平线并贴边 */
+#am-root .am-imm-q-fold { top: 50% !important; left: -27.5px !important; }
+
+/* B 方案：歌词面板不画左边线（连 1px 边带一起去掉，否则会显出一条白线） */
+#am-root .am-lyrics { border-left-color: transparent !important; border-left-width: 0 !important; }

@@ -25,6 +25,12 @@ import { RELEASE_TARGETS } from '../../scripts/assemble-release-artifacts.mjs'
 // @ts-expect-error -- JavaScript build hook intentionally has no declarations
 import stagedDependenciesBoundary from '../../scripts/before-build-use-staged-dependencies.mjs'
 // @ts-expect-error -- JavaScript release script intentionally has no declarations
+import {
+  CONTAINER_REPOSITORIES,
+  containerImageTags,
+  resolveContainerReleaseMetadata,
+} from '../../scripts/container-release-metadata.mjs'
+// @ts-expect-error -- JavaScript release script intentionally has no declarations
 import { resolveReleaseMetadata } from '../../scripts/release-metadata.mjs'
 
 interface LooseRecord {
@@ -43,9 +49,9 @@ const ROOT = process.cwd()
 const WORKFLOW_DIRECTORY = path.join(ROOT, '.github/workflows')
 const require = createRequire(import.meta.url)
 const parseYaml = require('js-yaml').load as (source: string) => unknown
-const PNPM_VERSION = '12.10.1'
+const PNPM_VERSION = '12.15.0'
 const PNPM_PACKAGE_MANAGER =
-  'pnpm@12.10.1+sha512.ba40a37eb1a370d60fea8c4cf1d364c13bcccef518e98ad2bcee954f539d38da37458e58261a3fa55e06523450ea0ffff9f497b135be41f2c15c1642bacace6c'
+  'pnpm@12.15.0+sha512.b3951d6d6ff4a9f13dc7cf56cd28d2b8eb37dbcc9c68e52e1e1191873ea9f82a017287ab50baadc5ccc494f036c67c0e47eb13608c2fa36f47711b61ea128e61'
 const ELECTRON_BUILDER_CUSTOM_DIR_ENVIRONMENT_VARIABLES = [
   'NPM_CONFIG_ELECTRON_BUILDER_BINARIES_CUSTOM_DIR',
   'npm_config_electron_builder_binaries_custom_dir',
@@ -1194,6 +1200,102 @@ describe('release workflow publication contract', () => {
       'publish-container',
     ])
   })
+
+  // The production alias step runs in Bash on a Linux runner.
+  it.skipIf(process.platform === 'win32')(
+    'promotes every stable container alias and rejects a mismatched digest',
+    () => {
+      const jobs = workflowJobs(releaseWorkflow)
+      const promoteJob = asRecord(
+        jobs['promote-container-aliases'],
+        'container alias promotion job'
+      )
+      const aliasCommand = stringField(
+        jobSteps(promoteJob).find(
+          (step) =>
+            step.name === 'Promote and verify stable container aliases last'
+        ) as LooseRecord,
+        'run'
+      )
+      const metadata = resolveContainerReleaseMetadata('2.0.0')
+      const floatingTags = containerImageTags(metadata.floatingTags) as string[]
+      const digest = `sha256:${'a'.repeat(64)}`
+      const fixture = realpathSync(
+        mkdtempSync(path.join(tmpdir(), 'motrix-container-aliases-'))
+      )
+      const callsPath = path.join(fixture, 'docker-calls.jsonl')
+      writeFileSync(
+        path.join(fixture, 'docker'),
+        [
+          `#!${process.execPath}`,
+          "const fs = require('node:fs')",
+          'const args = process.argv.slice(2)',
+          "fs.appendFileSync(process.env.MOTRIX_FAKE_DOCKER_CALLS, JSON.stringify(args) + '\\n')",
+          "if (args[0] !== 'buildx' || args[1] !== 'imagetools') process.exit(2)",
+          "if (args[2] === 'create') process.exit(0)",
+          "if (args[2] !== 'inspect') process.exit(2)",
+          "const digest = args[3] === process.env.MOTRIX_FAKE_MISMATCH_TAG ? 'sha256:' + 'b'.repeat(64) : process.env.PUBLISHED_DIGEST",
+          'process.stdout.write(JSON.stringify({ manifest: { digest } }))',
+        ].join('\n'),
+        { mode: 0o755 }
+      )
+      writeFileSync(
+        path.join(fixture, 'jq'),
+        [
+          `#!${process.execPath}`,
+          "const fs = require('node:fs')",
+          "if (process.argv[2] !== '-er' || process.argv[3] !== '.manifest.digest') process.exit(2)",
+          "process.stdout.write(JSON.parse(fs.readFileSync(0, 'utf8')).manifest.digest + '\\n')",
+        ].join('\n'),
+        { mode: 0o755 }
+      )
+      const runPromotion = (mismatchTag = '') => {
+        writeFileSync(callsPath, '')
+        return spawnSync('bash', ['-c', aliasCommand], {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            DOCKERHUB_REPOSITORY: CONTAINER_REPOSITORIES.dockerHub,
+            GHCR_REPOSITORY: CONTAINER_REPOSITORIES.ghcr,
+            FLOATING_TAGS: floatingTags.join('\n'),
+            MOTRIX_FAKE_DOCKER_CALLS: callsPath,
+            MOTRIX_FAKE_MISMATCH_TAG: mismatchTag,
+            PATH: `${fixture}:${process.env.PATH ?? ''}`,
+            PUBLISHED_DIGEST: digest,
+          },
+        })
+      }
+
+      try {
+        const promoted = runPromotion()
+        expect(promoted.stderr).toBe('')
+        expect(promoted.status).toBe(0)
+        const calls = readFileSync(callsPath, 'utf8')
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line) as string[])
+        expect(calls.filter((args) => args[2] === 'create')).toEqual(
+          Object.values(CONTAINER_REPOSITORIES).map((repository) => [
+            'buildx',
+            'imagetools',
+            'create',
+            ...['2.0', '2', 'stable', 'latest'].flatMap((tag) => [
+              '--tag',
+              `${repository}:${tag}`,
+            ]),
+            `${repository}@${digest}`,
+          ])
+        )
+        expect(
+          calls.filter((args) => args[2] === 'inspect').map((args) => args[3])
+        ).toEqual(floatingTags)
+
+        expect(runPromotion(floatingTags.at(-1)).status).toBe(1)
+      } finally {
+        rmSync(fixture, { force: true, recursive: true })
+      }
+    }
+  )
 
   it('bounds anonymous signature visibility retries and still fails closed', () => {
     const jobs = workflowJobs(releaseWorkflow)
@@ -2773,7 +2875,7 @@ describe('release workflow publication contract', () => {
       stringField(asRecord(config.directories, 'signing directories'), 'app')
     ).toBe('dist/electron-app')
     expect(stringField(config, 'electronDist')).toBe('trusted/electron.zip')
-    expect(stringField(config, 'electronVersion')).toBe('44.7.0')
+    expect(stringField(config, 'electronVersion')).toBe('45.0.0')
     expect(signingInputSource).toContain(
       "config.directories?.app !== 'dist/electron-app'"
     )
@@ -2839,7 +2941,7 @@ describe('release workflow publication contract', () => {
       asRecord(metadata.devDependencies, 'dev dependencies'),
       'electron'
     )
-    expect(version).toBe('44.7.0')
+    expect(version).toBe('45.0.0')
     expect(
       stringField(
         asRecord(
@@ -2871,7 +2973,7 @@ describe('release workflow publication contract', () => {
     expect(checked).toBeGreaterThan(0)
   })
 
-  it('pins the packaged macOS baseline to Electron 44 support', () => {
+  it('pins the packaged macOS baseline to Electron 45 support', () => {
     const builderConfig = asRecord(
       JSON.parse(
         readFileSync(path.join(ROOT, 'electron-builder.json'), 'utf8')

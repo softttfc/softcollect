@@ -5,8 +5,8 @@ import { beforeAll, describe, expect, it } from 'vitest'
 const MIB = 1024 * 1024
 const ROOT = path.resolve(import.meta.dirname, '../..')
 const TARGETS = [
-  // Plugin operations, renderer recovery and 26 catalogs bring main to ~5.28 MiB.
-  { name: 'main', initial: 2 * MIB, total: 5.5 * MIB },
+  // Explicit resource lifetimes add ~6 KiB; retain the 2 MiB startup ceiling.
+  { name: 'main', initial: 2 * MIB, total: 5.5 * MIB + 8 * 1024 },
   { name: 'preload', initial: 80 * 1024, total: 80 * 1024 },
   { name: 'worker', initial: 48 * 1024, total: 48 * 1024 },
   { name: 'renderer', initial: 2.75 * MIB, total: 8 * MIB },
@@ -23,6 +23,7 @@ interface BundleMetrics {
   sourceMaps: number
   initialLocales: string[]
   bundledLocales: string[]
+  bundledOperatorAdmin: boolean
   initialElk: boolean
   bundledElk: boolean
   javascriptAssetBytes: number
@@ -58,6 +59,8 @@ describe('production bundle loading and size contracts', () => {
       expect(result.initialBytes).toBeLessThanOrEqual(target.initial)
       expect(result.totalBytes).toBeLessThanOrEqual(target.total)
       expect(result.sourceMaps).toBe(0)
+      if (target.name === 'main')
+        expect(result.bundledOperatorAdmin).toBe(false)
       if (
         ['main', 'server', 'renderer', 'renderer.web'].includes(target.name)
       ) {

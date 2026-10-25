@@ -1,4 +1,6 @@
 export const Commands = {
+  AcknowledgeGraphicsRecoveryNotice:
+    'command:acknowledgeGraphicsRecoveryNotice',
   ExecuteRendererSubmission: 'command:executeRendererSubmission',
   AcknowledgeRendererIntent: 'command:acknowledgeRendererIntent',
   ReportRendererSurface: 'command:reportRendererSurface',
@@ -18,10 +20,13 @@ export const Commands = {
   CancelPluginOperation: 'command:cancelPluginOperation',
   PickFile: 'command:pickFile',
   ActivateLegacyBt: 'command:activateLegacyBt',
+  ActivateLegacyHttp: 'command:activateLegacyHttp',
+  CancelLegacyHttpActivation: 'command:cancelLegacyHttpActivation',
   PickLegacyImportSource: 'command:pickLegacyImportSource',
   RevealLegacyImportSource: 'command:revealLegacyImportSource',
   PickLegacyTorrentMetadata: 'command:pickLegacyTorrentMetadata',
   CommitLegacyImport: 'command:commitLegacyImport',
+  ReleaseLegacyImportPreview: 'command:releaseLegacyImportPreview',
   CancelLegacyImport: 'command:cancelLegacyImport',
   RetryLegacyImport: 'command:retryLegacyImport',
   DismissLegacyImportInvitation: 'command:dismissLegacyImportInvitation',

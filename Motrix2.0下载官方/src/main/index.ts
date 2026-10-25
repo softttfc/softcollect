@@ -37,6 +37,7 @@ import {
   taskInspectorActivityEnvironment,
 } from '@core/inspector-activity'
 import { LegacyBtActivationService } from '@core/legacy-import/bt-activation-service'
+import { LegacyHttpActivationService } from '@core/legacy-import/http-activation-service'
 import { LegacyImportService } from '@core/legacy-import/import-service'
 import {
   getLegacyQuarantinedGids,
@@ -206,6 +207,7 @@ import { resolveDefaultSaveDirOptions } from './platform/default-save-dir'
 import { resolveDesktopBackgroundPolicy } from './platform/desktop-background-policy'
 import { resolveDistributionContext } from './platform/distribution-context'
 import { removePathRecursive, renameAtomic } from './platform/fs-helpers'
+import { setupGraphicsRecovery } from './platform/graphics-recovery-runtime'
 import { setupNativeThemeSync } from './platform/native-theme-sync'
 import { setupPowerManager } from './platform/power-manager'
 import { createProtocolManager } from './platform/protocol-manager'
@@ -307,6 +309,7 @@ const speedHistoryStore = new SpeedHistoryStore()
 const taskSpeedHistoryStore = new TaskSpeedHistoryStore()
 const torrentParser = new TorrentParser()
 let windowManager: WindowManager
+let graphicsRuntime: ReturnType<typeof setupGraphicsRecovery> | undefined
 let rendererRecovery:
   | ReturnType<typeof createRendererRecoveryRuntime>
   | undefined
@@ -371,6 +374,11 @@ const settingsManager = new SettingsManager(settingsPath, {
   }),
   ...defaultSaveDirOptions,
   onChange: (old, updated) => {
+    if (old.app.hardwareAcceleration !== updated.app.hardwareAcceleration) {
+      graphicsRuntime?.recovery.preferenceChanged(
+        updated.app.hardwareAcceleration
+      )
+    }
     eventBus.emit(Events.SettingsChanged, { old, updated })
     if (
       old.app.notifyInAppOnComplete !== updated.app.notifyInAppOnComplete ||
@@ -457,7 +465,8 @@ log.info({ extraDir: platform.extraResourceDir }, 'resolved extra directory')
 
 const configBuilder = new Aria2ConfigBuilder(
   path.join(platform.extraResourceDir, 'aria2.conf'),
-  platform.userDataDir
+  platform.userDataDir,
+  { supervisorPid: process.pid }
 )
 const trustStore = new Aria2TrustStore(platform.userDataDir)
 
@@ -537,6 +546,7 @@ let segmentClient: Aria2SegmentClient | null = null
 let disposeIpcIngress: (() => void) | null = null
 let legacyImportService: LegacyImportService | null = null
 let legacyBtActivationService: LegacyBtActivationService | null = null
+let legacyHttpActivationService: LegacyHttpActivationService | null = null
 let pendingDisclaimerGate: DisclaimerGate | null = null
 const mainProcessWork = new MainProcessWorkCoordinator()
 const pollingNotificationUnsubscribers: Array<() => void> = []
@@ -590,6 +600,7 @@ function performCleanup(): Promise<void> {
     // the drain: startup can be blocked on the engine/plugin/session that only
     // those teardown operations can release.
     void legacyBtActivationService?.drain()
+    void legacyHttpActivationService?.drain()
     const acceptedWorkDrain = mainProcessWork.stopAndDrain()
     postDeliveryAbortController?.abort()
     await ingressClose
@@ -666,6 +677,9 @@ function performCleanup(): Promise<void> {
     })
     await safely('legacy-bt-activation', () =>
       legacyBtActivationService?.drain()
+    )
+    await safely('legacy-http-activation', () =>
+      legacyHttpActivationService?.drain()
     )
     await safely('legacy-import', () => legacyImportService?.drain())
     await safely('database', () => {
@@ -814,6 +828,13 @@ const launcher = setupLauncher({
   },
 })
 
+// Run synchronously before ready, after the launcher owns this profile.
+// SettingsManager loads asynchronously after ready, which is too late for
+// Electron's hardware acceleration switch.
+if (app.hasSingleInstanceLock()) {
+  graphicsRuntime = setupGraphicsRecovery(platform.userDataDir, settingsPath)
+}
+
 function runShellAsyncWork(
   label: string,
   operation: () => Promise<void>
@@ -943,6 +964,7 @@ async function handlePolledTasks(
               )
           }
           if (
+            !hasLegacyImport(existing) &&
             shouldEvictFromEngine(existing.status, merged.status, existing.type)
           ) {
             // Either BT/Magnet seeding just satisfied its ratio/time target,
@@ -1341,6 +1363,7 @@ async function startEngineAndRestore(
     await appliedDownloadProxyPolicy.runWithSnapshot(
       async (_snapshot, lease) => {
         await legacyBtActivationService?.recover()
+        await legacyHttpActivationService?.recover()
         await sessionManager.restore(lease.assertCurrent, (snapshot) =>
           completedEngineTaskCleanup.observe(snapshot)
         )
@@ -1520,6 +1543,13 @@ async function startEngineAndRestore(
           ) {
             return
           }
+          if (hasLegacyImport(task) && task.type === TaskType.Http) {
+            await completedEngineTaskCleanup.observe({
+              ...task,
+              status: TaskStatus.Completed,
+            })
+            return
+          }
           if (shouldSkipEngineCompletionFinalize(task)) return
           try {
             await finalizeTask(task.id, finalizeDepsFactory())
@@ -1577,6 +1607,10 @@ async function initializeMainProcess(): Promise<void> {
   // settings (for window bounds/run mode) and WindowManager.
 
   await settingsManager.load()
+  if (graphicsRuntime?.recovery.recoveredAtStartup) {
+    await settingsManager.update({ app: { hardwareAcceleration: false } })
+    graphicsRuntime.recovery.completeRecovery()
+  }
   pluginHttpClient = new PluginHttpClient(() => settingsManager.getProxy())
   if (!mainProcessWork.isAccepting()) return
 
@@ -1843,8 +1877,31 @@ async function initializeMainProcess(): Promise<void> {
     }
     return legacyBtActivationService
   }
+  const getLegacyHttpActivationService = () => {
+    if (!legacyHttpActivationService) {
+      getLegacyImportService()
+      legacyHttpActivationService = new LegacyHttpActivationService({
+        db: motrixDb,
+        taskManager,
+        adapter,
+        backupRoot: legacyBackupRoot,
+        isProcessRunning: legacyPidRunning,
+        publishTasks: publishTaskUpdateNow,
+        runTaskMutation: (taskIds, operation) =>
+          taskInspectorActivityRuntime
+            ? taskInspectorActivityRuntime.runTaskMutation(taskIds, operation)
+            : operation(),
+        runExclusivePersistence: (operation) =>
+          sessionManager
+            ? sessionManager.runExclusivePersistence(operation)
+            : Promise.resolve().then(operation),
+      })
+    }
+    return legacyHttpActivationService
+  }
   const disposeLegacyImportIpc = registerLegacyImportIpc({
     getActivationService: getLegacyBtActivationService,
+    getHttpActivationService: getLegacyHttpActivationService,
     getService: getLegacyImportService,
     hasConsent: () => gate.isAccepted() && mainProcessWork.isAccepting(),
     getTask: (taskId) => taskManager.getById(taskId),
@@ -1976,6 +2033,7 @@ async function initializeMainProcess(): Promise<void> {
 
   if (!legacyImportService) motrixDb.init()
   getLegacyBtActivationService()
+  getLegacyHttpActivationService()
   legacyImportService?.setPersistenceLane((operation) =>
     sessionManager
       ? sessionManager.runExclusivePersistence(operation)
@@ -2206,6 +2264,12 @@ async function initializeMainProcess(): Promise<void> {
     dispatch: (occurrence) => occurrenceDispatcher.dispatch(occurrence),
     prepareFiles: (task) =>
       syncTaskFilesIfIncomplete(task.id, task.engineTaskId),
+    // Cleanup owns the mutation lock across its exact-owner check and retry.
+    finalizeLegacyHttp: (taskId) =>
+      finalizeTask(taskId, {
+        ...buildFinalizeDeps(adapter),
+        runTaskMutation: undefined,
+      }),
     runTaskMutation: (ids, operation) =>
       activeTaskInspectorActivityRuntime.runTaskMutation(ids, operation),
     log,
@@ -3132,6 +3196,7 @@ async function showQuitConfirmation(activeCount: number): Promise<{
 }
 
 function beginShutdown(): void {
+  graphicsRuntime?.stop()
   // quitController.phase is already 'shutting-down' (set synchronously before
   // this call). app.quit() below re-fires before-quit synchronously; the guard
   // there relies on the phase already being terminal.

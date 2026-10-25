@@ -20,6 +20,7 @@ import {
   LegacyImportService,
   type LegacyImportServiceDeps,
 } from './import-service'
+import type { LegacySnapshot } from './source-scanner'
 
 const cleanups: Array<() => Promise<void>> = []
 
@@ -102,6 +103,119 @@ async function completed(service: LegacyImportService, runId: string) {
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup()
   vi.restoreAllMocks()
+  vi.useRealTimers()
+})
+
+function previewCache(service: LegacyImportService) {
+  // Observe ownership directly: GC timing and process RSS are nondeterministic.
+  return Reflect.get(service, 'previews') as Map<
+    string,
+    {
+      snapshot: LegacySnapshot | null
+      dto: { items: unknown[] }
+    }
+  >
+}
+
+describe('legacy preview memory ownership', () => {
+  it('cleans up admission ownership even when persisting its failure report also fails', async () => {
+    const f = await fixture()
+    const target = f.service as unknown as {
+      backup(): Promise<string>
+      saveReport(): void
+    }
+    vi.spyOn(target, 'backup').mockRejectedValueOnce(new Error('backup failed'))
+    const reportFailure = new Error('report persistence failed')
+    vi.spyOn(target, 'saveReport').mockImplementationOnce(() => {
+      throw reportFailure
+    })
+    await expect(f.service.commit(f.request)).rejects.toBe(reportFailure)
+    expect(previewCache(f.service).has(f.preview.previewId)).toBe(false)
+    await expect(f.service.scan(f.source.sourceHandle)).resolves.toMatchObject({
+      sourceHandle: f.source.sourceHandle,
+    })
+  })
+  it('expires raw snapshots without another scan', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+    const f = await fixture()
+    expect(
+      previewCache(f.service).get(f.preview.previewId)?.snapshot
+    ).toBeTruthy()
+    await vi.advanceTimersByTimeAsync(15 * 60_000 + 1)
+    expect(previewCache(f.service).size).toBe(0)
+    await expect(f.service.commit(f.request)).rejects.toThrow('expiredPreview')
+  })
+
+  it('retires completed snapshots while preserving duplicate commit results', async () => {
+    const f = await fixture()
+    const run = await f.service.commit(f.request)
+    await completed(f.service, run.runId)
+    expect(previewCache(f.service).get(f.preview.previewId)).toMatchObject({
+      snapshot: null,
+      dto: { items: [] },
+    })
+    expect((await f.service.commit(f.request)).runId).toBe(run.runId)
+    f.service.releasePreview(f.preview.previewId)
+    expect(previewCache(f.service).size).toBe(0)
+    expect((await f.service.retry(run.runId)).runId).toBe(run.runId)
+  })
+
+  it('releases cancelled snapshots and retries from the lightweight source index', async () => {
+    const f = await fixture(2)
+    const run = await f.service.commit(f.request)
+    f.service.cancel(run.runId)
+    await completed(f.service, run.runId)
+    expect(
+      previewCache(f.service).get(f.preview.previewId)?.snapshot
+    ).toBeNull()
+    f.service.releasePreview(f.preview.previewId)
+    const retried = await f.service.retry(run.runId)
+    expect((await completed(f.service, retried.runId)).imported).toBe(2)
+  })
+
+  it('does not interrupt an admitted commit when its UI releases the preview', async () => {
+    const f = await fixture()
+    const accepting = f.service.commit(f.request)
+    f.service.releasePreview(f.preview.previewId)
+    const run = await accepting
+    expect((await completed(f.service, run.runId)).imported).toBe(1)
+    expect(previewCache(f.service).size).toBe(0)
+  })
+
+  it('rejects overlapping scans and drains the admitted scan before clearing state', async () => {
+    const f = await fixture()
+    const scanning = f.service.scan(f.source.sourceHandle)
+    await expect(f.service.scan(f.source.sourceHandle)).rejects.toThrow('busy')
+    const rejected = expect(scanning).rejects.toThrow('busy')
+    await f.service.drain()
+    await rejected
+    expect(previewCache(f.service).size).toBe(0)
+  })
+
+  it('enforces the raw-byte budget before the four-preview count limit', async () => {
+    const f = await fixture()
+    const original = previewCache(f.service).get(f.preview.previewId)?.snapshot
+    expect(original).toBeTruthy()
+    const bytes = Buffer.alloc(24 * 1024 * 1024)
+    const scanSource = vi
+      .spyOn(
+        f.service as unknown as {
+          scanSource(): Promise<LegacySnapshot>
+        },
+        'scanSource'
+      )
+      .mockImplementation(async () => ({
+        ...original!,
+        candidates: [],
+        files: [{ relativePath: 'fixture', digest: 'fixture', bytes }],
+      }))
+    const first = await f.service.scan(f.source.sourceHandle)
+    await f.service.scan(f.source.sourceHandle)
+    await f.service.scan(f.source.sourceHandle)
+    expect(previewCache(f.service).has(first.previewId)).toBe(false)
+    expect(previewCache(f.service).size).toBe(2)
+    scanSource.mockRestore()
+  })
 })
 
 describe('legacy import service adversarial acceptance', () => {
@@ -299,6 +413,76 @@ describe('legacy import service adversarial acceptance', () => {
         (await stat(path.join(backup, 'download.session'))).mode & 0o777
       ).toBe(0o600)
     }
+  })
+
+  it('imports request-dependent HTTP records inactive without persisting request secrets', async () => {
+    const f = await fixture()
+    const session = [
+      'https://example.test/file-0.zip',
+      ' gid=0000000000000001',
+      ' out=file-0.zip',
+      ' pause=true',
+      ' header=Authorization: Bearer LEGACY_AUTH_SECRET',
+      ' header=Cookie: session=LEGACY_COOKIE_SECRET',
+      '',
+    ].join('\n')
+    await writeFile(f.sessionPath, session)
+    await writeFile(
+      path.join(f.sourceRoot, 'system.json'),
+      JSON.stringify({
+        dir: f.downloads,
+        'all-proxy': 'http://user:LEGACY_PROXY_SECRET@proxy.example:8080',
+      })
+    )
+    const preview = await f.service.scan(f.source.sourceHandle)
+    expect(preview.items[0]).toMatchObject({
+      type: 'http',
+      selectable: true,
+      reason: 'request-settings-required',
+      requestOptions: expect.arrayContaining(['header', 'all-proxy']),
+    })
+    const run = await f.service.commit({
+      previewId: preview.previewId,
+      itemIds: [preview.items[0].itemId],
+    })
+    const report = await completed(f.service, run.runId)
+    expect(report.imported).toBe(1)
+    const [task] = f.taskManager.getAll()
+    expect(task.status).toBe(TaskStatus.Paused)
+    expect(task.instances[0].gid).toBeNull()
+    expect(task.instances[0].payload.legacyImport).toMatchObject({
+      activation: 'inactive',
+      storagePolicy: 'legacy-read-only',
+      reason: 'request-settings-required',
+      requestOptions: expect.arrayContaining(['header', 'all-proxy']),
+    })
+    const persisted = JSON.stringify({
+      tasks: f.db.getAllTasks(),
+      report: f.service.getRun(run.runId),
+      preview,
+    })
+    for (const secret of [
+      'LEGACY_AUTH_SECRET',
+      'LEGACY_COOKIE_SECRET',
+      'LEGACY_PROXY_SECRET',
+    ])
+      expect(persisted).not.toContain(secret)
+    expect(await readFile(f.sessionPath, 'utf8')).toBe(session)
+    expect(await readFile(path.join(f.downloads, 'file-0.zip'), 'utf8')).toBe(
+      'original payload'
+    )
+    expect(
+      await readFile(
+        path.join(f.deps.backupRoot, run.runId, 'download.session'),
+        'utf8'
+      )
+    ).toBe(session)
+    expect(
+      (await f.service.scan(f.source.sourceHandle)).items[0]
+    ).toMatchObject({
+      selectable: false,
+      reason: 'already-imported',
+    })
   })
 
   it('rejects a stale preview before committing records', async () => {

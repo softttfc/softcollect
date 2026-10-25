@@ -1,7 +1,10 @@
 export const Queries = {
+  GetGraphicsRecoveryNotice: 'query:getGraphicsRecoveryNotice',
   GetRendererSession: 'query:getRendererSession',
   GetLegacyImportNavigation: 'query:getLegacyImportNavigation',
   GetLegacyBtActivationAvailability: 'query:getLegacyBtActivationAvailability',
+  GetLegacyHttpActivationAvailability:
+    'query:getLegacyHttpActivationAvailability',
   DiscoverLegacyImport: 'query:discoverLegacyImport',
   ScanLegacyImport: 'query:scanLegacyImport',
   GetLegacyImportRun: 'query:getLegacyImportRun',

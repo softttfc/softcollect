@@ -929,7 +929,10 @@
         "redownloadOverwriteTitle": "File Already Exists",
         "redownloadOverwriteDescription": "“{{name}}” already exists in the download directory. Re-downloading will overwrite or rename it. Do you want to continue?",
         "redownloadCredentialsExpired": "Original request options have expired. Please review and submit.",
-        "redownloadStarted": "Re-download started"
+        "redownloadStarted": "Re-download started",
+        "retryDialogTitle": "Thử tải xuống lại",
+        "retryDialogDescription": "Chỉnh sửa tham số yêu cầu cho {{name}} để bắt đầu lượt tải xuống mới. Tác vụ thất bại và tệp tải xuống một phần sẽ được giữ lại.",
+        "retryDialogProgress": "Lượt tải {{current}} trên {{total}}"
       },
       "titleCount": "Đang hiện {{shown}} · Tổng cộng {{total}}",
       "type": {
@@ -1160,7 +1163,8 @@
         "resumeSourceChanged": "Tệp tải dở được giữ lại vì tệp trên máy chủ đã thay đổi kể từ khi bắt đầu tải xuống.",
         "resumeRangeUnsupported": "Tệp tải dở được giữ lại vì máy chủ không hỗ trợ tải tiếp an toàn từ vị trí đã dừng.",
         "resumeValidationFailed": "Tệp tải dở được giữ lại vì Motrix không thể xác minh rằng tệp trên máy chủ chưa thay đổi.",
-        "mediaInterrupted": "Lượt tải nội dung đa phương tiện này bị gián đoạn khi ứng dụng khởi động lại và không thể tiếp tục. Hãy thêm lại để thử lại."
+        "mediaInterrupted": "Lượt tải nội dung đa phương tiện này bị gián đoạn khi ứng dụng khởi động lại và không thể tiếp tục. Hãy thêm lại để thử lại.",
+        "portableExternalPath": "This task uses a location outside the portable folder. The application moved or the original directory is unavailable. Check the download location before retrying."
       }
     },
     "error": {
@@ -1202,6 +1206,36 @@
         "checksumMismatch": "Tệp đã tải xuống có thể bị hỏng; hãy tải lại để kiểm tra",
         "tooManyRedirects": "Liên kết nguồn có thể bị hỏng; hãy thử liên kết khác",
         "btMetadataFailed": "Kiểm tra liên kết magnet hoặc thêm máy chủ theo dõi rồi thử lại"
+      }
+    },
+    "storage": {
+      "move": "Move files…",
+      "locate": "Find existing files…",
+      "recheck": "Check files…",
+      "moveDescription": "Choose a new folder for your downloaded files. Seeding pauses while they move.",
+      "locateDescription": "Choose where your downloaded files are now. Motrix will check them so you can continue seeding.",
+      "recheckDescription": "Check that your downloaded files are complete. This will not change the files or download them again.",
+      "directory": "Folder",
+      "name": "File or folder name",
+      "resume": "Continue seeding after checking",
+      "checking": "Checking files…",
+      "moving": "Moving files…",
+      "resuming": "Starting seeding…",
+      "verifiedPercent": "Verified: {{percent}}%",
+      "checkFailed": "Check failed",
+      "verified": "Your files are ready to seed.",
+      "resumed": "Seeding has resumed.",
+      "incomplete": "Some files are missing or incomplete. Check that you selected the right folder and try again.",
+      "resumeFailed": "The new location is saved. Select Re-seed to try sharing the files again.",
+      "useExisting": "Check and use these files",
+      "errors": {
+        "unavailable": "This task cannot be moved or checked yet.",
+        "busy": "Another file operation is still running. Please wait for it to finish.",
+        "destination": "Choose a different folder or file name. The location may already contain these files or be inside the current folder.",
+        "conflict": "Another download is using these files. Open that task to change their location.",
+        "engine": "Motrix could not stop this task. Please try again.",
+        "failed": "Motrix could not access or move the files. Check the folder, available space, and permission to use it.",
+        "cancelled": "Check cancelled."
       }
     }
   },
@@ -2185,6 +2219,15 @@
       "originMismatchBody": "Không có cập nhật theo thời gian thực. Hãy dùng địa chỉ máy chủ đã cấu hình hoặc nhờ quản trị viên sửa địa chỉ.",
       "disconnectedTitle": "Kết nối cập nhật theo thời gian thực đã bị ngắt.",
       "disconnectedBody": "Một số thông tin có thể bị trễ. Nếu tình trạng này kéo dài, hãy kiểm tra kết nối máy chủ và cấu hình proxy."
+    },
+    "portable": {
+      "title": "Portable mode",
+      "startupError": "Motrix could not open its portable data directory. Check that the data folder beside Motrix.exe is writable and that no external profile override is set. Motrix has not switched to the system profile.",
+      "integrationUnavailable": "Portable mode keeps system settings unchanged. Startup registration, file associations, and system tool installation are unavailable.",
+      "browserDescription": "The local bridge remains available while Motrix is running. Portable mode does not register a browser launcher or change existing browser integration.",
+      "updateDescription": "Download the Windows ZIP, exit Motrix, and move the entire data folder to the new version. Portable mode never runs the installer.",
+      "recoveryError": "Portable data could not be recovered safely. Keep the data folder and check the logs and directory permissions before retrying. Motrix has stopped without using the system profile.",
+      "enginePathDescription": "Portable mode manages engine state inside the data folder for the current application location."
     }
   },
   "errors": {

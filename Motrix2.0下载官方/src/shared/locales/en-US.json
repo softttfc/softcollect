@@ -941,7 +941,10 @@
         "redownloadOverwriteTitle": "File Already Exists",
         "redownloadOverwriteDescription": "“{{name}}” already exists in the download directory. Re-downloading will overwrite or rename it. Do you want to continue?",
         "redownloadCredentialsExpired": "Original request options have expired. Please review and submit.",
-        "redownloadStarted": "Re-download started"
+        "redownloadStarted": "Re-download started",
+        "retryDialogTitle": "Retry download",
+        "retryDialogDescription": "Edit the request parameters for {{name}} to start a new download. The failed task and its partial file will be kept.",
+        "retryDialogProgress": "Download {{current}} of {{total}}"
       },
       "titleCount": "{{shown}} shown · {{total}} total",
       "type": {
@@ -1174,7 +1177,8 @@
         "resumeSourceChanged": "The partial file was preserved because the remote file changed since the download started.",
         "resumeRangeUnsupported": "The partial file was preserved because the server does not support safe range resume.",
         "resumeValidationFailed": "The partial file was preserved because Motrix could not verify that the remote file is unchanged.",
-        "mediaInterrupted": "This media download was interrupted by an app restart and can’t be resumed. Re-add it to retry."
+        "mediaInterrupted": "This media download was interrupted by an app restart and can’t be resumed. Re-add it to retry.",
+        "portableExternalPath": "This task uses a location outside the portable folder. The application moved or the original directory is unavailable. Check the download location before retrying."
       }
     },
     "error": {
@@ -1216,6 +1220,36 @@
         "checksumMismatch": "The downloaded file may be corrupted; re-download to verify it",
         "tooManyRedirects": "The source link may be broken; try a different link",
         "btMetadataFailed": "Check the magnet link or add more trackers, then retry"
+      }
+    },
+    "storage": {
+      "move": "Move files…",
+      "locate": "Find existing files…",
+      "recheck": "Check files…",
+      "moveDescription": "Choose a new folder for your downloaded files. Seeding pauses while they move.",
+      "locateDescription": "Choose where your downloaded files are now. Motrix will check them so you can continue seeding.",
+      "recheckDescription": "Check that your downloaded files are complete. This will not change the files or download them again.",
+      "directory": "Folder",
+      "name": "File or folder name",
+      "resume": "Continue seeding after checking",
+      "checking": "Checking files…",
+      "moving": "Moving files…",
+      "resuming": "Starting seeding…",
+      "verifiedPercent": "Verified: {{percent}}%",
+      "checkFailed": "Check failed",
+      "verified": "Your files are ready to seed.",
+      "resumed": "Seeding has resumed.",
+      "incomplete": "Some files are missing or incomplete. Check that you selected the right folder and try again.",
+      "resumeFailed": "The new location is saved. Select Re-seed to try sharing the files again.",
+      "useExisting": "Check and use these files",
+      "errors": {
+        "unavailable": "This task cannot be moved or checked yet.",
+        "busy": "Another file operation is still running. Please wait for it to finish.",
+        "destination": "Choose a different folder or file name. The location may already contain these files or be inside the current folder.",
+        "conflict": "Another download is using these files. Open that task to change their location.",
+        "engine": "Motrix could not stop this task. Please try again.",
+        "failed": "Motrix could not access or move the files. Check the folder, available space, and permission to use it.",
+        "cancelled": "Check cancelled."
       }
     }
   },
@@ -2200,6 +2234,15 @@
       "originMismatchBody": "Real-time updates are unavailable. Use the configured server address or ask the administrator to correct it.",
       "disconnectedTitle": "Real-time updates are disconnected.",
       "disconnectedBody": "Some information may be delayed. If this persists, check the server connection and proxy configuration."
+    },
+    "portable": {
+      "title": "Portable mode",
+      "startupError": "Motrix could not open its portable data directory. Check that the data folder beside Motrix.exe is writable and that no external profile override is set. Motrix has not switched to the system profile.",
+      "integrationUnavailable": "Portable mode keeps system settings unchanged. Startup registration, file associations, and system tool installation are unavailable.",
+      "browserDescription": "The local bridge remains available while Motrix is running. Portable mode does not register a browser launcher or change existing browser integration.",
+      "updateDescription": "Download the Windows ZIP, exit Motrix, and move the entire data folder to the new version. Portable mode never runs the installer.",
+      "recoveryError": "Portable data could not be recovered safely. Keep the data folder and check the logs and directory permissions before retrying. Motrix has stopped without using the system profile.",
+      "enginePathDescription": "Portable mode manages engine state inside the data folder for the current application location."
     }
   },
   "errors": {

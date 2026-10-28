@@ -123,6 +123,21 @@ export function canReseed(t: DownloadTask): boolean {
   )
 }
 
+/** Storage changes require resolved metadata and no download/finalization in flight. */
+export function canManageBtStorage(t: DownloadTask): boolean {
+  return (
+    !t.storageOperation &&
+    !hasLegacyImport(t) &&
+    isTorrentLikeType(t.type) &&
+    t.torrentMetaPath != null &&
+    t.transitionPhase === TransitionPhase.Idle &&
+    ([TaskStatus.Completed, TaskStatus.Seeding, TaskStatus.Error].includes(
+      t.status
+    ) ||
+      (t.status === TaskStatus.Paused && t.progress === 1))
+  )
+}
+
 /** Completed regular downloads can be downloaded again. */
 export function canRedownload(t: DownloadTask): boolean {
   return (
@@ -259,6 +274,22 @@ export function getTaskRetryKind(t: DownloadTask): TaskRetryKind | null {
  *  engine dispatch can be rebuilt from the persisted record. */
 export function canAttemptRetry(t: DownloadTask): boolean {
   return getTaskRetryKind(t) !== null
+}
+
+/** Offer a fresh HTTP download form without changing the failed task or bytes. */
+export function canRetryWithParameters(t: DownloadTask): boolean {
+  return (
+    !hasLegacyImport(t) &&
+    t.kind === TaskKind.Direct &&
+    t.type === TaskType.Http &&
+    t.status === TaskStatus.Error &&
+    t.transitionPhase === TransitionPhase.Idle
+  )
+}
+
+/** UI affordance only; automatic replay still requires canAttemptRetry. */
+export function canOfferRetry(t: DownloadTask): boolean {
+  return canAttemptRetry(t) || canRetryWithParameters(t)
 }
 
 export function hasLegacyImport(t: Pick<DownloadTask, 'instances'>): boolean {

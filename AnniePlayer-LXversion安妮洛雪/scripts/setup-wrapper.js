@@ -77,11 +77,15 @@ function sha256File(p) {
   if (actual !== EXPECTED_SHA256) fail('SHA256 不匹配：期望 ' + EXPECTED_SHA256 + '，实际 ' + actual + '（资产被替换/下载损坏，已阻断）');
   console.log('[setup-wrapper] SHA256 校验通过');
 
-  // ③ 解压（Windows 自带 bsdtar，zip 直解；GitHub windows runner 同）
+  // ③ 解压（Windows 自带 bsdtar）
+  // V4.6.1 教训：新版 runner 的 bsdtar 对 zip 中 2 个目录条目报「empty or unreadable filename」
+  // 警告并以非零码退出，但 210 个实体文件已全部解出。容忍该警告，以 verifyDir 落盘校验为准。
   fs.mkdirSync(WRAPPER_DIR, { recursive: true });
   try {
     execFileSync('tar', ['-xf', ZIP_PATH, '-C', WRAPPER_DIR], { stdio: 'inherit' });
-  } catch (e) { fail('解压失败：' + e.message); }
+  } catch (e) {
+    console.warn('[setup-wrapper] tar 退出码非零（部分条目被跳过），以落盘校验为准');
+  }
 
   // ④ 落盘校验，不过即红
   const bad = verifyDir();

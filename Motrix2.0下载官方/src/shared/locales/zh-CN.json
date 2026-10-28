@@ -929,7 +929,10 @@
         "redownloadOverwriteTitle": "文件已存在",
         "redownloadOverwriteDescription": "文件“{{name}}”已存在于下载路径中。重新下载将覆盖或重命名该文件，是否继续？",
         "redownloadCredentialsExpired": "原始下载参数已失效，请确认后提交",
-        "redownloadStarted": "已重新发起下载"
+        "redownloadStarted": "已重新发起下载",
+        "retryDialogTitle": "重试下载",
+        "retryDialogDescription": "修改 {{name}} 的请求参数以开始新下载。原失败任务和部分文件将保留。",
+        "retryDialogProgress": "第 {{current}} 项，共 {{total}} 项"
       },
       "titleCount": "{{shown}} 项 · 共 {{total}}",
       "type": {
@@ -1160,7 +1163,8 @@
         "resumeSourceChanged": "远端文件在下载开始后发生变化，已保留部分文件且未继续写入。",
         "resumeRangeUnsupported": "服务器不支持安全的范围续传，已保留部分文件且未继续写入。",
         "resumeValidationFailed": "Motrix 无法确认远端文件是否未发生变化，已保留部分文件且未继续写入。",
-        "mediaInterrupted": "媒体下载因应用重启而中断，无法恢复。请重新添加以重试。"
+        "mediaInterrupted": "媒体下载因应用重启而中断，无法恢复。请重新添加以重试。",
+        "portableExternalPath": "此任务使用便携目录以外的位置。应用位置已变更或原目录不可用，请确认下载文件的位置后重试。"
       }
     },
     "error": {
@@ -1202,6 +1206,36 @@
         "checksumMismatch": "下载的文件可能已损坏，请重新下载以校验",
         "tooManyRedirects": "该链接可能已失效，请尝试更换下载链接",
         "btMetadataFailed": "检查磁力链接或添加更多 Tracker 后重试"
+      }
+    },
+    "storage": {
+      "move": "移动文件…",
+      "locate": "查找已有文件…",
+      "recheck": "检查文件…",
+      "moveDescription": "为下载好的文件选择新位置。移动期间会暂停做种。",
+      "locateDescription": "指定文件现在的位置，检查完整后即可继续做种。",
+      "recheckDescription": "检查下载的文件是否完整。检查不会修改文件或重新下载。",
+      "directory": "所在文件夹",
+      "name": "文件或文件夹名称",
+      "resume": "检查通过后继续做种",
+      "checking": "正在检查文件…",
+      "moving": "正在移动文件…",
+      "resuming": "正在启动做种…",
+      "verifiedPercent": "检查通过 {{percent}}%",
+      "checkFailed": "检查未通过",
+      "verified": "文件完整，可以开始做种。",
+      "resumed": "已恢复做种。",
+      "incomplete": "部分文件缺失或不完整，请确认文件夹选择正确后重试。",
+      "resumeFailed": "新位置已保存。可以点击“重新做种”再试一次。",
+      "useExisting": "检查并使用这些文件",
+      "errors": {
+        "unavailable": "这个任务暂时无法移动或检查。",
+        "busy": "还有文件操作正在进行，请稍后再试。",
+        "destination": "请换一个文件夹或名称。所选位置可能已有同名文件，或位于当前文件夹内。",
+        "conflict": "另一个下载任务正在使用这些文件，请打开对应任务更改位置。",
+        "engine": "未能停止当前任务，请重试。",
+        "failed": "无法访问或移动文件，请检查文件夹、可用空间和访问权限。",
+        "cancelled": "已取消检查。"
       }
     }
   },
@@ -2185,6 +2219,15 @@
       "originMismatchBody": "实时更新不可用。请使用服务器配置的访问地址，或联系管理员修正配置。",
       "disconnectedTitle": "实时更新连接已中断。",
       "disconnectedBody": "部分信息可能延迟。如果持续出现，请检查服务器连接和反向代理配置。"
+    },
+    "portable": {
+      "title": "便携模式",
+      "startupError": "无法打开便携数据目录。请检查 Motrix.exe 同级的 data 文件夹是否可写，并确认未设置外部用户数据目录。Motrix 未切换到系统用户数据目录。",
+      "integrationUnavailable": "便携模式保持系统设置不变，不支持开机启动注册、文件关联和系统工具安装。",
+      "browserDescription": "Motrix 运行时仍可使用本地桥接。便携模式不会注册浏览器启动器，也不会修改已有的浏览器集成。",
+      "updateDescription": "请下载 Windows ZIP，退出 Motrix 后将完整的 data 文件夹移到新版本目录。便携模式不会运行安装程序。",
+      "recoveryError": "无法安全恢复便携数据。请保留 data 文件夹，检查日志和目录权限后重试。Motrix 已停止启动，未使用系统用户数据目录。",
+      "enginePathDescription": "便携模式将引擎状态保存在 data 文件夹内，随应用位置自动管理。"
     }
   },
   "menu": {

@@ -929,7 +929,10 @@
         "redownloadOverwriteTitle": "File Already Exists",
         "redownloadOverwriteDescription": "“{{name}}” already exists in the download directory. Re-downloading will overwrite or rename it. Do you want to continue?",
         "redownloadCredentialsExpired": "Original request options have expired. Please review and submit.",
-        "redownloadStarted": "Re-download started"
+        "redownloadStarted": "Re-download started",
+        "retryDialogTitle": "ダウンロードを再試行",
+        "retryDialogDescription": "{{name}} のリクエストパラメーターを編集して、新しいダウンロードを開始します。失敗したタスクと未完了ファイルは保持されます。",
+        "retryDialogProgress": "{{total}} 件中 {{current}} 件目"
       },
       "titleCount": "{{shown}} 件表示 · 全 {{total}} 件",
       "type": {
@@ -1160,7 +1163,8 @@
         "resumeSourceChanged": "ダウンロード開始後にサーバー上のファイルが変更されたため、ダウンロード途中のファイルをそのまま保持しました。",
         "resumeRangeUnsupported": "サーバーが安全な範囲指定による再開に対応していないため、ダウンロード途中のファイルをそのまま保持しました。",
         "resumeValidationFailed": "サーバー上のファイルが変更されていないことを確認できなかったため、ダウンロード途中のファイルをそのまま保持しました。",
-        "mediaInterrupted": "このメディアのダウンロードはアプリの再起動により中断されたため、再開できません。再度追加してお試しください。"
+        "mediaInterrupted": "このメディアのダウンロードはアプリの再起動により中断されたため、再開できません。再度追加してお試しください。",
+        "portableExternalPath": "This task uses a location outside the portable folder. The application moved or the original directory is unavailable. Check the download location before retrying."
       }
     },
     "error": {
@@ -1202,6 +1206,36 @@
         "checksumMismatch": "ダウンロードしたファイルが破損している可能性があります。再度ダウンロードして確認してください",
         "tooManyRedirects": "リンク先に問題がある可能性があります。別のリンクをお試しください",
         "btMetadataFailed": "マグネットリンクを確認するか、トラッカーを追加してから再試行してください"
+      }
+    },
+    "storage": {
+      "move": "Move files…",
+      "locate": "Find existing files…",
+      "recheck": "Check files…",
+      "moveDescription": "Choose a new folder for your downloaded files. Seeding pauses while they move.",
+      "locateDescription": "Choose where your downloaded files are now. Motrix will check them so you can continue seeding.",
+      "recheckDescription": "Check that your downloaded files are complete. This will not change the files or download them again.",
+      "directory": "Folder",
+      "name": "File or folder name",
+      "resume": "Continue seeding after checking",
+      "checking": "Checking files…",
+      "moving": "Moving files…",
+      "resuming": "Starting seeding…",
+      "verifiedPercent": "Verified: {{percent}}%",
+      "checkFailed": "Check failed",
+      "verified": "Your files are ready to seed.",
+      "resumed": "Seeding has resumed.",
+      "incomplete": "Some files are missing or incomplete. Check that you selected the right folder and try again.",
+      "resumeFailed": "The new location is saved. Select Re-seed to try sharing the files again.",
+      "useExisting": "Check and use these files",
+      "errors": {
+        "unavailable": "This task cannot be moved or checked yet.",
+        "busy": "Another file operation is still running. Please wait for it to finish.",
+        "destination": "Choose a different folder or file name. The location may already contain these files or be inside the current folder.",
+        "conflict": "Another download is using these files. Open that task to change their location.",
+        "engine": "Motrix could not stop this task. Please try again.",
+        "failed": "Motrix could not access or move the files. Check the folder, available space, and permission to use it.",
+        "cancelled": "Check cancelled."
       }
     }
   },
@@ -2185,6 +2219,15 @@
       "originMismatchBody": "リアルタイム更新を利用できません。設定済みのサーバーアドレスを使用するか、管理者に修正を依頼してください。",
       "disconnectedTitle": "リアルタイム更新の接続が切れています。",
       "disconnectedBody": "一部の情報の表示が遅れる場合があります。解消しない場合は、サーバーへの接続とプロキシ設定を確認してください。"
+    },
+    "portable": {
+      "title": "Portable mode",
+      "startupError": "Motrix could not open its portable data directory. Check that the data folder beside Motrix.exe is writable and that no external profile override is set. Motrix has not switched to the system profile.",
+      "integrationUnavailable": "Portable mode keeps system settings unchanged. Startup registration, file associations, and system tool installation are unavailable.",
+      "browserDescription": "The local bridge remains available while Motrix is running. Portable mode does not register a browser launcher or change existing browser integration.",
+      "updateDescription": "Download the Windows ZIP, exit Motrix, and move the entire data folder to the new version. Portable mode never runs the installer.",
+      "recoveryError": "Portable data could not be recovered safely. Keep the data folder and check the logs and directory permissions before retrying. Motrix has stopped without using the system profile.",
+      "enginePathDescription": "Portable mode manages engine state inside the data folder for the current application location."
     }
   },
   "errors": {

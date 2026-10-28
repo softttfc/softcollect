@@ -36,6 +36,7 @@ import { directTaskUpdatePublication } from '@test-utils/task-update'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createAppUpdateService } from '../core/app-update-service'
 import { MainProcessWorkCoordinator } from '../main-process-work-coordinator'
+import { setPortableProfile } from '../platform/portable-profile'
 import { WINDOWS_DEFAULT_APPS_SETTINGS_URL } from '../platform/windows-default-apps'
 import type { CommandContext } from './commands'
 import { buildCommandHandlers, registerCommandHandlers } from './commands'
@@ -3182,4 +3183,50 @@ describe('plugin diagnostic mode command', () => {
       expect(setLogVerbose).not.toHaveBeenCalled()
     }
   )
+})
+
+it('rejects system association commands from a portable profile', async () => {
+  setPortableProfile({
+    root: 'E:\\Motrix',
+    dataDir: '',
+    userDataDir: '',
+    tempDir: '',
+    workDir: '',
+    downloadsDir: '',
+  })
+  try {
+    const handlers = buildCommandHandlers(
+      fakeCtx() as unknown as CommandContext
+    )
+    await expect(
+      handlers[Commands.RequestDefaultTorrentHandler]?.()
+    ).rejects.toMatchObject({ code: ErrorCode.SettingsInvalid })
+  } finally {
+    setPortableProfile(null)
+  }
+})
+
+describe('BT storage command contract', () => {
+  it('validates destination requests before invoking storage', async () => {
+    const handlers = buildCommandHandlers(
+      fakeCtx() as unknown as CommandContext
+    )
+    await expect(
+      handlers[Commands.ChangeBtStorage]?.({ taskId: 'bt', mode: 'move' })
+    ).rejects.toThrow()
+  })
+  it('reports unavailable storage and accepts a harmless cancellation', async () => {
+    const handlers = buildCommandHandlers(
+      fakeCtx() as unknown as CommandContext
+    )
+    expect(
+      await handlers[Commands.ChangeBtStorage]?.({
+        taskId: 'bt',
+        mode: 'recheck',
+      })
+    ).toEqual({ error: 'unavailable' })
+    expect(await handlers[Commands.CancelBtStorage]?.('bt')).toEqual({
+      ok: true,
+    })
+  })
 })

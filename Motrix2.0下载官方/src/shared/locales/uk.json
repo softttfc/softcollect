@@ -908,7 +908,10 @@
         "redownloadOverwriteTitle": "File Already Exists",
         "redownloadOverwriteDescription": "“{{name}}” already exists in the download directory. Re-downloading will overwrite or rename it. Do you want to continue?",
         "redownloadCredentialsExpired": "Original request options have expired. Please review and submit.",
-        "redownloadStarted": "Re-download started"
+        "redownloadStarted": "Re-download started",
+        "retryDialogTitle": "Повторити завантаження",
+        "retryDialogDescription": "Змініть параметри запиту для {{name}}, щоб почати нове завантаження. Невдале завдання та його частковий файл буде збережено.",
+        "retryDialogProgress": "Завантаження {{current}} з {{total}}"
       },
       "column": {
         "connections": "Піри",
@@ -2776,6 +2779,15 @@
       "textLength": "Використайте не більше {{max}} символів.",
       "time": "Використайте 24-годинний формат часу, наприклад 23:00.",
       "wholeBytes": "Використайте менше десяткових знаків."
+    },
+    "portable": {
+      "title": "Portable mode",
+      "startupError": "Motrix could not open its portable data directory. Check that the data folder beside Motrix.exe is writable and that no external profile override is set. Motrix has not switched to the system profile.",
+      "integrationUnavailable": "Portable mode keeps system settings unchanged. Startup registration, file associations, and system tool installation are unavailable.",
+      "browserDescription": "The local bridge remains available while Motrix is running. Portable mode does not register a browser launcher or change existing browser integration.",
+      "updateDescription": "Download the Windows ZIP, exit Motrix, and move the entire data folder to the new version. Portable mode never runs the installer.",
+      "recoveryError": "Portable data could not be recovered safely. Keep the data folder and check the logs and directory permissions before retrying. Motrix has stopped without using the system profile.",
+      "enginePathDescription": "Portable mode manages engine state inside the data folder for the current application location."
     }
   },
   "task": {
@@ -2952,7 +2964,8 @@
         "resumeRangeUnsupported": "Частково завантажений файл збережено, оскільки сервер не підтримує безпечне продовження за діапазоном байтів.",
         "resumeSourceChanged": "Частково завантажений файл збережено, оскільки віддалений файл змінився від початку завантаження.",
         "resumeValidationFailed": "Частково завантажений файл збережено, оскільки Motrix не вдалося перевірити, що віддалений файл не змінився.",
-        "torrentMetaMissing": "Не вдалося відновити це завдання BitTorrent: файл метаданих .torrent відсутній. Приберіть завдання й додайте його знову."
+        "torrentMetaMissing": "Не вдалося відновити це завдання BitTorrent: файл метаданих .torrent відсутній. Приберіть завдання й додайте його знову.",
+        "portableExternalPath": "This task uses a location outside the portable folder. The application moved or the original directory is unavailable. Check the download location before retrying."
       },
       "toast": "Відновлено перерваних завдань: {{count}}. Натисніть, щоб переглянути."
     },
@@ -2980,6 +2993,36 @@
       "image": "Зображення",
       "selectAll": "Вибрати все",
       "video": "Відео"
+    },
+    "storage": {
+      "move": "Move files…",
+      "locate": "Find existing files…",
+      "recheck": "Check files…",
+      "moveDescription": "Choose a new folder for your downloaded files. Seeding pauses while they move.",
+      "locateDescription": "Choose where your downloaded files are now. Motrix will check them so you can continue seeding.",
+      "recheckDescription": "Check that your downloaded files are complete. This will not change the files or download them again.",
+      "directory": "Folder",
+      "name": "File or folder name",
+      "resume": "Continue seeding after checking",
+      "checking": "Checking files…",
+      "moving": "Moving files…",
+      "resuming": "Starting seeding…",
+      "verifiedPercent": "Verified: {{percent}}%",
+      "checkFailed": "Check failed",
+      "verified": "Your files are ready to seed.",
+      "resumed": "Seeding has resumed.",
+      "incomplete": "Some files are missing or incomplete. Check that you selected the right folder and try again.",
+      "resumeFailed": "The new location is saved. Select Re-seed to try sharing the files again.",
+      "useExisting": "Check and use these files",
+      "errors": {
+        "unavailable": "This task cannot be moved or checked yet.",
+        "busy": "Another file operation is still running. Please wait for it to finish.",
+        "destination": "Choose a different folder or file name. The location may already contain these files or be inside the current folder.",
+        "conflict": "Another download is using these files. Open that task to change their location.",
+        "engine": "Motrix could not stop this task. Please try again.",
+        "failed": "Motrix could not access or move the files. Check the folder, available space, and permission to use it.",
+        "cancelled": "Check cancelled."
+      }
     }
   },
   "trackers": {

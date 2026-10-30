@@ -36,12 +36,24 @@ function init(broadcastFn) {
   for (const t of tasks) {
     if (t.status === 'downloading' || t.status === 'waiting') { t.status = 'paused'; t.error = ''; }
   }
+  backfillActualFormats();
+}
+
+/* 旧版本已完成任务没有真实格式：启动后逐个探测本地成品并回填，无需重新下载。 */
+async function backfillActualFormats() {
+  for (const t of tasks) {
+    if (t.status !== 'done' || !t.filePath || t.actualCodec || !fs.existsSync(t.filePath)) continue;
+    const actual = await streaming.probeDownloadedFile(t.filePath).catch(() => null);
+    if (!actual || !actual.actualCodec) continue;
+    Object.assign(t, actual);
+    pushTasks();
+  }
 }
 
 function persist() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    try { fs.writeFileSync(file(), JSON.stringify({ settings, tasks })); } catch { }
+    try { require('./jsonFile').writeJsonAtomic(file(), { settings, tasks }); } catch { }
   }, 300);
 }
 
@@ -67,6 +79,7 @@ function add(items) {
       name: it.song.name || '', artist: it.song.artist || '', album: it.song.album || '',
       provider: it.provider || '', songId: sid, quality: it.quality || '',
       song: it.song, saveLrc: it.saveLrc !== false, saveCover: it.saveCover !== false,
+      groupDir: String(it.groupDir || ''), // V4.6.4：歌单/专辑名子文件夹（空=不建）
       status: 'waiting', received: 0, total: 0, error: '', filePath: '', note: '', addedAt: Date.now()
     });
     added++;
@@ -103,6 +116,7 @@ async function start(t) {
   const runDownload = (song, provider) => streaming.download({
     provider, quality: t.quality, song,
     saveLrc: t.saveLrc, saveCover: t.saveCover,
+    groupDir: t.groupDir, // V4.6.4：歌单/专辑名子文件夹
     fileNameFmt: settings.fileNameFmt, skipExisting: settings.skipExisting,
     embedCover: settings.embedCover, embedLrc: settings.embedLrc, embedTLrc: settings.embedTLrc,
     embedRLrc: settings.embedRLrc, embedLxLrc: settings.embedLxLrc,
@@ -134,6 +148,11 @@ async function start(t) {
       t.note = '原平台失败，已从 ' + (PN[alt.provider] || alt.provider) + ' 换源下载';
     }
     t.status = 'done'; t.filePath = r.path || ''; t.doneAt = Date.now();
+    // 真实成品格式随任务持久化并推送：界面不得仅凭请求档位或 FLAC 容器猜 Hi-Res
+    t.actualCodec = (r && r.actualCodec) || '';
+    t.actualBitDepth = (r && Number(r.actualBitDepth)) || 0;
+    t.actualSampleRate = (r && Number(r.actualSampleRate)) || 0;
+    t.actualQuality = (r && r.actualQuality) || '';
     if (r && r.skipped) t.note = '同名文件已存在，跳过';
     else if (!t.note && r && r.downgraded) t.note = '已降级为 ' + (r.quality || '');
   } catch (e) {
@@ -199,7 +218,21 @@ function retryAll() {
 
 function openFolder(id) {
   const t = find(id);
-  if (t && t.filePath) { try { shell.showItemInFolder(t.filePath); } catch { } }
+  if (!t) return;
+  /* V4.6.4：歌单/专辑任务（groupDir 非空）直接打开该歌单子文件夹——批量下载后
+   * 用户要看的是整个文件夹，而非定位到某一首歌。单曲任务仍定位文件本身。 */
+  if (t.groupDir) {
+    try {
+      const dir = path.join(streaming.downloadDir(), t.groupDir);
+      if (fs.existsSync(dir)) { shell.openPath(dir); return; }
+    } catch { }
+  }
+  if (t.filePath) { try { shell.showItemInFolder(t.filePath); } catch { } }
+}
+
+/* V4.6.4：打开下载根目录（下载情况视图头部「打开下载目录」按钮用） */
+function openRoot() {
+  try { const d = streaming.downloadDir(); fs.mkdirSync(d, { recursive: true }); shell.openPath(d); } catch { }
 }
 
 function getSettings() { return { ...settings }; }
@@ -211,4 +244,4 @@ function setSettings(patch) {
   return getSettings();
 }
 
-module.exports = { init, list: snap, add, pause, resume, remove, clear, retryAll, openFolder, getSettings, setSettings };
+module.exports = { init, list: snap, add, pause, resume, remove, clear, retryAll, openFolder, openRoot, getSettings, setSettings };

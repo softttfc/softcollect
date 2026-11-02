@@ -60,6 +60,13 @@ const ELECTRON_BUILDER_CUSTOM_DIR_ENVIRONMENT_VARIABLES = [
 ] as const
 const EXPECTED_ACTION_PINS = new Map([
   [
+    'actions/cache',
+    {
+      sha: 'caa296126883cff596d87d8935842f9db880ef25',
+      comment: 'v5',
+    },
+  ],
+  [
     'actions/checkout',
     {
       sha: '3d3c42e5aac5ba805825da76410c181273ba90b1',
@@ -2758,7 +2765,7 @@ describe('release workflow publication contract', () => {
       stringField(asRecord(config.directories, 'signing directories'), 'app')
     ).toBe('dist/electron-app')
     expect(stringField(config, 'electronDist')).toBe('trusted/electron.zip')
-    expect(stringField(config, 'electronVersion')).toBe('45.1.0')
+    expect(stringField(config, 'electronVersion')).toBe('45.2.1')
     expect(signingInputSource).toContain(
       "config.directories?.app !== 'dist/electron-app'"
     )
@@ -2824,7 +2831,7 @@ describe('release workflow publication contract', () => {
       asRecord(metadata.devDependencies, 'dev dependencies'),
       'electron'
     )
-    expect(version).toBe('45.1.0')
+    expect(version).toBe('45.2.1')
     expect(
       stringField(
         asRecord(
@@ -3124,7 +3131,19 @@ function targetMatrix(workflow: LooseRecord): {
       if (job.strategy === undefined) return []
       const strategy = asRecord(job.strategy, `${jobName} strategy`)
       if (strategy.matrix === undefined) return []
-      const matrix = asRecord(strategy.matrix, `${jobName} matrix`)
+      const matrix =
+        workflow === ciWorkflow && jobName === 'package-targets'
+          ? (() => {
+              expect(strategy.matrix).toBe(
+                `\${{ fromJSON(needs.plan.outputs.package_matrix) }}`
+              )
+              return {
+                include: JSON.parse(
+                  readFileSync('.github/ci-package-targets.json', 'utf8')
+                ),
+              }
+            })()
+          : asRecord(strategy.matrix, `${jobName} matrix`)
       if (!Array.isArray(matrix.include)) return []
       const entries = matrix.include.map((entry) =>
         asRecord(entry, `${jobName} matrix entry`)

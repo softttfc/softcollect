@@ -59,7 +59,7 @@ jobs:
             [motrix-extension下载]="https://github.com/motrixapp/motrix-extension.git"
             [motrix-install-assistant下载]="https://github.com/motrixapp/motrix-install-assistant.git"
             [Motrix2.0下载官方]="https://github.com/agalwood/Motrix.git"
-            
+            [keepassxc密码保存官方]="https://github.com/keepassxreboot/keepassxc.git"
             
             
             # 可以继续添加其他仓库

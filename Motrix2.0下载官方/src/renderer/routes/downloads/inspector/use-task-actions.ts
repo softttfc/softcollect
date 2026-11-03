@@ -5,6 +5,7 @@ import {
   invalidateTaskList,
 } from '@renderer/hooks/use-task-list'
 import { openAddTaskDialog } from '@renderer/lib/open-add-task-dialog'
+import { useOperatorSession } from '@renderer/lib/operator-auth'
 import { transport } from '@renderer/lib/transport'
 import { type CommandChannel, Commands } from '@shared/protocol/commands'
 import { Queries } from '@shared/protocol/queries'
@@ -371,11 +372,47 @@ export function useTaskActions(
   const onRetry = useCallback(
     async (modifier?: { alt: boolean }) => {
       if (!readyToWrite()) return
-      const targets = resolveLatest(selected)
+      const sessionEpoch = useOperatorSession.getState().epoch
+      let targets = resolveLatest(selected)
+      const candidates = modifier?.alt
+        ? []
+        : targets.filter(
+            (task) => canRetryWithParameters(task) && !canAttemptRetry(task)
+          )
+      const nativeRetryIds = new Set<string>()
+      if (candidates.length) {
+        try {
+          for (let offset = 0; offset < candidates.length; offset += 1000) {
+            const available = await transport.invoke(
+              Queries.GetTaskHttpRetryAvailability,
+              candidates.slice(offset, offset + 1000).map((task) => task.id)
+            )
+            // Logout cancels this intent even if a new login has already completed.
+            if (sessionEpoch !== useOperatorSession.getState().epoch) return
+            if (!readyToWrite()) return
+            if (Array.isArray(available)) {
+              for (const id of available)
+                if (typeof id === 'string') nativeRetryIds.add(id)
+            }
+          }
+          targets = resolveLatest(selected)
+        } catch (error) {
+          if (sessionEpoch !== useOperatorSession.getState().epoch) return
+          reportPartial(
+            candidates.map((task) => ({
+              ok: false,
+              task,
+              reason: errMsg(error),
+            }))
+          )
+          return
+        }
+      }
       const parameterTargets = targets.filter(
         (task) =>
           canRetryWithParameters(task) &&
-          (!canAttemptRetry(task) || modifier?.alt)
+          ((!canAttemptRetry(task) && !nativeRetryIds.has(task.id)) ||
+            modifier?.alt)
       )
       if (parameterTargets.length) {
         if (!useRetryParametersStore.getState().openWith(parameterTargets))
@@ -383,7 +420,9 @@ export function useTaskActions(
         const parameterIds = new Set(parameterTargets.map((task) => task.id))
         await dispatchSubset(
           Commands.RetryTasks,
-          (task) => canAttemptRetry(task) && !parameterIds.has(task.id)
+          (task) =>
+            (canAttemptRetry(task) || nativeRetryIds.has(task.id)) &&
+            !parameterIds.has(task.id)
         )
         return
       }
@@ -396,9 +435,14 @@ export function useTaskActions(
         await altReAddSingle(targets[0])
         return
       }
-      await dispatchSubset(Commands.RetryTasks, canAttemptRetry)
+      await dispatchSubset(
+        Commands.RetryTasks,
+        (task) =>
+          canAttemptRetry(task) ||
+          (nativeRetryIds.has(task.id) && canRetryWithParameters(task))
+      )
     },
-    [selected, altReAddSingle, dispatchSubset, readyToWrite]
+    [selected, altReAddSingle, dispatchSubset, readyToWrite, reportPartial]
   )
 
   const checkFileExists = useCallback(

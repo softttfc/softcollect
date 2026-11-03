@@ -8,10 +8,16 @@ import {
 } from '@shared/types/task'
 import { makeDownloadTask } from '@test-utils/task'
 import { renderHook } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@renderer/lib/transport', () => ({
-  transport: { invoke: vi.fn().mockResolvedValue({ ok: true }) },
+  transport: {
+    platform: 'web',
+    invoke: vi.fn().mockResolvedValue({ ok: true }),
+  },
+}))
+vi.mock('@renderer/features/application-menu/task-context', () => ({
+  taskWritesAvailable: vi.fn().mockReturnValue(true),
 }))
 vi.mock('@renderer/lib/open-add-task-dialog', () => ({
   openAddTaskDialog: vi.fn().mockResolvedValue(undefined),
@@ -22,7 +28,13 @@ vi.mock('@renderer/components/ui/toast', () => ({
 }))
 
 import '@renderer/lib/i18n'
+import { taskWritesAvailable } from '@renderer/features/application-menu/task-context'
 import { openAddTaskDialog } from '@renderer/lib/open-add-task-dialog'
+import {
+  operatorLogin,
+  operatorLogout,
+  useOperatorSession,
+} from '@renderer/lib/operator-auth'
 import { transport } from '@renderer/lib/transport'
 import { Commands } from '@shared/protocol/commands'
 import { Queries } from '@shared/protocol/queries'
@@ -98,7 +110,14 @@ describe('useTaskActions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     useRetryParametersStore.getState().close()
+    vi.mocked(taskWritesAvailable).mockReturnValue(true)
+    useOperatorSession.setState({
+      state: 'authenticated',
+      status: { authed: true, mode: 'cookie', canLogout: true },
+      epoch: useOperatorSession.getState().epoch + 1,
+    })
   })
+  afterEach(() => vi.unstubAllGlobals())
 
   it('counts pause-eligible tasks correctly', () => {
     const tasks = [
@@ -235,7 +254,10 @@ describe('useTaskActions', () => {
     const { result } = renderHook(() => useTaskActions([task]))
     await result.current.onRetry()
     expect(useRetryParametersStore.getState().targets).toEqual([task])
-    expect(transport.invoke).not.toHaveBeenCalled()
+    expect(transport.invoke).toHaveBeenCalledExactlyOnceWith(
+      Queries.GetTaskHttpRetryAvailability,
+      [task.id]
+    )
     expect(task).toEqual(before)
   })
 
@@ -281,10 +303,107 @@ describe('useTaskActions', () => {
     const { result } = renderHook(() => useTaskActions([first, bt, second]))
     await result.current.onRetry()
     expect(useRetryParametersStore.getState().targets).toEqual([first, second])
-    expect(transport.invoke).toHaveBeenCalledExactlyOnceWith(
-      Commands.RetryTasks,
-      ['bt']
+    expect(transport.invoke).toHaveBeenCalledWith(Commands.RetryTasks, ['bt'])
+  })
+
+  it('uses native continuation when the engine retains the original authenticated request', async () => {
+    const task = makeTask({ id: 'retained', status: TaskStatus.Error })
+    vi.mocked(transport.invoke).mockResolvedValueOnce([task.id])
+    const { result } = renderHook(() => useTaskActions([task]))
+    await result.current.onRetry()
+    expect(transport.invoke).toHaveBeenCalledWith(Commands.RetryTasks, [
+      task.id,
+    ])
+    expect(useRetryParametersStore.getState().targets).toEqual([])
+  })
+
+  it('does not turn a failed capability query into a new download or an automatic retry', async () => {
+    const task = makeTask({ status: TaskStatus.Error })
+    vi.mocked(transport.invoke).mockRejectedValueOnce(
+      new Error('engine reconnecting')
     )
+    const { result } = renderHook(() => useTaskActions([task]))
+    await result.current.onRetry()
+    expect(transport.invoke).toHaveBeenCalledExactlyOnceWith(
+      Queries.GetTaskHttpRetryAvailability,
+      [task.id]
+    )
+    expect(useRetryParametersStore.getState().targets).toEqual([])
+    expect(toastAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'error' })
+    )
+  })
+
+  it.each([
+    { available: [], loginBeforeResponse: false },
+    { available: ['t1'], loginBeforeResponse: false },
+    { available: [], loginBeforeResponse: true },
+    { available: ['t1'], loginBeforeResponse: true },
+  ])(
+    'discards a retry response across logout: %j',
+    async ({ available, loginBeforeResponse }) => {
+      const task = makeTask({ status: TaskStatus.Error })
+      let resolve!: (ids: string[]) => void
+      vi.mocked(transport.invoke).mockImplementationOnce(
+        () =>
+          new Promise<string[]>((done) => {
+            resolve = done
+          })
+      )
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockImplementation(
+          async () =>
+            new Response(
+              JSON.stringify({
+                authed: true,
+                mode: 'cookie',
+                canLogout: true,
+              })
+            )
+        )
+      )
+      const { result, unmount } = renderHook(() => useTaskActions([task]))
+      const retry = result.current.onRetry()
+      await operatorLogout()
+      unmount()
+      vi.mocked(taskWritesAvailable).mockReturnValue(false)
+      expect(useOperatorSession.getState().state).toBe('locked')
+      if (loginBeforeResponse) {
+        expect(await operatorLogin('test-token')).toBe(true)
+        vi.mocked(taskWritesAvailable).mockReturnValue(true)
+      }
+      resolve(available)
+      await retry
+      expect(useRetryParametersStore.getState().targets).toEqual([])
+      expect(transport.invoke).toHaveBeenCalledExactlyOnceWith(
+        Queries.GetTaskHttpRetryAvailability,
+        [task.id]
+      )
+      expect(openAddTaskDialog).not.toHaveBeenCalled()
+      expect(toastAddMock).not.toHaveBeenCalled()
+      if (!loginBeforeResponse)
+        expect(await operatorLogin('test-token')).toBe(true)
+      expect(useRetryParametersStore.getState().targets).toEqual([])
+    }
+  )
+
+  it('rechecks write readiness before opening a form after the capability query', async () => {
+    const task = makeTask({ status: TaskStatus.Error })
+    let resolve!: (ids: string[]) => void
+    vi.mocked(transport.invoke).mockImplementationOnce(
+      () =>
+        new Promise<string[]>((done) => {
+          resolve = done
+        })
+    )
+    const { result } = renderHook(() => useTaskActions([task]))
+    const retry = result.current.onRetry()
+    vi.mocked(taskWritesAvailable).mockReturnValue(false)
+    resolve([])
+    await retry
+    expect(useRetryParametersStore.getState().targets).toEqual([])
+    expect(transport.invoke).toHaveBeenCalledTimes(1)
   })
 
   it('onRetry() dispatches nothing for a Mux-kind Error task', async () => {

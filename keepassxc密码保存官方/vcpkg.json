@@ -1,0 +1,57 @@
+{
+  "name": "keepassxc",
+  "version-string": "2.8.0",
+  "builtin-baseline": "1600ce2ba1b6b621bfc5a31a785c4963b817a1c7",
+  "dependencies": [
+    "botan",
+    "minizip",
+    "libqrencode",
+    "readline",
+    "zlib",
+    {
+      "name": "libusb",
+      "platform": "linux | freebsd"
+    },
+    {
+      "name": "libxi",
+      "platform": "linux | freebsd"
+    },
+    {
+      "name": "libxtst",
+      "platform": "linux | freebsd"
+    },
+    {
+      "name": "libxkbcommon",
+      "platform": "linux | freebsd"
+    }
+  ],
+  "features": {
+    "qt": {
+      "description": "Build Qt6 dependency.",
+      "dependencies": [
+        {
+          "name": "qtbase",
+          "features": ["network", "openssl"]
+        },
+        {
+          "name": "qtbase",
+          "platform": "linux | freebsd",
+          "features": ["wayland"]
+        },
+        {
+          "name": "qtbase",
+          "platform": "windows",
+          "features": ["windeployqt"]
+        },
+        "qtdeclarative",
+        "qtimageformats",
+        "qtsvg",
+        {
+          "name": "qttools",
+          "features": ["linguist", "qml"]
+        },
+        "qttranslations"
+      ]
+    }
+  }
+}

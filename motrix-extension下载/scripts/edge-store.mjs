@@ -32,6 +32,7 @@ export async function submitEdge(
   options,
   {
     dryRun = false,
+    draftOnly = false,
     log = console.log,
     fetch = globalThis.fetch,
     wait = sleep,
@@ -76,8 +77,9 @@ export async function submitEdge(
         signal: AbortSignal.timeout(Math.min(REQUEST_TIMEOUT_MS, remaining())),
       })
       const text = await response.text()
-      const expected = method === 'POST' ? 202 : 200
-      if (response.status !== expected)
+      // The status endpoint can return 202 with an InProgress operation body.
+      const expected = method === 'POST' ? [202] : [200, 202]
+      if (!expected.includes(response.status))
         throw new Error(
           `HTTP ${response.status} ${response.statusText}: ${text || '(empty response)'}`
         )
@@ -117,11 +119,15 @@ export async function submitEdge(
     }
   }
 
-  await runOperation(
-    'upload',
-    `${submissionPath}/draft/package`,
-    await readFile(options.zip),
-    'application/zip'
-  )
+  if (draftOnly) {
+    log('Edge upload: skipped; maintainer verified the existing draft')
+  } else {
+    await runOperation(
+      'upload',
+      `${submissionPath}/draft/package`,
+      await readFile(options.zip),
+      'application/zip'
+    )
+  }
   return runOperation('submission', submissionPath, '{}', 'application/json')
 }

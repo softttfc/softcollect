@@ -49,10 +49,10 @@ function fixture(t, responses) {
 test('automatically uploads and submits, waiting for both operations to succeed', async (t) => {
   const { options, dependencies, calls, logs, waits } = fixture(t, [
     accepted(uploadId),
-    status(uploadId, 'InProgress'),
+    Response.json({ id: uploadId, status: 'InProgress' }, { status: 202 }),
     status(uploadId, 'Succeeded'),
     accepted(`${origin}${path}/operations/${submissionId}`),
-    status(submissionId, 'InProgress'),
+    Response.json({ id: submissionId, status: 'InProgress' }, { status: 202 }),
     status(submissionId, 'InProgress'),
     status(submissionId, 'Succeeded'),
   ])
@@ -201,4 +201,19 @@ test('dry runs never upload or submit', async (t) => {
   const { options, dependencies, calls } = fixture(t, [])
   await submitEdge(options, { ...dependencies, dryRun: true })
   assert.equal(calls.length, 0)
+})
+
+test('submits a verified existing draft without uploading another package', async (t) => {
+  const { options, dependencies, calls } = fixture(t, [
+    accepted(submissionId),
+    status(submissionId, 'Succeeded'),
+  ])
+  await submitEdge(options, { ...dependencies, draftOnly: true })
+  assert.deepEqual(
+    calls.map(({ method, url }) => [method, url]),
+    [
+      ['POST', `${origin}${path}`],
+      ['GET', `${origin}${path}/operations/${submissionId}`],
+    ]
+  )
 })

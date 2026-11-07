@@ -9,6 +9,10 @@
             "name": "👖api"
         },
         {
+            "url": "https://gh-proxy.org/https://github.com/Supprise0901/api/blob/main/baxian.json",
+            "name": "👖baxian"
+        },
+        {
             "url": "http://cdn.qiaoji8.com/tvbox.json",
             "name": "👖天天"
         },
@@ -23,10 +27,6 @@
         {
             "url": "http://tvbox.王二小放牛娃.top",
             "name": "👖王二小放牛娃"
-        },
-        {
-            "url": "https://dxawi.github.io/0/0.json",
-            "name": "👖牛播"
         },
         {
             "url": "https://szyyds.cn/tv/x.json",

@@ -89,6 +89,7 @@ import type { CommandHandlerMap } from '@shared/protocol/handler-types'
 import { taskCreateRequestSchema } from '@shared/schemas/add-task'
 import { btStorageRequestSchema } from '@shared/schemas/bt-storage'
 import {
+  reAddTaskPayloadSchema,
   removeTasksPayloadSchema,
   taskIdsPayloadSchema,
 } from '@shared/schemas/bulk-task-command'
@@ -126,6 +127,8 @@ export interface ServerCommandContext {
   authorizeTaskWrite?: (task: DownloadTask) => Promise<void>
   authorizeTaskRemoval?: (task: DownloadTask) => Promise<void>
   authorizeOutputWrite?: (output: string) => Promise<void>
+  authorizeRecheck?: (task: DownloadTask) => Promise<void>
+  prepareStorageBinding?: import('@core/task/bt-storage-service').BtStorageServiceDeps['prepareStorageBinding']
   btStorageRuntime?: Pick<
     DurableFinalizeRuntime,
     'commit' | 'withArtifactLease' | 'hasPendingFinalization'
@@ -148,7 +151,7 @@ export interface ServerCommandContext {
    * paths cannot drift. Called synchronously during handler construction.
    */
   bindTaskRetry?: (fn: (taskId: string) => Promise<unknown>) => void
-  recoverFinalization?: (taskId: string) => Promise<void>
+  recoverFinalization?: (taskId: string, sha256?: string) => Promise<void>
   rpcClient: Aria2RpcClient
   adapter: EngineAdapter
   trackerManager: TrackerManager
@@ -164,6 +167,7 @@ export interface ServerCommandContext {
   torrentMetaStore: TorrentMetaStore
   taskManager: TaskManager
   fileCleanupService: FileCleanupService
+  fileCleanupForTask?: (task: DownloadTask) => FileCleanupService
   eventBus: EventBus
   proxyApplier: ReturnType<typeof createServerProxyApplier>
   appliedDownloadProxyPolicy: AppliedDownloadProxyPolicy
@@ -380,6 +384,8 @@ export function buildServerCommandHandlers(
     ctx.btStorageRuntime && ctx.persistBtStorage
       ? new BtStorageService({
           authorizeOutputWrite: ctx.authorizeOutputWrite,
+          prepareStorageBinding: ctx.prepareStorageBinding,
+          authorizeRecheck: ctx.authorizeRecheck,
           ...reAddDeps,
           runtime: ctx.btStorageRuntime,
           persistStorage: ctx.persistBtStorage,
@@ -415,6 +421,7 @@ export function buildServerCommandHandlers(
   bindTaskRetry?.((id) => reAddTask(id, reAddDeps))
   const removeDeps = {
     authorizeTaskRemoval: ctx.authorizeTaskRemoval,
+    fileCleanupForTask: ctx.fileCleanupForTask,
     cancelMedia: ctx.cancelMedia,
     taskManager,
     adapter,
@@ -810,8 +817,9 @@ export function buildServerCommandHandlers(
       return { ok: true }
     },
 
-    [Commands.ReAddTask]: async (taskId: string) => {
-      await reAddTask(taskId, reAddDeps)
+    [Commands.ReAddTask]: async (rawPayload: unknown) => {
+      const { taskId, sha256 } = reAddTaskPayloadSchema.parse(rawPayload)
+      await reAddTask(taskId, reAddDeps, sha256)
       return { ok: true }
     },
 

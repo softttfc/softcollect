@@ -118,6 +118,6 @@ from Renovate's `prBodyNotes`; an unchanged set after a lint repair is skipped.
 Existing PRs become eligible when Renovate refreshes their body.
 To retry a failed analysis, rerun its Actions run; if versions changed, wait for
 the new dispatch. No agent starts on ordinary development or review tasks.
-The separate lint repair entry uses `COPILOT_GITHUB_TOKEN` with Copilot assignment
+The separate lint repair entry uses `GH_AW_AGENT_TOKEN` with Copilot assignment
 permissions and allows one automatic assignment per PR. Further repairs are
 maintainer-directed. Both workflows reuse repository rules without adding skills.

@@ -139,8 +139,8 @@ export async function assignCopilot({
   core,
   env = process.env,
 }) {
-  if (!env.COPILOT_TOKEN)
-    throw new Error('COPILOT_GITHUB_TOKEN is required for Copilot assignment')
+  if (!env.GH_AW_AGENT_TOKEN)
+    throw new Error('GH_AW_AGENT_TOKEN is required for Copilot assignment')
   const params = { ...context.repo, issue_number: Number(env.PR_NUMBER) }
   const { data: pr } = await github.rest.pulls.get({
     ...context.repo,

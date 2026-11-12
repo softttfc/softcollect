@@ -34,12 +34,14 @@
 
 - 修复 macOS TUN 模式下原有 DNS 被清除、关闭后 DNS 未恢复及联网后设置未生效
 - 修复 macOS 断网时误报代理已回退直连，恢复联网后自动重试系统代理
+- 修复 macOS 切换主题后标题栏保留原有深浅色
 
 </details>
 
 <details>
 <summary><strong> ✨ 新增功能 </strong></summary>
 
+- 新增连接页面按网络协议（TCP/UDP）筛选连接
 
 </details>
 

@@ -885,6 +885,7 @@
       },
       "action": {
         "pause": "Szüneteltetés",
+        "pausing": "Szüneteltetés…",
         "queueMoveFailed": "Nem sikerült frissíteni a várakozási sort.",
         "queueTaskStarted": "A feladat már nincs a várakozási sorban.",
         "queueMoveHint": "A várakozási sorban elfoglalt hely határozza meg, melyik letöltés indul el következőként. Az oszlopok rendezése ettől függetlenül kerül mentésre.",
@@ -1386,6 +1387,8 @@
       "runModeLinuxDesc": "A rendszertálca elérhetősége és működése az asztali környezettől függ.",
       "lightweightMode": "Könnyített mód",
       "lightweightModeDesc": "Memóriamegtakarítás az ablak bezárásakor. A letöltések folytatódnak, de az újbóli megnyitás lassabb, és a nem mentett bevitt adatok törlődnek.",
+      "keepStatsBarVisible": "Statisztikák megjelenítése a részletek mellett",
+      "keepStatsBarVisibleDesc": "A letöltési statisztikasáv megtartása a feladat részletei alatt.",
       "byteUnitSystem": "Méret és sebesség mértékegységei",
       "byteUnitSystemDesc": "Válaszd ki, hogyan jelenjenek meg a fájlméretek és a sebességek.",
       "byteUnitDecimal": "Decimális ({{megabyte}}, {{gigabyte}} · 1000)",

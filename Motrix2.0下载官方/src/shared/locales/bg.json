@@ -867,6 +867,7 @@
         "openFileFailedHint": "Проверете дали файлът все още съществува и дали имате разрешение да го отворите.",
         "openFolder": "Отваряне на папката",
         "pause": "Пауза",
+        "pausing": "Поставяне на пауза…",
         "pauseTooltipBatch": "Пауза на {{n}} от {{total}} избрани задачи",
         "queueBoundary": "Изборът вече е на границата на опашката",
         "queueMoveFailed": "Опашката с чакащи задачи не можа да бъде обновена.",
@@ -1875,6 +1876,8 @@
     "appearance": {
       "byteUnitBinary": "Двоични ({{megabyte}}, {{gigabyte}} · 1024)",
       "byteUnitDecimal": "Десетични ({{megabyte}}, {{gigabyte}} · 1000)",
+      "keepStatsBarVisible": "Показване на статистиката при отворени подробности",
+      "keepStatsBarVisibleDesc": "Запазване на лентата със статистика под панела с подробности за задачата.",
       "byteUnitSystem": "Мерни единици за размер и скорост",
       "byteUnitSystemDefault": "Според системата ({{units}})",
       "byteUnitSystemDesc": "Изберете как да се показват размерите на файловете и скоростите.",

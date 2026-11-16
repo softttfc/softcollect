@@ -909,6 +909,7 @@
       },
       "action": {
         "pause": "Wstrzymaj",
+        "pausing": "Wstrzymywanie…",
         "queueMoveFailed": "Nie udało się zaktualizować kolejki oczekujących.",
         "queueTaskStarted": "Zadanie nie znajduje się już w kolejce oczekujących.",
         "queueMoveHint": "Pozycja w kolejce określa, które oczekujące pobieranie rozpocznie się jako następne. Sortowanie kolumn jest zapisywane osobno.",
@@ -1414,6 +1415,8 @@
       "runModeLinuxDesc": "Dostępność zasobnika systemowego i sposób aktywacji zależą od środowiska graficznego.",
       "lightweightMode": "Tryb oszczędzania pamięci",
       "lightweightModeDesc": "Oszczędzaj pamięć po zamknięciu okna. Pobieranie trwa nadal, ale ponowne otwarcie zajmuje więcej czasu i usuwa niezapisane dane.",
+      "keepStatsBarVisible": "Pokazuj statystyki przy otwartych szczegółach",
+      "keepStatsBarVisibleDesc": "Zachowaj pasek statystyk pobierania pod panelem szczegółów zadania.",
       "byteUnitSystem": "Jednostki rozmiaru i prędkości",
       "byteUnitSystemDesc": "Wybierz sposób wyświetlania rozmiarów plików i prędkości.",
       "byteUnitDecimal": "Dziesiętne ({{megabyte}}, {{gigabyte}} · 1000)",

@@ -870,6 +870,7 @@
         "openFileFailedHint": "Comproveu que el fitxer encara existeixi i que tingueu permís per obrir-lo.",
         "openFolder": "Obrir la carpeta",
         "pause": "Pausar",
+        "pausing": "S’està posant en pausa…",
         "pauseTooltipBatch": "Pausar {{n}} de {{total}} tasques seleccionades",
         "queueBoundary": "La selecció ja és al límit de la cua",
         "queueMoveFailed": "No s'ha pogut actualitzar la cua d'espera.",
@@ -1894,6 +1895,8 @@
     "appearance": {
       "byteUnitBinary": "Binàries ({{megabyte}}, {{gigabyte}} · 1024)",
       "byteUnitDecimal": "Decimals ({{megabyte}}, {{gigabyte}} · 1000)",
+      "keepStatsBarVisible": "Mantén les estadístiques visibles amb els detalls oberts",
+      "keepStatsBarVisibleDesc": "Mantén la barra d’estadístiques de baixada sota el tauler de detalls de la tasca.",
       "byteUnitSystem": "Unitats de mida i velocitat",
       "byteUnitSystemDefault": "Seguir el sistema ({{units}})",
       "byteUnitSystemDesc": "Trieu com es mostren les mides dels fitxers i les velocitats.",

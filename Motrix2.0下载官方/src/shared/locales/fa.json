@@ -867,6 +867,7 @@
         "openFileFailedHint": "بررسی کنید که فایل همچنان وجود داشته باشد و اجازهٔ باز کردن آن را داشته باشید.",
         "openFolder": "باز کردن پوشه",
         "pause": "مکث",
+        "pausing": "در حال مکث…",
         "pauseTooltipBatch": "مکث {{n}} مورد از {{total}} مورد انتخاب‌شده",
         "queueBoundary": "انتخاب از قبل در مرز صف است",
         "queueMoveFailed": "به‌روزرسانی صف انتظار ممکن نشد.",
@@ -1875,6 +1876,8 @@
     "appearance": {
       "byteUnitBinary": "دودویی ({{megabyte}}، {{gigabyte}} · 1024)",
       "byteUnitDecimal": "ده‌دهی ({{megabyte}}، {{gigabyte}} · 1000)",
+      "keepStatsBarVisible": "نمایش آمار هنگام باز بودن جزئیات",
+      "keepStatsBarVisibleDesc": "نوار آمار بارگیری در زیر پنل جزئیات کار نمایش داده شود.",
       "byteUnitSystem": "واحدهای اندازه و سرعت",
       "byteUnitSystemDefault": "پیروی از سیستم ({{units}})",
       "byteUnitSystemDesc": "نحوهٔ نمایش اندازهٔ فایل‌ها و سرعت‌ها را انتخاب کنید.",

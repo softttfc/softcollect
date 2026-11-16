@@ -864,6 +864,7 @@
         "openFileFailedHint": "โปรดตรวจสอบว่าไฟล์ยังอยู่และคุณมีสิทธิ์เปิดไฟล์",
         "openFolder": "เปิดโฟลเดอร์",
         "pause": "พัก",
+        "pausing": "กำลังหยุดชั่วคราว…",
         "pauseTooltipBatch": "พัก {{n}} จาก {{total}} งานที่เลือก",
         "queueBoundary": "รายการที่เลือกอยู่ต้นหรือท้ายคิวแล้ว",
         "queueMoveFailed": "อัปเดตคิวรอไม่ได้",
@@ -1856,6 +1857,8 @@
     "appearance": {
       "byteUnitBinary": "ฐานสอง ({{megabyte}}, {{gigabyte}} · 1024)",
       "byteUnitDecimal": "ฐานสิบ ({{megabyte}}, {{gigabyte}} · 1000)",
+      "keepStatsBarVisible": "แสดงสถิติต่อไปเมื่อเปิดรายละเอียด",
+      "keepStatsBarVisibleDesc": "แสดงแถบสถิติการดาวน์โหลดไว้ด้านล่างแผงรายละเอียดงาน",
       "byteUnitSystem": "หน่วยขนาดและความเร็ว",
       "byteUnitSystemDefault": "ตามระบบ ({{units}})",
       "byteUnitSystemDesc": "เลือกรูปแบบหน่วยที่ใช้แสดงขนาดไฟล์และความเร็ว",

@@ -870,6 +870,7 @@
         "openFileFailedHint": "Vérifiez que le fichier existe toujours et que vous avez l’autorisation de l’ouvrir.",
         "openFolder": "Ouvrir le dossier",
         "pause": "Mettre en pause",
+        "pausing": "Mise en pause…",
         "pauseTooltipBatch": "Mettre en pause {{n}} des {{total}} tâches sélectionnées",
         "queueBoundary": "La sélection est déjà à l’extrémité de la file",
         "queueMoveFailed": "Impossible de modifier la file d’attente.",
@@ -1894,6 +1895,8 @@
     "appearance": {
       "byteUnitBinary": "Binaires ({{megabyte}}, {{gigabyte}} · 1024)",
       "byteUnitDecimal": "Décimales ({{megabyte}}, {{gigabyte}} · 1000)",
+      "keepStatsBarVisible": "Garder les statistiques visibles avec les détails ouverts",
+      "keepStatsBarVisibleDesc": "Afficher la barre des statistiques de téléchargement sous le panneau des détails de la tâche.",
       "byteUnitSystem": "Unités de taille et de débit",
       "byteUnitSystemDefault": "Suivre le système ({{units}})",
       "byteUnitSystemDesc": "Choisissez les unités d’affichage des tailles de fichiers et des débits.",

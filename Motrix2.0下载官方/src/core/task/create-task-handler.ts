@@ -31,6 +31,7 @@ import {
 import type { SettingsManager } from '@core/settings/settings-manager'
 import { INCOMPLETE_SUFFIX } from '@shared/constants/incomplete'
 import { AppError, ErrorCode } from '@shared/errors'
+import { formatFileSelection } from '@shared/lib/file-selection-ranges'
 import type {
   TaskCreateRequest,
   TaskCreateSuccessResult,
@@ -229,6 +230,12 @@ export interface CreateTaskDeps {
 }
 
 export interface CreateTaskOptions {
+  /** Internal paired-bridge reservation. Only the host can supply this callback. */
+  handoff?: {
+    taskId: string
+    gid: string
+    commit: (task: DownloadTask, request: CreateDownloadParams) => Promise<void>
+  }
   source?: TaskSource // default 'user'
   sourceMeta?: SourceMeta // default null
   /** Ephemeral credentials; kept out of persisted task records and plugins. */
@@ -423,7 +430,7 @@ async function handleCreateTaskUnderAdmission(
     (deps.prepareSaveDir
       ? await deps.prepareSaveDir(requestedSaveDir)
       : requestedSaveDir)
-  const taskId = newTaskId()
+  const taskId = opts.handoff?.taskId ?? newTaskId()
 
   log.info(
     {
@@ -446,7 +453,7 @@ async function handleCreateTaskUnderAdmission(
   if (req.type === 'bt' && req.payload.kind === 'torrent-base64') {
     torrentBytes = req.torrentBytes ?? decodeBase64ToBytes(req.payload.base64)
     try {
-      parsedBtLayout = await parseBtFileLayout(torrentBytes)
+      parsedBtLayout = await parseBtFileLayout(torrentBytes, req.selectedFiles)
       torrentInfoName = parsedBtLayout.torrentRootName
       isPrivateFromTorrent = parsedBtLayout.isPrivate
     } catch (err) {
@@ -684,6 +691,7 @@ async function handleCreateTaskUnderAdmission(
     | undefined
   let pluginMetadataOps: readonly StagedMetadataOp[] = []
   let assertPluginPolicyCurrent: (() => void) | undefined
+  let handoffRequest: CreateDownloadParams | undefined
   let dispatchEngine: (reservedGid: string) => Promise<string>
   let directReplay: DirectReplayRecipe | null = null
   let canonicalUris = deriveUris(req)
@@ -973,6 +981,7 @@ async function handleCreateTaskUnderAdmission(
     // rewritten request must never probe the stale user-supplied target.
     // Manual names remain authoritative and skip filename discovery.
     if (
+      !opts.handoff &&
       !req.filename?.trim() &&
       params.uris.length === 1 &&
       metadataRequestProfile !== null &&
@@ -1022,6 +1031,7 @@ async function handleCreateTaskUnderAdmission(
     if (
       directReplay.replayability === 'uri-only' &&
       metadataRequestProfile !== null &&
+      !opts.handoff &&
       deps.directResourceValidator &&
       params.uris.length === 1
     ) {
@@ -1050,6 +1060,7 @@ async function handleCreateTaskUnderAdmission(
     }
     assertPluginPolicyCurrent?.()
     canonicalUris = [...params.uris]
+    if (opts.handoff) handoffRequest = params
     dispatchEngine = dispatchCreateDownload(params)
   } else if (req.payload.kind === 'torrent-base64') {
     // Torrent bytes were decoded earlier for name/private extraction; they
@@ -1061,7 +1072,7 @@ async function handleCreateTaskUnderAdmission(
         : {}),
       saveDir: btStoragePlan?.saveDir ?? diskPath,
       // CREATE-PATH +1: req indices are 0-based; aria2 select-file is
-      // 1-based, and addTorrent serializes selectedFiles with a raw join.
+      // 1-based. The adapter compacts consecutive indices into ranges.
       selectedFiles: req.selectedFiles.map((i) => i + 1),
       outputFilePaths: btStoragePlan?.outputFilePaths,
       outputRoot: btStoragePlan?.outputRoot,
@@ -1078,12 +1089,13 @@ async function handleCreateTaskUnderAdmission(
       params.gid = reservedGid
       // Never log `params.metadata` itself: pino would expand the whole
       // torrent byte array into a multi-megabyte JSON line.
-      const { metadata, ...loggableParams } = params
+      const { metadata, selectedFiles, outputFilePaths } = params
       log.info(
         {
           method: 'addTorrent',
           metadataBytes: metadata.length,
-          params: loggableParams,
+          selectedFileCount: selectedFiles?.length,
+          mappedFileCount: outputFilePaths?.length,
         },
         'dispatching to engine'
       )
@@ -1095,9 +1107,10 @@ async function handleCreateTaskUnderAdmission(
     // dir=diskPath, no out) through createDownload + extraEngineOptions.
     const magnetEngineOpts: Record<string, string> = {}
     if (req.selectedFiles.length > 0) {
-      magnetEngineOpts['select-file'] = req.selectedFiles
-        .map((i) => i + 1)
-        .join(',')
+      magnetEngineOpts['select-file'] = formatFileSelection(
+        req.selectedFiles,
+        0
+      )
     }
     if (req.dlLimit !== undefined) {
       magnetEngineOpts['max-download-limit'] = String(req.dlLimit)
@@ -1134,7 +1147,8 @@ async function handleCreateTaskUnderAdmission(
     await deps.waitForEngineReady()
   }
 
-  const gid = newEngineTaskId(deps.createEngineTaskId, 'createTask')
+  const gid =
+    opts.handoff?.gid ?? newEngineTaskId(deps.createEngineTaskId, 'createTask')
   // 5. Build a fully-populated durable owner before engine dispatch.
   const isBtLike = isTorrentLikeType(taskType)
   const taskKind: TaskKind = isBtLike ? TaskKind.Bt : TaskKind.Direct
@@ -1148,7 +1162,7 @@ async function handleCreateTaskUnderAdmission(
     phase,
     status: TaskStatus.Queued,
     progress: 0,
-    totalBytes: 0,
+    totalBytes: parsedBtLayout?.totalBytes ?? 0,
     downloadedBytes: 0,
     uploadedBytes: 0,
     diskPath,
@@ -1189,6 +1203,13 @@ async function handleCreateTaskUnderAdmission(
     finalName,
     torrentMetaPath,
     infoHash: btInfoHash,
+    ...(parsedBtLayout
+      ? {
+          totalBytes: parsedBtLayout.totalBytes ?? 0,
+          sizeWhenDone: parsedBtLayout.totalBytes ?? 0,
+          fileCount: parsedBtLayout.files.length,
+        }
+      : {}),
     // For BT/Magnet, seed bt.isPrivate at creation time so SessionManager.save()
     // persists is_private to db. Other bt fields are filled in by the next poll
     // cycle via translateBtExtension; mergeEngineTask preserves this metadata
@@ -1206,6 +1227,16 @@ async function handleCreateTaskUnderAdmission(
     instances: [primaryInstance],
   })
   const createReservedTask = async (): Promise<TaskCreateSuccessResult> => {
+    if (opts.handoff) {
+      if (
+        !handoffRequest ||
+        pluginMetadataOps.length ||
+        assertPluginPolicyCurrent
+      )
+        throw new Error('Unsupported handoff creation policy')
+      await opts.handoff.commit(task, { ...handoffRequest, gid })
+      return { outcome: 'created', taskId, gid }
+    }
     deps.taskManager.reserveEngineTaskId(gid)
 
     const persistParent = async (): Promise<void> => {
@@ -1331,6 +1362,20 @@ async function handleCreateTaskUnderAdmission(
       // The engine outcome or durable rollback is uncertain. Promote the silent
       // candidate to an ordinary owner so every live GID has the same public
       // task identity and recovery can reconcile it after restart.
+      if (parsedBtLayout) {
+        task.status = TaskStatus.Error
+        primaryInstance.status = TaskStatus.Error
+        primaryInstance.payload.unconfirmedTorrentCreateGid = gid
+        task.errorMessage = cause instanceof Error ? cause.message : null
+        try {
+          await deps.persistTask?.(task)
+        } catch (error) {
+          log.warn(
+            { err: error, taskId },
+            'could not persist uncertain torrent creation'
+          )
+        }
+      }
       deps.taskManager.add(task)
       announceOwnedTask()
       throw cause

@@ -624,7 +624,7 @@ export class SessionManager {
     this.db.saveTasksBatch(payloads)
   }
 
-  private async buildTaskPayload(
+  async buildTaskPayload(
     task: DownloadTask,
     now: number
   ): Promise<TaskWithInstances> {
@@ -792,7 +792,8 @@ export class SessionManager {
 
   async restore(
     assertProxyCurrent?: () => void,
-    observeCompletedTask?: (snapshot: DownloadTask) => Promise<unknown>
+    observeCompletedTask?: (snapshot: DownloadTask) => Promise<unknown>,
+    pendingHandoffs: ReadonlyMap<string, string> = new Map()
   ): Promise<void> {
     // aria2 is the source of truth for engine lifecycle. motrix.db is a
     // metadata sidecar tracking task identity and the relationship between
@@ -801,7 +802,56 @@ export class SessionManager {
     // reconstruct the parent task by reading all its sibling instances.
     // Anything left over in motrix.db after Pass 1 is an orphan.
 
-    const persisted = this.db.getAllTasks()
+    const handoffGids = new Set(pendingHandoffs.values())
+    const isolatedHandoffs = new Map<string, TaskWithInstances>()
+    const unconfirmed = new Map<string, TaskWithInstances>()
+    const persisted: TaskWithInstances[] = []
+    for (const pair of this.db.getAllTasks()) {
+      const owner = pair.instances[0]
+      if (
+        pair.task.kind === TaskKind.Bt &&
+        pair.task.aggStatus === TaskStatus.Error &&
+        pair.instances.length === 1 &&
+        owner?.gid &&
+        owner.payload.unconfirmedTorrentCreateGid === owner.gid
+      ) {
+        try {
+          // Compensation was interrupted. Only the caller-reserved GID is ours.
+          // Never infer absence from a timeout or delete any downloaded files.
+          const live = await this.adapter.getTaskStatus(owner.gid)
+          if (live !== null && (!live.infoHash || !pair.task.infoHash)) {
+            unconfirmed.set(owner.gid, pair)
+            continue
+          }
+          if (
+            !live ||
+            live.infoHash?.toLowerCase() === pair.task.infoHash?.toLowerCase()
+          ) {
+            if (
+              live &&
+              ![
+                TaskStatus.Error,
+                TaskStatus.Removed,
+                TaskStatus.Completed,
+              ].includes(live.status)
+            )
+              await this.adapter.forceRemoveTask(owner.gid)
+            // The SQLite-backed engine can retain a GID outside its in-memory window.
+            await this.adapter.removeDownloadResult(owner.gid)
+          }
+          this.db.deleteTask(pair.task.motrixId)
+          continue
+        } catch {
+          log.warn(
+            { taskId: pair.task.motrixId },
+            'torrent creation cleanup still unconfirmed'
+          )
+          unconfirmed.set(owner.gid, pair)
+          continue
+        }
+      }
+      persisted.push(pair)
+    }
     const byMotrixId = new Map<string, TaskWithInstances>()
     const instanceByGid = new Map<
       string,
@@ -815,6 +865,14 @@ export class SessionManager {
     const migrationGids = new Set<string>()
 
     for (const pair of persisted) {
+      if (
+        pair.instances.some(
+          (i) => i.gid && i.gid === pendingHandoffs.get(pair.task.motrixId)
+        )
+      ) {
+        isolatedHandoffs.set(pair.task.motrixId, pair)
+        continue
+      }
       byMotrixId.set(pair.task.motrixId, pair)
       for (const gid of getLegacyQuarantinedGids(pair)) migrationGids.add(gid)
       if (isInactiveLegacyTask(pair)) continue
@@ -873,7 +931,16 @@ export class SessionManager {
     const aria2GidSet = new Set(aria2Tasks.map((t) => t.gid))
 
     this.taskManager.clear()
-    const consumedMotrixIds = new Set<string>()
+    for (const pair of unconfirmed.values()) {
+      this.taskManager.add(taskRowToDownloadTask(pair.task, pair.instances))
+    }
+    // The outbox owns activation. Generic orphan recovery must not issue a second GET.
+    for (const [id, pair] of isolatedHandoffs) {
+      const task = taskRowToDownloadTask(pair.task, pair.instances)
+      this.taskManager.reserveEngineTaskId(task.engineTaskId)
+      this.taskManager.setReservedEngineTaskOwner(id, task, task.engineTaskId)
+    }
+    const consumedMotrixIds = new Set(isolatedHandoffs.keys())
 
     // Completion observations and engine-row evictions collected during Pass 1.
     // Each eviction preserves its own force-remove → purge order; batching lets
@@ -890,6 +957,8 @@ export class SessionManager {
 
     // Pass 1 — drive from aria2 rows.
     for (const aria2 of aria2Tasks) {
+      if (handoffGids.has(aria2.gid)) continue
+      if (unconfirmed.has(aria2.gid)) continue
       if (migrationGids.has(aria2.gid)) continue
       // Media segments are ephemeral children of a coordinator task. Older
       // versions left them in aria2's durable store, so hide AND evict them;

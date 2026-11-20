@@ -104,6 +104,13 @@ export class BridgeConnection {
     this.mdxp.onRequest(method, handler)
   }
 
+  onRoutedRequest(
+    method: keyof import('@motrix/mdxp').MdxpRequestMap,
+    handler: (params: unknown) => Promise<unknown>
+  ): void {
+    this.mdxp.raw.onRequest(method, handler)
+  }
+
   /** Register a typed notification handler. */
   onNotification: MdxpConnection['onNotification'] = (name, handler) => {
     this.mdxp.onNotification(name, handler)

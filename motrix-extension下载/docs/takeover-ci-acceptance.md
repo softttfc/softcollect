@@ -17,9 +17,9 @@ Firefox 场景包括旧入口元数据、未知大小策略、默认启用、自
 
 ### Chromium 确认回归
 
-运行 `pnpm exec playwright-core install chromium` 后执行 `pnpm test:chromium-confirmation`；也可用 `CHROME_BINARY` 指向允许加载测试扩展的 Chrome for Testing。使用独立 profile、真实浏览器下载 API、生产确认表单和本机 MDXP 模拟器。浏览器确认、取消及明确拒绝分别核对原下载 ID、终态和服务端任务数。受保护或未知的单次源拒绝第二次请求，并校验首份浏览器文件的 SHA-256。Firefox 恢复原下载 ID 时允许续发 Range，检查最终摘要。两端均在已开始的原生下载确认用例中停留 12.5 秒、核对暂停期间字节计数。另有七个官网点击用例：选 Motrix、选浏览器、取消、Alt 放行、明确拒绝、表单打不开和接受后丢回执。表单出现时独立查询测试源的文件请求数量，应为零。
+运行 `pnpm exec playwright-core install chromium` 后执行 `pnpm test:chromium-confirmation`；也可用 `CHROME_BINARY` 指向允许加载测试扩展的 Chrome for Testing。使用独立 profile、真实浏览器下载 API、生产确认表单和本机 MDXP 模拟器。浏览器确认、取消及明确拒绝分别核对原下载 ID、终态和服务端任务数。受保护或未知的单次源拒绝第二次请求，并校验首份浏览器文件的 SHA-256。Firefox 恢复原下载 ID 时允许续发 Range，检查最终摘要。两端均在已开始的原生下载确认用例中停留 12.5 秒、核对暂停期间字节计数。
 
-更新随扩展打包的离线名单可运行 `pnpm sync:download-protection ../motrix-website/public/rules/download-protection/v1.json`。运行时使用官网固定地址和 ETag，新增规则以官网仓库的 JSON 为准。
+排除接管用例从已保存的用户域名配置读取规则。
 
 ## 执行与证据
 
@@ -95,7 +95,6 @@ PR #45 已于 2026-10-02 合并为 `0c119e6`。本次优化从该提交单独建
 
 ```sh
 export MOTRIX_HOST_DIR=../Motrix
-export MOTRIX_HANDOFF_SDK=../mdxp-handoff-contract
 pnpm test:chromium-confirmation --paired-handoff
 pnpm test:firefox-takeover --paired-handoff
 ```
@@ -104,4 +103,4 @@ pnpm test:firefox-takeover --paired-handoff
 
 每个浏览器验证五种选择或故障：选 Motrix、选浏览器、取消、prepare 明确拒绝、commit 写库后实际断开 WebSocket。检查同一原生下载 ID 的暂停与终态、配对次数、重连后的任务 ID、账本状态、引擎请求和文件摘要。拒绝后 abort 建立终止记录，浏览器恢复原项；已确认停止后丢回执则重连原实例查询 status。Firefox 恢复原 ID 时可发送 Range。逐项证据默认写入 `.cache/paired-handoff/`，可用 `PAIRED_REPORT_DIR` 指定其他本地目录。
 
-本地候选 Chromium／Firefox 构建可设置 `MOTRIX_LOCAL_HANDOFF_SDK` 为已构建候选 SDK 的工作目录。常规构建保留原协议，Web Store 构建忽略这个本地开关。宿主只对显式装配完整账本模块的扩展会话宣告能力。该验收覆盖本机类型的 MBP1 WebSocket，远端 Server 的 WSS、账户与凭据转发策略仍有独立门禁。
+Chrome、Edge 和 Firefox 的正式构建直接使用锁文件中的 MDXP SDK。扩展只向已配对并声明支持交接的本机桌面端发起新交接；旧宿主继续使用既有提交方式。远端 Server 的 WSS、账户与凭据转发策略另行验收。

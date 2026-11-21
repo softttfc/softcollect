@@ -217,24 +217,6 @@ export function TakeoverSection({
               />
               <FormField
                 control={form.control}
-                name="releaseClick"
-                render={({ field }) => (
-                  <Field orientation="horizontal">
-                    <FieldContent>
-                      <FieldLabel htmlFor="release-click">
-                        {t('options.takeover.releaseClick')}
-                      </FieldLabel>
-                    </FieldContent>
-                    <Switch
-                      id="release-click"
-                      checked={field.value === true}
-                      onCheckedChange={field.onChange}
-                    />
-                  </Field>
-                )}
-              />
-              <FormField
-                control={form.control}
                 name="denylist"
                 render={({ field, fieldState }) => (
                   <Field

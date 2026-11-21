@@ -226,12 +226,14 @@ describe('DownloadTab', () => {
   })
 })
 
-it('adds, edits and removes personal protection domains without persisting share tokens', async () => {
+it('adds, edits and removes download exclusion domains without persisting share tokens', async () => {
   const user = userEvent.setup()
   const first = render(<DownloadTab />)
   const field = await screen.findByRole('textbox', {
-    name: /personal protection list/i,
+    name: /domains excluded from download takeover/i,
   })
+  expect((field as HTMLTextAreaElement).value).toBe('')
+  expect(screen.queryByRole('button', { name: /import/i })).toBeNull()
   fireEvent.change(field, {
     target: {
       value:
@@ -248,7 +250,7 @@ it('adds, edits and removes personal protection domains without persisting share
   first.unmount()
   render(<DownloadTab />)
   const edit = await screen.findByRole('textbox', {
-    name: /personal protection list/i,
+    name: /domains excluded from download takeover/i,
   })
   await waitFor(() =>
     expect((edit as HTMLTextAreaElement).value).toBe(
@@ -272,25 +274,8 @@ it('adds, edits and removes personal protection domains without persisting share
   await waitFor(() => expect(savedTakeover?.rules).toEqual([]))
 })
 
-it('keeps the site release-click pilot opt-in and allows disabling it again', async () => {
-  const user = userEvent.setup({ pointerEventsCheck: 0 })
-  const first = render(<DownloadTab />)
-  const toggle = await screen.findByRole('switch', {
-    name: /installers on motrix.app/i,
-  })
-  expect(toggle.getAttribute('aria-checked')).toBe('false')
-  await user.click(toggle)
-  await user.click(screen.getByRole('button', { name: /apply/i }))
-  await waitFor(() => expect(savedTakeover?.releaseClick).toBe(true))
-  first.unmount()
+it('does not offer a site-specific download prompt', async () => {
   render(<DownloadTab />)
-  const persisted = await screen.findByRole('switch', {
-    name: /installers on motrix.app/i,
-  })
-  await waitFor(() =>
-    expect(persisted.getAttribute('aria-checked')).toBe('true')
-  )
-  await user.click(persisted)
-  await user.click(screen.getByRole('button', { name: /apply/i }))
-  await waitFor(() => expect(savedTakeover?.releaseClick).toBe(false))
+  await screen.findByRole('button', { name: /apply/i })
+  expect(screen.queryByRole('switch', { name: /motrix.app/i })).toBeNull()
 })

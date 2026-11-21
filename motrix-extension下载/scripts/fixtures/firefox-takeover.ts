@@ -6,6 +6,7 @@ import {
   Methods,
 } from '@motrix/mdxp/browser'
 import { createElement } from 'react'
+import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { createConfirmedDownloadActions } from '@/background/confirmedDownload'
 import { DownloadConfirmationService } from '@/background/DownloadConfirmationService'
@@ -17,10 +18,11 @@ import type { ChromiumInterceptionDeps } from '@/background/interception/chromiu
 import { registerChromiumInterception } from '@/background/interception/chromium'
 import { registerFirefoxInterception } from '@/background/interception/firefox'
 import { registerNativeConfirmation } from '@/background/interception/nativeConfirmation'
-import { registerReleaseClicks } from '@/background/interception/releaseClick'
 import { observeReplaySources } from '@/background/interception/replaySource'
 import { registerWebRequestEarlyTakeover } from '@/background/interception/webRequestEarly'
 import { log } from '@/background/log'
+import { startDownloadProtection } from '@/background/policy/downloadProtection'
+import { TAKEOVER_CONFIG_KEY } from '@/background/TakeoverConfigStore'
 import { WebSocketClient } from '@/background/WebSocketClient'
 import { DownloadConfirmationForm } from '@/popup/DownloadConfirmationDialog'
 import { extensionBrowser as browser, nativeBrowser } from '@/shared/browser'
@@ -92,13 +94,7 @@ browser.downloads.onChanged.addListener((delta) => {
         })
     })
 })
-const replaySource = observeReplaySources(
-  (_role, url) => !!url?.includes('/early-protected'),
-  (url) =>
-    new URL(url).hostname === '127.0.0.1' &&
-    new URL(url).pathname.startsWith('/download/') &&
-    !url.endsWith('/confirm')
-)
+const replaySource = observeReplaySources(startDownloadProtection())
 const deps = {
   replaySource,
   popup: {
@@ -136,48 +132,37 @@ const service = new DownloadConfirmationService({
   publish() {},
   open: async (windowId) => {
     confirmations++
-    if (['early-confirm-unavailable', 'click-unavailable'].includes(caseName))
+    if (caseName === 'early-confirm-unavailable')
       throw new Error('popup unavailable')
     await new Promise((r) => setTimeout(r, 350))
     const draft = service.get(windowId)
     if (!draft) throw new Error('missing draft')
-    if (draft.target.releaseClickId) {
-      const response = await fetch(
-        new URL('/seen/' + caseName, draft.target.url)
-      )
-      observations.push({
-        event: 'before-decision',
-        requests: Number(await response.text()),
-        nativeCount: nativeIds.length,
-      })
-    } else {
-      if (draft.target.pausedDownloadId === undefined)
-        throw new Error('Missing native ID')
-      const [item] = await browser.downloads.search({
+    if (draft.target.pausedDownloadId === undefined)
+      throw new Error('Missing native ID')
+    const [item] = await browser.downloads.search({
+      id: draft.target.pausedDownloadId,
+    })
+    observations.push({
+      event: 'confirmation-hold',
+      nativeCount: nativeIds.length,
+      paused: item?.paused,
+      id: item?.id,
+    })
+    observations.push({
+      event: 'confirmation-filename',
+      filename: draft.options.filename,
+    })
+    if (caseName === 'early-confirm-accept') {
+      // Longer than the Chromium filename deadline and the fixture's entire transfer.
+      await new Promise((r) => setTimeout(r, 12500))
+      const [held] = await browser.downloads.search({
         id: draft.target.pausedDownloadId,
       })
       observations.push({
-        event: 'confirmation-hold',
-        nativeCount: nativeIds.length,
-        paused: item?.paused,
-        id: item?.id,
+        event: 'quiet-hold',
+        stable:
+          held?.paused === true && held.bytesReceived === item?.bytesReceived,
       })
-      observations.push({
-        event: 'confirmation-filename',
-        filename: draft.options.filename,
-      })
-      if (caseName === 'early-confirm-accept') {
-        // Longer than the Chromium filename deadline and the fixture's entire transfer.
-        await new Promise((r) => setTimeout(r, 12500))
-        const [held] = await browser.downloads.search({
-          id: draft.target.pausedDownloadId,
-        })
-        observations.push({
-          event: 'quiet-hold',
-          stable:
-            held?.paused === true && held.bytesReceived === item?.bytesReceived,
-        })
-      }
     }
     const action = caseName.endsWith('-browser')
       ? 'browser'
@@ -187,18 +172,21 @@ const service = new DownloadConfirmationService({
     const host = document.body.appendChild(document.createElement('div'))
     const root = createRoot(host)
     try {
-      root.render(
-        createElement(DownloadConfirmationForm, {
-          draft,
-          onDismiss: () => service.close(windowId),
-          onDecide: (decision) => service.decide(windowId, draft.id, decision),
-        })
-      )
+      // The runner tab is in the background during the native download. Mount
+      // before driving the button so throttled timers cannot miss the commit.
+      flushSync(() => {
+        root.render(
+          createElement(DownloadConfirmationForm, {
+            draft,
+            onDismiss: () => service.close(windowId),
+            onDecide: (decision) =>
+              service.decide(windowId, draft.id, decision),
+          })
+        )
+      })
       const label = i18n.t(
         action === 'browser'
-          ? draft.target.releaseClickId
-            ? 'popup.confirmDownload.browser'
-            : 'popup.confirmDownload.keepBrowser'
+          ? 'popup.confirmDownload.keepBrowser'
           : action === 'cancel'
             ? 'popup.quickAdd.cancel'
             : 'popup.quickAdd.add'
@@ -260,18 +248,6 @@ const actions: Parameters<typeof registerNativeConfirmation>[0]['actions'] = (
     guard,
     beforeSend
   )
-registerReleaseClicks(
-  {
-    ...deps,
-    actions,
-    available: () => true,
-    protected: () => false,
-    confirmation: service,
-    report: (outcome) => observations.push({ event: 'click-report', outcome }),
-  },
-  (url) => new URL(url).pathname.startsWith('/start/click-'),
-  (url) => new URL(url).pathname.startsWith('/download/click-')
-)
 registerNativeConfirmation({
   ...deps,
   replaySource,
@@ -350,17 +326,20 @@ Object.assign(window, {
     config = {
       ...TAKEOVER_DEFAULT,
       enabled: input.name !== 'early-off',
-      releaseClick: true,
       downloadMode:
         ['confirm', 'early-protected'].includes(input.name) ||
-        input.name.startsWith('early-confirm-') ||
-        input.name.startsWith('click-')
+        input.name.startsWith('early-confirm-')
           ? 'confirm'
           : 'direct',
       unknownSizeAction: input.name === 'unknown-motrix' ? 'motrix' : 'chrome',
       rules: ['small', 'early-small'].includes(input.name)
         ? [{ id: 'small', match: { minSizeMB: 10 }, action: 'chrome' }]
-        : input.name === 'early-excluded'
+        : [
+              'early-excluded',
+              'early-protected',
+              'early-protected-direct',
+              'confirm',
+            ].includes(input.name)
           ? [
               {
                 id: 'excluded',
@@ -370,6 +349,7 @@ Object.assign(window, {
             ]
           : [],
     }
+    await browser.storage.local.set({ [TAKEOVER_CONFIG_KEY]: config })
     const tab = await browser.tabs.create({
       url: `${input.baseUrl}/start/${input.name}${nativeBrowser.downloads.onDeterminingFilename ? '?click=1' : ''}`,
     })
@@ -411,35 +391,6 @@ Object.assign(window, {
           'in_progress'
       )
         await new Promise((r) => setTimeout(r, 50))
-    }
-    if (input.name.startsWith('click-')) {
-      const native = [
-        'click-browser',
-        'click-bypass',
-        'click-rejected',
-        'click-unavailable',
-      ].includes(input.name)
-      const until = Date.now() + 4500
-      while (Date.now() < until) {
-        if (
-          native &&
-          nativeId !== undefined &&
-          (await browser.downloads.search({ id: nativeId }))[0]?.state ===
-            'complete'
-        )
-          break
-        if (
-          !native &&
-          observations.some((o) => o.event === 'form-click') &&
-          (input.name === 'click-cancel' || submits > 0)
-        )
-          break
-        await new Promise((r) => setTimeout(r, 40))
-      }
-    }
-    if (input.name === 'click-unknown') {
-      const win = await browser.windows.getLastFocused()
-      if (win.id !== undefined) service.close(win.id)
     }
     const items =
       nativeId === undefined

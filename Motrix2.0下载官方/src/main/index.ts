@@ -17,6 +17,7 @@ import {
   PollingScheduler,
   type PollingTaskUpdateSource,
 } from '@core/engine/aria2/polling-scheduler'
+import { TASK_STATUS_FIELDS } from '@core/engine/aria2/task-status-fields'
 import { translateRawToTask } from '@core/engine/aria2/translate'
 import type { Aria2TaskStatus } from '@core/engine/aria2/types'
 import { WebSocketTransport } from '@core/engine/aria2/web-socket-transport'
@@ -26,6 +27,10 @@ import {
 } from '@core/engine/engine-supervisor'
 import { EventBus } from '@core/events/event-bus'
 import { locateFfmpeg } from '@core/ffmpeg/ffmpeg-locator'
+import {
+  canonicalizeFinalizeCommitRequest,
+  canonicalizeSaveDir,
+} from '@core/fs/canonicalize-save-dir'
 import { pathExists } from '@core/fs/path-exists'
 import { GeoIPManager } from '@core/geoip/geo-ip-manager'
 import { LocaleCoordinator } from '@core/i18n/locale-coordinator'
@@ -931,10 +936,11 @@ async function handlePolledTasks(
 ): Promise<void> {
   if (supervisor.getState() !== EngineState.Ready) return
   let dirty = false
-  // 优先接力已完成并自动跟进真实 BT 子任务的磁力元数据记录，防止残留哈希命名磁力任务 (#2552)
+  // 优先接力已完成并自动跟进真实 BT 子任务的磁力元数据记录，防止残留哈希命名磁力任务 (#2552, #2569)
   const followedResult = await reconcileFollowedMagnetTasks(rawTasks, {
     taskManager,
     persistTask,
+    lookupFollowedTask: (gid) => rpcClient.tellStatus(gid, TASK_STATUS_FIELDS),
     retireMetadataGid: (gid) => {
       runShellAsyncWork('followed magnet metadata eviction', async () => {
         try {
@@ -1110,7 +1116,25 @@ async function handlePolledTasks(
             syncTaskFilesIfIncomplete(existing.id, merged.engineTaskId)
           )
         }
-        if (!publishedTerminal) taskManager.set(existing.id, merged)
+        if (!publishedTerminal) {
+          taskManager.set(existing.id, merged)
+          // 直连磁力在轮询中补全真实名称与路径后立刻触发一次保存，避免退出丢失 (#2569)
+          if (
+            existing.name !== merged.name ||
+            existing.finalName !== merged.finalName ||
+            existing.diskPath !== merged.diskPath ||
+            existing.finalPath !== merged.finalPath
+          ) {
+            void sessionManager
+              .requestSave()
+              .catch((err) =>
+                log.warn(
+                  { err, taskId: existing.id },
+                  'direct magnet identity save failed'
+                )
+              )
+          }
+        }
         dirty = true
       }
     } else {
@@ -1334,18 +1358,20 @@ function buildFinalizeDeps(adapter: Aria2Adapter) {
       if (!durableFinalizeRuntime) {
         throw new Error('durable finalize runtime is unavailable')
       }
+      // 兼容符号链接保存目录（如 macOS 将 ~/Downloads 软链至外置盘）的存量任务落盘
+      const normalized = await canonicalizeFinalizeCommitRequest(input)
       const post =
-        input.occurrence?.type === 'terminal' && pluginHookRuntime
+        normalized.occurrence?.type === 'terminal' && pluginHookRuntime
           ? await pluginHookRuntime.prepareTerminal(
-              input.task,
-              input.occurrence
+              normalized.task,
+              normalized.occurrence
             )
           : { postDeliveries: [], beforeCommit: () => undefined }
       await durableFinalizeRuntime.commit({
-        ...input,
+        ...normalized,
         postDeliveries: post.postDeliveries,
         beforeCommit: () => {
-          input.beforeCommit?.()
+          normalized.beforeCommit?.()
           post.beforeCommit()
         },
       })
@@ -2830,6 +2856,7 @@ async function initializeMainProcess(): Promise<void> {
       eventBus,
       publishTaskUpdate,
       activityRecorder: activeTaskActivityService,
+      prepareSaveDir: canonicalizeSaveDir,
       persistTask,
       persistTaskWithPluginMetadata:
         pluginRuntime.persistTaskWithPluginMetadata,

@@ -1,7 +1,7 @@
 import { checkPath, joinPath, extname, basename, readFile, getFileStats } from '@common/utils/nodejs'
 import { formatPlayTime } from '@common/utils/common'
 import { decodeKrc } from '@common/utils/lyricUtils/kg'
-import { type IAudioMetadata } from 'music-metadata'
+import { type IAudioMetadata } from 'music-metadata/node'
 
 export const checkDownloadFileAvailable = async(musicInfo: LX.Download.ListItem, savePath: string): Promise<boolean> => {
   return musicInfo.isComplate && !/\.ape$/.test(musicInfo.metadata.fileName) &&
@@ -61,7 +61,7 @@ export const getMusicFilePath = async(musicInfo: LX.Music.MusicInfo | LX.Downloa
  */
 export const createLocalMusicInfo = async(path: string): Promise<LX.Music.MusicInfoLocal | null> => {
   if (!await checkPath(path)) return null
-  const { parseFile } = await import('music-metadata')
+  const { parseFile } = await import('music-metadata/node')
 
   let metadata
   try {
@@ -106,7 +106,7 @@ const getFileMetadata = async(path: string) => {
   if (prevFileInfo.path == path) return prevFileInfo.promise
   prevFileInfo.path = path
   return prevFileInfo.promise = checkPath(path).then(async(isExist) => {
-    return isExist ? import('music-metadata').then(async({ parseFile }) => parseFile(path)).catch(err => {
+    return isExist ? import('music-metadata/node').then(async({ parseFile }) => parseFile(path)).catch(err => {
       console.log(err)
       return null
     }) : null
@@ -126,7 +126,7 @@ export const getLocalMusicFilePic = async(path: string) => {
   if (stats) return picPath
   const metadata = await getFileMetadata(path)
   if (!metadata) return null
-  const { selectCover } = await import('music-metadata')
+  const { selectCover } = await import('music-metadata/node')
   return selectCover(metadata.common.picture)
 }
 
@@ -164,7 +164,7 @@ export const getLocalMusicFilePic = async(path: string) => {
 //   return lyricInfo
 // }
 
-type IComment = NonNullable<IAudioMetadata['common']['comment']> extends Array<infer U> ? U : never
+type IComment = NonNullable<IAudioMetadata['common']['comments']> extends Array<infer U> ? U : never
 
 /**
  * 获取歌曲文件歌词
@@ -181,7 +181,7 @@ export const getLocalMusicFileLyric = async(path: string): Promise<LX.Music.Lyri
     const { detect } = await import('jschardet')
     const { confidence, encoding } = detect(lrcBuf)
     console.log('lrc file encoding', confidence, encoding)
-    if (confidence > 0.8) {
+    if (encoding && confidence > 0.8) {
       const iconv = (await import('iconv-lite')).default
       if (iconv.encodingExists(encoding)) {
         const lrc = iconv.decode(lrcBuf, encoding)

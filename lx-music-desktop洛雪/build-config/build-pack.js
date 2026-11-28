@@ -23,8 +23,8 @@ const options = {
     buildResources: './resources',
     output: './build',
   },
-  "toolsets": {
-    "appimage": "1.0.3"
+  toolsets: {
+    appimage: '1.0.3',
   },
   files: [
     '!node_modules/**/*',
@@ -112,6 +112,9 @@ const macOptions = {
     icon: './resources/icons/icon.icns',
     category: 'public.app-category.music',
     // artifactName: '${productName}-${version}.${ext}',
+    extendInfo: {
+      NSLocalNetworkUsageDescription: '此应用需要访问本地网络，以连接局域网中的设备和服务。',
+    },
   },
   dmg: {
     window: {

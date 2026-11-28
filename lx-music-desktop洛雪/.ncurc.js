@@ -25,6 +25,9 @@ module.exports = {
     // 'eslint-config-standard-with-typescript',
 
     'webpack',
+    'webpack-cli',
+    'webpack-merge',
+    'webpack-dev-server',
   ],
 
   // target: 'newest',
@@ -54,6 +57,5 @@ module.exports = {
   //   'vue-eslint-parser',
   //   'better-sqlite3',
   //   '@types/better-sqlite3',
-  //   'webpack-dev-server',
   // ],
 }
